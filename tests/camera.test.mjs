@@ -145,3 +145,38 @@ test('fixed north disables rotation entirely', () => {
   for (let i = 0; i < 600; i++) cam.follow(state, { fixedNorth: true }, 1 / 60, 800, 600);
   assert.ok(Math.abs(cam.angle - HALF_PI) < 1e-6, `fixed north drifted to ${cam.angle}`);
 });
+
+test('a zero-sized viewport never collapses the zoom', () => {
+  // Regression: a canvas measured mid-layout (orientation change, still
+  // display:none, backgrounded tab) reports 0x0. Taking that literally set
+  // pixels-per-metre to ~0, rendering the entire world as a dot -- and because
+  // zoom was damped, it then crawled back over several visible seconds.
+  const cam = new Camera();
+  const state = { x: 0, y: 0, heading: 0, speed: 20, slipAngle: 0 };
+  const settings = { fixedNorth: false };
+  for (let i = 0; i < 200; i++) cam.follow(state, settings, 1 / 60, 1280, 720);
+  const good = cam.scale;
+  assert.ok(good > 1, `expected a sane scale, got ${good}`);
+
+  cam.applyZoom(0, 0);
+  assert.equal(cam.scale, good, 'a 0x0 viewport must be ignored, not obeyed');
+  cam.follow(state, settings, 1 / 60, 0, 0);
+  assert.equal(cam.scale, good, 'a 0x0 follow must not change the scale either');
+});
+
+test('resizing re-derives zoom immediately, without a zoom animation', () => {
+  const cam = new Camera();
+  const state = { x: 0, y: 0, heading: 0, speed: 28, slipAngle: 0 };
+  const settings = { fixedNorth: false };
+  for (let i = 0; i < 300; i++) cam.follow(state, settings, 1 / 60, 1280, 720);
+
+  const metresBefore = 720 / cam.scale;
+  // Phone rotation: short edge changes from 720 to 390.
+  cam.applyZoom(844, 390);
+  const metresAfter = 390 / cam.scale;
+
+  assert.ok(
+    Math.abs(metresAfter - metresBefore) < 1e-9,
+    `view width in metres changed from ${metresBefore} to ${metresAfter} across a resize`,
+  );
+});

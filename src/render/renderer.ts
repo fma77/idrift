@@ -61,14 +61,44 @@ export class Renderer {
 
   resize(): void {
     const rect = this.canvas.getBoundingClientRect();
+
+    // A zero-sized measurement is not a viewport, it is a moment when the
+    // browser has not laid the canvas out yet -- mid orientation change, while
+    // the element is still display:none, or when the page is in a background
+    // tab. Clamping those to 1px used to look harmless and was not: the camera
+    // derives its zoom from the viewport, so a 1px canvas collapsed the scale
+    // to ~0.02 px/m, and because the scale is damped rather than snapped it
+    // then took seconds of visibly microscopic world to crawl back. Keep the
+    // last good size instead and wait for a real one.
+    let width = Math.round(rect.width);
+    let height = Math.round(rect.height);
+
+    if (width <= 0 || height <= 0) {
+      // The canvas is full-bleed, so the window is a good second opinion.
+      width = Math.round(window.innerWidth);
+      height = Math.round(window.innerHeight);
+    }
+    if (width <= 0 || height <= 0) {
+      // Still nothing real. Keep whatever we last measured and try again on the
+      // next resize; a 1px fallback would be worse than doing nothing, because
+      // it looks like a valid viewport all the way down the pipeline.
+      if (this.width > 0 && this.height > 0) return;
+      width = 1;
+      height = 1;
+    }
+
+    this.width = width;
+    this.height = height;
+
     // Cap DPR: a 3x retina phone rendering a full-screen canvas at native
     // density spends more time on fill than on anything else, and the art
     // direction is flat colour with hairlines -- 2x is indistinguishable.
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = Math.max(1, Math.round(rect.width));
-    this.height = Math.max(1, Math.round(rect.height));
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
+    // The zoom target moved with the viewport; take it immediately rather than
+    // easing to it, so a rotation does not play a one-second zoom animation.
+    this.camera.applyZoom(this.width, this.height);
   }
 
   clearTrails(): void {

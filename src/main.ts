@@ -632,7 +632,9 @@ syncKeyHints();
 controlsEl.dataset.lefty = String(settings.lefty);
 showScreen('title');
 
-// Expose a little state for debugging in the console during tuning.
+// Expose live state for tuning from the console: camera framing and handling
+// are judged by eye, and being able to read the actual numbers behind a frame
+// is the difference between tuning and guessing.
 Object.assign(window as unknown as Record<string, unknown>, {
   idrift: {
     get settings() {
@@ -641,6 +643,13 @@ Object.assign(window as unknown as Record<string, unknown>, {
     get outcome() {
       return lastOutcome;
     },
+    get session() {
+      return session;
+    },
+    get route() {
+      return currentRoute;
+    },
+    renderer,
     TICK_RATE,
     SIM_VERSION,
   },

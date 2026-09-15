@@ -16,18 +16,40 @@ export interface CameraSettings {
 }
 
 /**
- * Metres of road visible across the short edge of the screen when stationary.
- * Widens with speed for lookahead; at 40 m/s the view covers about twice this.
+ * Zoom is expressed as "how many metres of road fit across the short edge of
+ * the screen", never as pixels per metre.
+ *
+ * An absolute px/m value frames the game completely differently on a 390px
+ * phone and a 1600px desktop -- the same road is a quarter of the screen on one
+ * and a twentieth on the other -- and that fraction is what decides whether a
+ * corner is readable. Deriving pixels from the viewport keeps both honest.
+ *
+ * These two constants are the whole feel of the camera. Lower METRES_AT_REST to
+ * zoom in, raise SPEED_WIDENING to open the view up faster as the car builds
+ * speed.
  */
-const METRES_AT_REST = 34;
+const METRES_AT_REST = 26;
+/** Extra metres of view per m/s of speed, for lookahead. */
+const SPEED_WIDENING = 0.85;
+const MAX_METRES_ACROSS = 62;
 
 export class Camera {
   x = 0;
   y = 0;
   /** World angle currently pointing up-screen. */
   angle = HALF_PI;
-  /** Pixels per metre. */
+  /** Pixels per metre. Derived every frame from metresAcross and the viewport. */
   scale = 12;
+
+  /**
+   * The damped quantity is the *view width in metres*, not the pixel scale.
+   *
+   * Damping the pixel scale directly conflates two different changes: the car
+   * speeding up (which should ease) and the viewport resizing (which should
+   * not). Keeping metres as the state means a phone rotation re-derives pixels
+   * instantly and correctly, with no zoom animation and no stale scale.
+   */
+  private metresAcross = METRES_AT_REST;
 
   private settled = false;
 
@@ -72,27 +94,35 @@ export class Camera {
       this.angle = wrapAngle(this.angle + delta * k);
     }
 
-    // Zoom is expressed as "how many metres fit across the short edge of the
-    // screen", not as pixels per metre.
-    //
-    // An absolute px/m value frames the game completely differently on a 390px
-    // phone and a 1600px desktop -- the same road is a third of the screen on
-    // one and a tenth on the other. Deriving the scale from the viewport means
-    // both platforms see the same amount of road, which is what actually
-    // determines whether a corner is drivable.
-    const metresAcross = clamp(METRES_AT_REST + state.speed * 1.05, METRES_AT_REST, 78);
-    const shortEdge = Math.min(viewWidth, viewHeight);
-    const targetScale = shortEdge / metresAcross;
-    this.scale = lerp(this.scale, targetScale, 1 - Math.exp(-2.5 * dtSeconds));
+    const target = clamp(
+      METRES_AT_REST + state.speed * SPEED_WIDENING,
+      METRES_AT_REST,
+      MAX_METRES_ACROSS,
+    );
+    this.metresAcross = lerp(this.metresAcross, target, 1 - Math.exp(-2.5 * dtSeconds));
+    this.applyZoom(viewWidth, viewHeight);
   }
 
   reset(state: SimState, viewWidth = 0, viewHeight = 0): void {
     this.x = state.x;
     this.y = state.y;
     this.angle = state.heading;
-    const shortEdge = Math.min(viewWidth, viewHeight);
-    this.scale = shortEdge > 0 ? shortEdge / METRES_AT_REST : 12;
+    this.metresAcross = METRES_AT_REST;
+    this.applyZoom(viewWidth, viewHeight);
     this.settled = true;
+  }
+
+  /**
+   * Re-derive pixels-per-metre for a viewport size. Called on resize.
+   *
+   * A zero-sized viewport is not a viewport -- it is a browser that has not
+   * laid out yet. Taking it literally would set the scale to zero and render
+   * the world as a dot, so the previous scale is kept until a real size shows up.
+   */
+  applyZoom(viewWidth: number, viewHeight: number): void {
+    const shortEdge = Math.min(viewWidth, viewHeight);
+    if (shortEdge <= 0) return;
+    this.scale = shortEdge / this.metresAcross;
   }
 
   /**
