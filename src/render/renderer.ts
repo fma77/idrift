@@ -2,6 +2,7 @@ import { sin, cos, wrapAngle, clamp, lerp } from '../sim/math/trig.ts';
 import type { CarParams, RouteData, SimState } from '../sim/types.ts';
 import { Camera, type CameraSettings } from './camera.ts';
 import { getSprite } from './sprites.ts';
+import { drawDecoration, type DecorationData } from './decoration.ts';
 
 /**
  * World renderer.
@@ -52,6 +53,12 @@ export class Renderer {
   private skidLeft: SkidPoint[] = [];
   private skidRight: SkidPoint[] = [];
 
+  /**
+   * Route scenery. Held on the renderer, not on the route, so there is no field
+   * anywhere in sim-visible data that could carry it into the simulation.
+   */
+  private decoration: DecorationData | null = null;
+
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('2D canvas context unavailable');
@@ -101,6 +108,10 @@ export class Renderer {
     this.camera.applyZoom(this.width, this.height);
   }
 
+  setDecoration(decoration: DecorationData | null): void {
+    this.decoration = decoration;
+  }
+
   clearTrails(): void {
     this.skidLeft.length = 0;
     this.skidRight.length = 0;
@@ -141,6 +152,18 @@ export class Renderer {
     // The camera transform scales metres to pixels, so every line width below
     // is expressed in metres and divided by scale to stay pixel-constant.
     const px = 1 / this.camera.scale;
+
+    // Scenery first: it sits under the road surface and the racing line.
+    if (this.decoration) {
+      const spacing = route.sampleSpacing;
+      drawDecoration(
+        ctx,
+        this.decoration,
+        state.sampleIndex - Math.round(REVEAL_BEHIND / spacing),
+        state.sampleIndex + Math.round(REVEAL_AHEAD / spacing),
+        px,
+      );
+    }
 
     this.drawRoad(ctx, route, state, px);
     this.drawScoringMarks(ctx, route, state, px);

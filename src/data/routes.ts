@@ -29,6 +29,20 @@ export const ROUTES: RouteEntry[] = [
     file: 'routes/akari-downhill.json',
     blurb: 'Fast opener, three hairpins, esses in the middle. 1.5km down.',
   },
+  {
+    id: 'kirisame-ridge',
+    name: 'KIRISAME RIDGE',
+    location: 'Kirisame Ridge, East Col',
+    file: 'routes/kirisame-ridge.json',
+    blurb: 'Long radii, linked esses, one hairpin that bites. 1.75km.',
+  },
+  {
+    id: 'shiomi-docks',
+    name: 'SHIOMI DOCKS',
+    location: 'Shiomi Docks, Berth 9',
+    file: 'routes/shiomi-docks.json',
+    blurb: 'Wide, slippery and tight. Built for angle, not speed. 1km.',
+  },
 ];
 
 export const ROUTE_IDS = ROUTES.map((r) => r.id);

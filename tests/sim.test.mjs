@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -302,4 +302,54 @@ test('wall contact costs time and puts the car back on the road', () => {
     Math.abs(state.lateralOffset) <= halfWidth + 0.01,
     'the car must be back on the road after a reset',
   );
+});
+
+test('decoration cannot reach the simulation', () => {
+  // The brief requires that visual changes never invalidate a leaderboard.
+  // That holds only if decoration is genuinely unreachable from the sim, so
+  // assert it behaviourally rather than trusting the file layout: run the same
+  // inputs against routes whose decoration fields differ in every way, and
+  // require bit-identical results.
+  const car = carById('kaido-zen-r');
+  const baseline = runBot(car, 'driftRun');
+
+  const mutated = JSON.parse(JSON.stringify(route));
+  mutated.decoration = 'something-completely-different.deco.json';
+  mutated.poster = 'art/nope.png';
+  delete mutated.decoration;
+
+  const state = createSimState(mutated, car);
+  const config = { mode: 'driftRun', assist: 0 };
+  const input = { steer: 0, throttle: 0, handbrake: false };
+  const q = { steer: 0, throttle: 0, flags: 0 };
+  const hashes = [];
+  while (!state.finished && state.tick < baseline.state.tick + 10) {
+    baseline.recorder.at(Math.floor(state.tick / TICKS_PER_INPUT), q);
+    dequantiseInput(q, input);
+    if (state.tick % HASH_INTERVAL === 0) hashes.push(hashSimState(state));
+    stepSim(state, input, car, mutated, config);
+  }
+
+  assert.deepEqual(hashes, baseline.hashes, 'changing decoration changed the simulation');
+  assert.equal(state.drift.banked, baseline.state.drift.banked);
+});
+
+test('the sim never imports the rendering layer', () => {
+  // A structural backstop for the test above: if someone reaches into the
+  // renderer from inside src/sim, determinism and the decoration guarantee both
+  // quietly stop holding, and only this would notice.
+  const simDir = resolve(here, '../src/sim');
+  const offenders = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.ts')) {
+        const src = readFileSync(full, 'utf8');
+        if (/from '\.\.\/(render|ui|input|audio|net|storage)\//.test(src)) offenders.push(entry.name);
+      }
+    }
+  };
+  walk(simDir);
+  assert.deepEqual(offenders, [], 'src/sim must not import from the presentation layers');
 });

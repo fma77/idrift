@@ -330,6 +330,108 @@ function theoreticalMaxPoints(zones, ds) {
 }
 
 // ---------------------------------------------------------------------------
+// Decoration
+// ---------------------------------------------------------------------------
+
+/**
+ * Small deterministic PRNG so re-baking a route produces the same scenery.
+ * Nothing here reaches the sim, but a baked file that changes on every run is
+ * a miserable thing to keep in version control.
+ */
+function lcg(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+/**
+ * Generate the decoration layer.
+ *
+ * Written to a SEPARATE file from the route, and never merged into it. The
+ * brief is firm about this and it is the right call: decoration must not be
+ * able to affect physics or scoring, so that re-scattering the trees can never
+ * invalidate a leaderboard. Keeping it in its own file makes that structural
+ * rather than a rule someone has to remember.
+ *
+ * Every object carries the centreline index it sits nearest to, so the renderer
+ * can cull it with the same window it uses for the road instead of doing a
+ * spatial query every frame.
+ */
+function bakeDecoration(route) {
+  const rand = lcg(route.seed ^ 0x5eed);
+  const s = route.samples;
+  const objects = [];
+
+  for (let i = 0; i < s.x.length; i++) {
+    const h = s.heading[i];
+    const w = s.halfWidth[i];
+    const k = Math.abs(s.curvature[i]);
+
+    // Guardrail on the outside of anything tighter than a 60m radius. Cosmetic
+    // only -- the wall that actually stops the car is the route's halfWidth.
+    if (k > 1 / 60 && i % 3 === 0) {
+      const side = s.curvature[i] > 0 ? -1 : 1;
+      const off = (w + 1.9) * side;
+      objects.push({
+        kind: 'guardrail',
+        index: i,
+        x: round3(s.x[i] - Math.sin(h) * off),
+        y: round3(s.y[i] + Math.cos(h) * off),
+        rotation: round3(h),
+        scale: 1,
+      });
+    }
+
+    // Trees and posts scattered beyond the shoulder, thinned out so the sides
+    // read as texture rather than a hedge.
+    if (i % 4 === 0) {
+      for (const side of [1, -1]) {
+        if (rand() > 0.45) continue;
+        const off = (w + 4 + rand() * 11) * side;
+        objects.push({
+          kind: rand() > 0.22 ? 'tree' : 'post',
+          index: i,
+          x: round3(s.x[i] - Math.sin(h) * off),
+          y: round3(s.y[i] + Math.cos(h) * off),
+          rotation: round3(rand() * 6.283),
+          scale: round3(0.7 + rand() * 0.8),
+        });
+      }
+    }
+  }
+
+  // A marker board at each corner entry, which doubles as a visual pace note.
+  for (const corner of route.corners) {
+    const i = Math.max(0, corner.startIndex - 6);
+    const h = s.heading[i];
+    const side = corner.sign > 0 ? -1 : 1;
+    const off = (s.halfWidth[i] + 1.4) * side;
+    objects.push({
+      kind: 'marker',
+      index: i,
+      x: round3(s.x[i] - Math.sin(h) * off),
+      y: round3(s.y[i] + Math.cos(h) * off),
+      rotation: round3(h),
+      scale: 1,
+      severity: corner.severity,
+      sign: corner.sign,
+    });
+  }
+
+  return {
+    routeId: route.id,
+    routeVersion: route.version,
+    // Bumped independently of routeVersion: changing the scenery is explicitly
+    // NOT a change to the route, and must never reset a leaderboard.
+    decorationVersion: 1,
+    palette: { tree: '#1f1f1f', post: '#3a3a3a', guardrail: '#5a564c', marker: '#e8402a' },
+    objects,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Bake
 // ---------------------------------------------------------------------------
 
@@ -439,6 +541,10 @@ async function main() {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(route));
 
+  const deco = bakeDecoration(route);
+  const decoOut = resolve(dirname(out), `${route.id}.deco.json`);
+  writeFileSync(decoOut, JSON.stringify(deco));
+
   const bytes = Buffer.byteLength(JSON.stringify(route));
   console.log(`baked ${basename(out)}`);
   console.log(`  samples        ${route.samples.x.length} @ ${route.sampleSpacing}m`);
@@ -448,6 +554,7 @@ async function main() {
   console.log(`  min time       ${route.theoreticalMinTime}s (theoretical bound)`);
   console.log(`  max points     ${route.theoreticalMaxPoints} (theoretical bound)`);
   console.log(`  file size      ${(bytes / 1024).toFixed(1)} KB`);
+  console.log(`  decoration     ${deco.objects.length} objects -> ${basename(decoOut)}`);
 }
 
 main().catch((err) => {

@@ -28,12 +28,36 @@ export interface MemeAsset {
 }
 
 /**
- * Populate with real assets as they arrive. An entry of `null` means the event
- * is recognised and deliberately has nothing attached yet.
+ * Two placeholder cards, drawn as inline SVG so the trigger path is wired and
+ * demonstrably working before any art exists. They are meant to look like
+ * placeholders -- swapping in a real clip is replacing one entry here with
+ * `{ src: 'art/memes/whatever.webm', type: 'video' }` and nothing else.
+ *
+ * `null` means the event is recognised and deliberately has nothing attached.
  */
+function placeholderCard(line: string, sub: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="300" viewBox="0 0 520 300">
+    <rect width="520" height="300" fill="#f4f1ea"/>
+    <rect x="16" y="16" width="488" height="268" fill="none" stroke="#141414" stroke-width="3"/>
+    <text x="260" y="140" text-anchor="middle" font-family="Bungee,Arial Black,sans-serif"
+          font-size="48" fill="#e8402a">${line}</text>
+    <text x="260" y="182" text-anchor="middle" font-family="Work Sans,sans-serif"
+          font-size="15" letter-spacing="2" fill="#6d675c">${sub}</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export const MEME_TABLE: Record<MemeEvent, MemeAsset | null> = {
-  personalBest: null,
-  leaderboardTop20: null,
+  personalBest: {
+    src: placeholderCard('BEST YET', 'PLACEHOLDER — SWAP IN MEME_TABLE'),
+    type: 'image',
+    duration: 1600,
+  },
+  leaderboardTop20: {
+    src: placeholderCard('TOP 20', 'PLACEHOLDER — SWAP IN MEME_TABLE'),
+    type: 'image',
+    duration: 1600,
+  },
   routeComplete: null,
   sRank: null,
   spinOut: null,

@@ -99,4 +99,14 @@ screen, score numerals, combo multipliers, failure states. Radius 0 everywhere.
 Bungee for display, Work Sans for everything else with tabular numerals on anything
 that counts. Tokens are in `src/ui/styles.css`.
 
+## Deploying
+
+One Cloudflare Worker serves the game and the API. See `docs/deploy.md`.
+
+```bash
+npx wrangler login
+npm run setup:cloudflare
+npm run deploy
+```
+
 See `docs/decisions.md` for where the implementation deviates from the brief and why.

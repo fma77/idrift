@@ -102,7 +102,12 @@ export const CARS: CarParams[] = [
       filterRange: 3200,
       whine: 0.34,
     },
-    tint: '#141414',
+    // Car tints are picked for legibility on the ink-2 tarmac, not for realism.
+    // The first pass gave two of the three cars ink and ink-2 fills, which made
+    // them all but invisible against the road they drive on -- only the paper
+    // outline gave them away. In a top-down game the car is the one object that
+    // must never be hard to find.
+    tint: '#f4f1ea',
   },
   {
     id: 'tengu-gt-x',
@@ -146,7 +151,7 @@ export const CARS: CarParams[] = [
       filterRange: 4200,
       whine: 0.22,
     },
-    tint: '#2B2B2B',
+    tint: '#e0dbd0',
   },
 ];
 

@@ -63,6 +63,30 @@ must travel with the replay. It lives in `SimConfig` and in the stored run recor
 There is a test asserting that changing assist changes the run — if it ever stops
 changing it, the assist has quietly become a no-op.
 
+### Hosting is one Worker with Static Assets, not Pages plus an API Worker
+
+The brief (§10) specifies Cloudflare Pages for the frontend and separate
+Workers for the API. Cloudflare now recommends Workers with Static Assets for
+exactly this shape, and it is simpler where it counts: one project, one deploy,
+one origin (so no CORS), and no way for the game and the API to end up on
+different versions. Same free tier, and static asset bandwidth is still
+unmetered. D1, R2 and the rate limiter are unchanged.
+
+### Sanity bounds are read from the route file, not duplicated in the Worker
+
+The brief asks the API to reject times below the route's theoretical minimum
+and points above its maximum. Rather than copying those numbers into the
+Worker, it reads them from the baked route JSON through the ASSETS binding, so
+they cannot drift from the geometry the sim actually drove.
+
+### Car tints were changed for legibility
+
+Two of the three cars originally used the design system's ink and ink-2 as
+their body fill, which is very nearly the colour of the tarmac they drive on.
+Only the paper outline made them findable. In a top-down game the car is the
+one object that must never be hard to see, so the roster is now red, paper and
+paper-2.
+
 ## Additions not in the brief
 
 - **Skid marks.** Cosmetic, and worth the cost: in a top-down view a player otherwise
@@ -98,8 +122,10 @@ Four were caught by the headless harness and would have been miserable to find b
 
 - Drift Duels / tandem (§7.3) — deferred by the brief. The ghost-replay half is
   already free from the determinism work; the pursuit controller is not started.
-- Cloudflare Workers + D1 leaderboards (§10), art integration beyond the loader and
-  fallbacks (§8), and meme assets (§8) — the trigger system and table are wired with
-  no assets attached.
 - Server-side re-simulation — explicitly not required for v1. The state-hash stream is
   recorded anyway, so it is cheap to add later.
+- Ghost playback. Replays are recorded, compressed, stored and served
+  byte-identically, and the sim replays them exactly; nothing yet draws a second
+  car from one. This is the cheapest remaining feature by a distance.
+- Supplied art. The loading, rotation and fallback paths all exist and are
+  exercised; there are simply no image files yet.

@@ -1,0 +1,30 @@
+{
+  "id": "shiomi-docks",
+  "version": 1,
+  "name": "SHIOMI DOCKS",
+  "location": "Shiomi Docks, Berth 9",
+  "seed": 90210,
+  "sampleSpacing": 2,
+  "width": 10.5,
+  "grip": 0.94,
+  "startHeading": 0,
+  "_note": "The drift course. Deliberately wide and slightly slippery: big angles need room to run out, and a surface that lets go early makes initiation cheap and holding it the skill. Nothing here is fast, so the scoring comes from angle and line rather than speed.",
+  "segments": [
+    { "type": "straight", "length": 60 },
+    { "type": "corner", "direction": "left", "radius": 26, "angle": 110 },
+    { "type": "straight", "length": 35 },
+    { "type": "corner", "direction": "right", "radius": 20, "angle": 140 },
+    { "type": "straight", "length": 25 },
+    { "type": "corner", "direction": "left", "radius": 30, "angle": 90 },
+    { "type": "corner", "direction": "right", "radius": 28, "angle": 100 },
+    { "type": "straight", "length": 50 },
+    { "type": "corner", "direction": "left", "radius": 16, "angle": 170 },
+    { "type": "straight", "length": 70 },
+    { "type": "corner", "direction": "right", "radius": 34, "angle": 95 },
+    { "type": "corner", "direction": "left", "radius": 22, "angle": 130 },
+    { "type": "straight", "length": 40 },
+    { "type": "corner", "direction": "right", "radius": 40, "angle": 85 },
+    { "type": "corner", "direction": "left", "radius": 45, "angle": 70 },
+    { "type": "straight", "length": 140 }
+  ]
+}

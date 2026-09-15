@@ -14,7 +14,10 @@
     "deploy": "npm run build && wrangler deploy",
     "db:local": "wrangler d1 migrations apply idrift-db --local",
     "db:remote": "wrangler d1 migrations apply idrift-db --remote",
-    "dev:worker": "npm run build && wrangler dev"
+    "dev:worker": "npm run build && wrangler dev",
+    "setup:cloudflare": "node tools/cloudflare-setup.mjs",
+    "db:reset": "wrangler d1 execute idrift-db --remote --command \"DELETE FROM scores\"",
+    "db:reset:local": "wrangler d1 execute idrift-db --local --command \"DELETE FROM scores\""
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260915.1",

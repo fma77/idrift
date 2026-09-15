@@ -19,6 +19,8 @@ import {
   compress,
   bestKey,
 } from './storage/bests.ts';
+import { loadDecoration } from './render/decoration.ts';
+import { getSprite, preload } from './render/sprites.ts';
 import { fireMeme } from './ui/memes.ts';
 import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
@@ -176,9 +178,14 @@ async function openIntro(entry: RouteEntry): Promise<void> {
     ...(isCompleted(entry.id) ? [] : [chip('NEW', 'chip--red')]),
   );
 
-  drawMinimap(route);
+  showPoster(route);
   void refreshBoard();
   showScreen('intro');
+
+  // Scenery and car art load in the background. Neither blocks the drive
+  // button, and neither is required for the route to be playable.
+  void loadDecoration(route.decoration).then((deco) => renderer.setDecoration(deco));
+  void preload([carById(settings.carId).sprite?.path, entry.poster]);
 }
 
 // --- Leaderboard ------------------------------------------------------------
@@ -294,6 +301,29 @@ function chip(text: string, className: string): HTMLElement {
  * this; until then the player still gets an accurate read of the corner
  * sequence, which is the part that actually matters before a first run.
  */
+/**
+ * Route intro artwork.
+ *
+ * Uses the supplied poster when one has loaded, and the drawn course map
+ * otherwise. Both answer the same question -- what shape is this route -- and
+ * the drawn one is generated from the centreline the sim drives, so it can
+ * never disagree with the road even when the poster does.
+ */
+function showPoster(route: RouteData): void {
+  const poster = getSprite(currentEntry.poster);
+  const img = $<HTMLImageElement>('poster-img');
+  const canvas = $<HTMLCanvasElement>('minimap');
+  if (poster) {
+    img.src = poster.src;
+    img.hidden = false;
+    canvas.hidden = true;
+    return;
+  }
+  img.hidden = true;
+  canvas.hidden = false;
+  drawMinimap(route);
+}
+
 function drawMinimap(route: RouteData): void {
   const el = $<HTMLCanvasElement>('minimap');
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -818,7 +848,7 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('resize', () => {
   if (!gameEl.hidden) renderer.resize();
-  if (!SCREENS.intro.hidden && currentRoute) drawMinimap(currentRoute);
+  if (!SCREENS.intro.hidden && currentRoute) showPoster(currentRoute);
 });
 
 // Touch anywhere switches the control hints over to the on-screen layout.
