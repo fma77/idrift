@@ -59,7 +59,14 @@ export class Renderer {
    */
   private decoration: DecorationData | null = null;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  // Declared as a plain field rather than a constructor parameter property:
+  // Node's type-stripping loader rejects parameter properties outright, and
+  // that one shortcut was enough to make this whole module unimportable from a
+  // headless test.
+  private readonly canvas: HTMLCanvasElement;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('2D canvas context unavailable');
     this.ctx = ctx;
@@ -396,14 +403,7 @@ export class Renderer {
       ctx.lineWidth = px * 2;
       ctx.strokeRect(-len / 2, -wid / 2, len, wid);
 
-      // Front axle indicator, turned to the steered angle.
-      ctx.save();
-      ctx.translate(car.cgToFront, 0);
-      ctx.rotate(view.steerAngle);
-      ctx.fillStyle = INK;
-      ctx.fillRect(-0.35, -wid / 2 - 0.18, 0.7, 0.26);
-      ctx.fillRect(-0.35, wid / 2 - 0.08, 0.7, 0.26);
-      ctx.restore();
+      drawWheels(ctx, car, view.steerAngle);
     }
 
     ctx.restore();
@@ -430,6 +430,45 @@ export class Renderer {
     gradient.addColorStop(1, 'rgba(20,20,20,1)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, this.width, this.height);
+  }
+}
+
+/**
+ * Four wheels, each pivoting about its own centre.
+ *
+ * The first version translated to the middle of the front axle and rotated the
+ * pair together. That is a pivot on the car's centreline, so steering swung one
+ * wheel forwards and the other backwards -- the axle appeared to rotate about
+ * the middle of the car, like a shopping trolley castor. A real steering axis
+ * runs down through each wheel, so each one turns where it stands and neither
+ * moves along the car.
+ *
+ * Rear wheels are drawn unsteered, which is also the point: with all four
+ * present, the fronts turning alone is what reads as steering from above.
+ */
+export function drawWheels(
+  ctx: CanvasRenderingContext2D,
+  car: CarParams,
+  steerAngle: number,
+): void {
+  // Wheel centres sit on the body edge, so half of each wheel shows against the
+  // body and half against the road. That keeps them legible whichever of the
+  // two the car's tint happens to resemble.
+  const halfTrack = car.bodyWidth / 2;
+  const length = Math.min(0.78, car.bodyLength * 0.19);
+  const width = 0.26;
+
+  ctx.fillStyle = INK;
+  for (const side of [-1, 1]) {
+    // Front: steered.
+    ctx.save();
+    ctx.translate(car.cgToFront, side * halfTrack);
+    ctx.rotate(steerAngle);
+    ctx.fillRect(-length / 2, -width / 2, length, width);
+    ctx.restore();
+
+    // Rear: fixed to the body.
+    ctx.fillRect(-car.cgToRear - length / 2, side * halfTrack - width / 2, length, width);
   }
 }
 

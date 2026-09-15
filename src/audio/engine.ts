@@ -31,7 +31,11 @@ export class EngineAudio {
   private noiseGain: GainNode | null = null;
   private started = false;
 
-  constructor(private enabled: boolean) {}
+  private readonly enabled: boolean;
+
+  constructor(enabled: boolean) {
+    this.enabled = enabled;
+  }
 
   /**
    * Must be called from a user gesture. Browsers refuse to start an AudioContext

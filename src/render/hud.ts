@@ -33,7 +33,11 @@ export class Hud {
   private lastScore = 0;
   private lastPaceKey = '';
 
-  constructor(private el: HudElements) {}
+  private readonly el: HudElements;
+
+  constructor(el: HudElements) {
+    this.el = el;
+  }
 
   /**
    * Update the HUD from sim state.
