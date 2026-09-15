@@ -1,5 +1,5 @@
 import { clamp, lerp } from '../math/trig.ts';
-import type { CarParams, EngineParams, SimState } from '../types.ts';
+import type { CarParams, EngineParams, SimInput, SimState } from '../types.ts';
 
 const RPM_PER_RAD_PER_SEC = 9.549296585513721; // 60 / (2 * PI)
 
@@ -71,36 +71,68 @@ function engineBraking(car: CarParams, vx: number): number {
   return clamp(Math.abs(vx) * 12, 0, 900) * (vx >= 0 ? 1 : -1) * (car.mass / 1300);
 }
 
+/** Throttle the autopilot asks for at assist 1.0 when nothing needs correcting. */
+const AUTOPILOT_CRUISE = 0.85;
+
 /**
- * Automatic throttle for the assist slider.
- *
- * This is NOT a difficulty flag that swaps code paths -- it produces a throttle
- * value that is blended with the player's and then fed through exactly the same
- * engine and tyre equations. At assist 1.0 the player still steers; the
- * computer just works the pedal.
- *
- * The controller holds a target slip angle. It reads counter-steer (steering
- * opposite to the direction of the slide) as the player's request for a bigger
- * angle, which is the same signal a real driver uses.
+ * How far the assist will push the throttle to hold its target slip angle.
+ * Radians of slip error map to throttle at this rate.
  */
-export function autoThrottle(state: SimState, steerInput: number): number {
+const SLIP_GAIN = 2.5;
+
+/**
+ * The slide correction the assist wants, as a throttle delta.
+ *
+ * Positive means "more power, the car is not rotating enough"; negative means
+ * "lift, this is turning into a spin". Reads counter-steer -- steering into the
+ * slide -- as the driver asking for a bigger angle, which is the same signal a
+ * real driver acts on.
+ */
+function slipCorrection(state: SimState, steerInput: number): number {
   const absSlip = Math.abs(state.slipAngle);
 
-  // Steering into the opposite lock of the slide = "hold this drift".
+  // slipAngle > 0 means the car is travelling to the left of where it points,
+  // which is caught with left lock -- and left is negative steer. So opposite
+  // signs means the driver is counter-steering.
   const counterSteering = steerInput * state.slipAngle < 0 ? Math.abs(steerInput) : 0;
 
   // 7 degrees of slip when tracking straight, up to ~27 under full counter-lock.
   const targetSlip = 0.12 + 0.35 * counterSteering;
-
-  // Below target, feed power to rotate the car. Above it, lift to catch the slide.
-  const correction = (targetSlip - absSlip) * 2.5;
-
-  // Never asks for more than a light brake: the assist should not be able to
-  // stop the car, only modulate the slide.
-  return clamp(0.9 + correction, -0.2, 1);
+  return (targetSlip - absSlip) * SLIP_GAIN;
 }
 
-/** Blend player and assist throttle. `assist` is 0..1 from the settings slider. */
-export function blendThrottle(playerThrottle: number, auto: number, assist: number): number {
-  return lerp(playerThrottle, auto, clamp(assist, 0, 1));
+/**
+ * Resolve the player's pedal and the assist into the single throttle value the
+ * engine and tyres actually see.
+ *
+ * This is NOT a difficulty flag that swaps code paths: the result goes through
+ * exactly the same equations at every assist level, which is why `assist` has
+ * to travel with a stored replay.
+ *
+ * The first version of this simply blended the player's throttle with an
+ * autopilot that always wanted ~90% power. At the default assist of 0.6 that
+ * made a full brake application come out as +0.20 throttle -- the car
+ * *accelerated* when you hit the brakes, and coasted to 25km/h with nobody
+ * touching anything. The pedals felt disconnected because they very nearly
+ * were.
+ *
+ * So braking is now never arbitrated. The assist exists to manage the slide,
+ * not to argue with the driver about slowing down: when the brake is asked for
+ * it is delivered, and the assist may only add lift on top, never remove it.
+ */
+export function resolveThrottle(state: SimState, input: SimInput, assistLevel: number): number {
+  const assist = clamp(assistLevel, 0, 1);
+  const player = input.throttle;
+  const correction = slipCorrection(state, input.steer);
+
+  if (player < 0) {
+    // Braking. The driver's request passes through untouched; the assist can
+    // only ever brake harder to catch a slide.
+    return clamp(player + assist * Math.min(correction, 0), -1, 1);
+  }
+
+  // On throttle or coasting. At assist 0 the pedal is entirely the player's; at
+  // 1 the assist cruises and holds the target slip angle on its own.
+  const base = lerp(player, AUTOPILOT_CRUISE, assist);
+  return clamp(base + assist * correction, -1, 1);
 }

@@ -432,3 +432,34 @@
   text-align: center;
   padding: 0 var(--gutter);
 }
+
+/*
+ * Buttons on the ink overlays.
+ *
+ * .btn--secondary is defined for the paper surface: a #141414 border and #141414
+ * text. On the pause overlay, which is ink at 86% over a near-black canvas, that
+ * renders black on black -- the "Quit run" button was fully present, focusable
+ * and clickable, and completely invisible. Overlays get the inverted pair.
+ */
+.overlay .btn--secondary {
+  border-color: var(--paper);
+  color: var(--paper);
+}
+
+.overlay .btn--secondary:active {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.overlay .btn--text {
+  color: var(--paper);
+}
+
+/* Give the pause overlay's actions room to breathe and a consistent width. */
+.overlay__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: 100%;
+  max-width: 320px;
+}

@@ -353,3 +353,99 @@ test('the sim never imports the rendering layer', () => {
   walk(simDir);
   assert.deepEqual(offenders, [], 'src/sim must not import from the presentation layers');
 });
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+
+/** A wide-open version of the route, so steering tests never hit a wall. */
+function openRoute() {
+  const wide = JSON.parse(JSON.stringify(route));
+  wide.samples.halfWidth = wide.samples.halfWidth.map(() => 500);
+  return wide;
+}
+
+/** Bring a car up to `speed` m/s on full throttle, then return its state. */
+function rollingStart(car, cfg, track, speed) {
+  const state = createSimState(track, car);
+  const input = { steer: 0, throttle: 1, handbrake: false };
+  while (state.speed < speed) stepSim(state, input, car, track, cfg);
+  return state;
+}
+
+test('steering right turns the car right', () => {
+  // Regression: the sim uses counter-clockwise-positive angles, so a positive
+  // road-wheel angle is a LEFT turn -- while the input contract says +1 is
+  // RIGHT. Without the negation between them the car steered away from the key
+  // you pressed, which is instantly obvious to a player and invisible to every
+  // test that only checked lap times.
+  const track = openRoute();
+  const car = carById('kaido-zen-r');
+
+  for (const [label, steer, wantSign] of [['right', 1, -1], ['left', -1, 1]]) {
+    const cfg = { mode: 'timeAttack', assist: 0 };
+    const state = rollingStart(car, cfg, track, 15);
+    const before = state.heading;
+    const input = { steer, throttle: 0.3, handbrake: false };
+    for (let t = 0; t < TICK_RATE * 2; t++) stepSim(state, input, car, track, cfg);
+
+    const turned = state.heading - before;
+    assert.ok(
+      Math.sign(turned) === wantSign && Math.abs(turned) > 0.3,
+      `steer ${steer} ("${label}") changed heading by ${turned.toFixed(2)} rad`,
+    );
+  }
+});
+
+test('the brake works at every assist level', () => {
+  // Regression: the assist used to be a plain blend with an autopilot that
+  // always wanted ~90% throttle. At the default assist of 0.6 a full brake
+  // application resolved to +0.20 throttle -- the car accelerated when you hit
+  // the brakes. Braking is the driver's; the assist may only ever add lift.
+  const track = openRoute();
+  const car = carById('kaido-zen-r');
+
+  for (const assist of [0, 0.3, 0.6, 1]) {
+    const cfg = { mode: 'timeAttack', assist };
+    const state = rollingStart(car, cfg, track, 25);
+    const before = state.speed;
+
+    const input = { steer: 0, throttle: -1, handbrake: false };
+    for (let t = 0; t < TICK_RATE * 2; t++) stepSim(state, input, car, track, cfg);
+
+    assert.ok(
+      state.speed < before * 0.6,
+      `at assist ${assist}, two seconds of full brake went ${(before * 3.6).toFixed(0)} -> ${(state.speed * 3.6).toFixed(0)} km/h`,
+    );
+    assert.ok(
+      state.throttleApplied < 0,
+      `at assist ${assist}, a brake request resolved to throttle ${state.throttleApplied.toFixed(2)}`,
+    );
+  }
+});
+
+test('assist 0 hands the throttle entirely to the player', () => {
+  const track = openRoute();
+  const car = carById('kaido-zen-r');
+  const cfg = { mode: 'timeAttack', assist: 0 };
+  const state = createSimState(track, car);
+  const input = { steer: 0, throttle: 0, handbrake: false };
+  for (let t = 0; t < TICK_RATE * 3; t++) stepSim(state, input, car, track, cfg);
+  // Not exactly zero: the tyre model's low-speed slip clamp leaves a residue
+  // around 1e-13 m/s. That is a picometre per second -- stationary by any
+  // measure that matters, so the bound is small rather than exact.
+  assert.ok(
+    state.speed < 1e-6,
+    `with no assist and no throttle the car must not move, but reached ${state.speed} m/s`,
+  );
+});
+
+test('assist 1 drives the throttle on its own', () => {
+  const track = openRoute();
+  const car = carById('kaido-zen-r');
+  const cfg = { mode: 'timeAttack', assist: 1 };
+  const state = createSimState(track, car);
+  const input = { steer: 0, throttle: 0, handbrake: false };
+  for (let t = 0; t < TICK_RATE * 3; t++) stepSim(state, input, car, track, cfg);
+  assert.ok(state.speed > 5, `full assist should pull away unaided, reached ${state.speed} m/s`);
+});

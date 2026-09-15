@@ -97,7 +97,9 @@ export function driveBot(
   //    terms leave behind, bounded so it cannot fight the other terms.
   steerAngle += clamp(-state.lateralOffset * CROSS_TRACK_GAIN, -0.14, 0.14);
 
-  out.steer = clamp(steerAngle / car.maxSteerAngle, -1, 1);
+  // steerAngle is a road-wheel angle (positive = left); out.steer is a
+  // player-facing input (positive = right). Opposite signs, so negate.
+  out.steer = clamp(-steerAngle / car.maxSteerAngle, -1, 1);
 
   // --- Speed target from the tightest curvature in the braking zone ahead ---
   const brakingMetres = clamp(state.speed * state.speed * 0.062, 25, 140);

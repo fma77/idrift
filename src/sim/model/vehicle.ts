@@ -1,6 +1,6 @@
 import { atan2, sin, cos, clamp, moveToward, wrapAngle } from '../math/trig.ts';
 import { lateralForce, longitudinalCapacity, combinedSlipScale } from './tyre.ts';
-import { driveForce, autoThrottle, blendThrottle } from './engine.ts';
+import { driveForce, resolveThrottle } from './engine.ts';
 import type { CarParams, SimConfig, SimInput, SimState } from '../types.ts';
 
 const GRAVITY = 9.80665;
@@ -36,9 +36,19 @@ export function stepVehicle(
 ): void {
   const wheelbase = car.cgToFront + car.cgToRear;
 
-  // --- Steering: rate limited, so a keyboard's instant full-lock still takes
-  // physical time to arrive at the road wheel and cannot step the tyre force.
-  const targetSteer = input.steer * car.maxSteerAngle;
+  // --- Steering ---
+  //
+  // Sign convention, which was wrong for a while and worth spelling out:
+  //   input.steer   -1 = full LEFT,  +1 = full RIGHT  (what a player expects)
+  //   steerAngle    positive = LEFT                   (maths convention: the
+  //                 whole sim uses counter-clockwise-positive angles, so a left
+  //                 turn increases heading)
+  // The two therefore have OPPOSITE signs, hence the negation. Without it the
+  // car steers away from the key you press.
+  //
+  // Rate limited, so a keyboard's instant full-lock still takes physical time
+  // to arrive at the road wheel and cannot step the tyre force.
+  const targetSteer = -input.steer * car.maxSteerAngle;
   state.steerAngle = moveToward(state.steerAngle, targetSteer, car.steerRate * dt);
   const delta = state.steerAngle;
 
@@ -49,9 +59,8 @@ export function stepVehicle(
   state.frontSlip = alphaFront;
   state.rearSlip = alphaRear;
 
-  // --- Throttle: player and assist blended, then through one shared path ---
-  const auto = autoThrottle(state, input.steer);
-  const throttle = blendThrottle(input.throttle, auto, config.assist);
+  // --- Throttle: player and assist resolved, then through one shared path ---
+  const throttle = resolveThrottle(state, input, config.assist);
   state.throttleApplied = throttle;
 
   // --- Longitudinal forces ---
