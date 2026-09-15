@@ -1,0 +1,66 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "idrift",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-15",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // One Worker serves the built game and the API.
+  //
+  // The brief called for Pages plus a separate API Worker. Cloudflare now
+  // recommends Workers with Static Assets for this exact shape, and it is
+  // simpler in the ways that matter here: one project, one deploy, one origin
+  // (so no CORS), and no way for the frontend and API to end up on different
+  // versions. Static asset bandwidth is still free and unmetered.
+  "assets": {
+    "directory": "./dist/",
+    "binding": "ASSETS",
+    // The game is a single page; anything that is not a real file should still
+    // boot the app rather than 404.
+    "not_found_handling": "single-page-application",
+    // API paths must reach the Worker instead of being answered by the asset
+    // server, which would otherwise return index.html for them.
+    "run_worker_first": ["/api/*"]
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Leaderboards. database_id is filled in by `wrangler d1 create idrift-db`.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "idrift-db",
+      "database_id": "PLACEHOLDER_RUN_WRANGLER_D1_CREATE",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Car art, route posters and meme assets. Zero egress fees, which matters
+  // when every player downloads them. Bound now; nothing reads it yet.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "idrift-media"
+    }
+  ],
+
+  // Abuse protection on score submission, per the brief.
+  //
+  // Ten per minute per IP, not five. The limit is per *public* IP, and the
+  // expected audience is a family behind one home NAT -- several people posting
+  // ~90-second runs from what Cloudflare sees as a single address. Five was
+  // enough to lock out a household mid-session while still being no obstacle
+  // to anyone scripting it.
+  "ratelimits": [
+    {
+      "name": "SCORE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ]
+}

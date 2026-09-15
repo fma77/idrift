@@ -20,6 +20,9 @@ import {
   bestKey,
 } from './storage/bests.ts';
 import { fireMeme } from './ui/memes.ts';
+import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
+import { checkName } from '../shared/moderation.ts';
+import type { LeaderboardRow } from '../shared/api.ts';
 import { SIM_VERSION, TICK_RATE } from './sim/version.ts';
 import type { RouteData, SimMode } from './sim/types.ts';
 
@@ -57,6 +60,10 @@ let currentRoute: RouteData | null = null;
 let currentMode: SimMode = 'timeAttack';
 let session: GameSession | null = null;
 let lastOutcome: RunOutcome | null = null;
+/** Which board the route screen is showing. */
+let boardMode: SimMode = 'timeAttack';
+/** Row id of the score just posted, so it can be highlighted on the board. */
+let myLastRowId: string | null = null;
 
 const renderer = new Renderer(canvas);
 const hud = new Hud({
@@ -170,7 +177,94 @@ async function openIntro(entry: RouteEntry): Promise<void> {
   );
 
   drawMinimap(route);
+  void refreshBoard();
   showScreen('intro');
+}
+
+// --- Leaderboard ------------------------------------------------------------
+
+function setBoardMode(mode: SimMode): void {
+  boardMode = mode;
+  $('board-tab-time').setAttribute('aria-selected', String(mode === 'timeAttack'));
+  $('board-tab-drift').setAttribute('aria-selected', String(mode === 'driftRun'));
+  void refreshBoard();
+}
+
+/**
+ * Fetch and draw the board for the current route and mode.
+ *
+ * Every failure here is non-fatal by design. The board is the only part of the
+ * game that needs the network, so an outage shows a line of text and the player
+ * carries on driving.
+ */
+async function refreshBoard(): Promise<void> {
+  const route = currentRoute;
+  const container = $('board-rows');
+  if (!route) return;
+
+  container.replaceChildren(caption('Loading…'));
+
+  try {
+    const board = await fetchBoard(
+      route.id,
+      boardMode,
+      'all',
+      route.version,
+      SIM_VERSION,
+    );
+    if (board.rows.length === 0) {
+      container.replaceChildren(caption('No times posted yet. Be first.'));
+      return;
+    }
+    container.replaceChildren(...board.rows.map(boardRow));
+  } catch (err) {
+    const message =
+      err instanceof LeaderboardError ? err.message : 'Could not reach the leaderboard.';
+    container.replaceChildren(caption(message));
+  }
+}
+
+function boardRow(row: LeaderboardRow): HTMLElement {
+  const el = document.createElement('div');
+  el.className = row.id === myLastRowId ? 'board__row board__row--me' : 'board__row';
+
+  const rank = document.createElement('span');
+  rank.className = 'board__rank';
+  rank.textContent = String(row.rank);
+
+  const name = document.createElement('span');
+  name.className = 'board__name';
+  name.textContent = row.playerName;
+  const car = document.createElement('span');
+  car.className = 'board__car';
+  car.textContent = carById(row.carId).name;
+  name.appendChild(car);
+
+  const value = document.createElement('span');
+  value.className = 'board__value';
+  // Time Attack shows only a time; Drift Run shows points, with the time as
+  // the secondary value, exactly as the brief specifies.
+  value.textContent =
+    boardMode === 'timeAttack'
+      ? formatTime(row.timeMs / 1000)
+      : row.points.toLocaleString('en-GB');
+  if (boardMode === 'driftRun') {
+    const time = document.createElement('span');
+    time.className = 'board__car';
+    time.style.textAlign = 'right';
+    time.textContent = formatTime(row.timeMs / 1000);
+    value.appendChild(time);
+  }
+
+  el.append(rank, name, value);
+  return el;
+}
+
+function caption(text: string): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'caption';
+  el.textContent = text;
+  return el;
 }
 
 function statRow(label: string, value: string): HTMLElement {
@@ -547,6 +641,7 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
   }
 
   $('result-stats').replaceChildren(...rows);
+  resetSubmitPanel();
   showScreen('results');
 
   // Meme triggers fire here -- on a results screen, never mid-drive.
@@ -562,6 +657,112 @@ function quitRun(): void {
   $('overlay-paused').hidden = true;
   buildRouteList();
   showScreen('routes');
+}
+
+// --- Posting a score --------------------------------------------------------
+
+function resetSubmitPanel(): void {
+  const input = $<HTMLInputElement>('player-name');
+  input.value = settings.playerName;
+  input.removeAttribute('aria-invalid');
+  $('name-error').textContent = '';
+  $('post-status').textContent = '';
+  const post = $<HTMLButtonElement>('btn-post');
+  post.disabled = false;
+  post.textContent = 'Post score';
+}
+
+/** Live feedback as the player types. The server check is the one that counts. */
+function validateNameField(): boolean {
+  const input = $<HTMLInputElement>('player-name');
+  const error = $('name-error');
+  const value = input.value.trim();
+  if (value.length === 0) {
+    input.removeAttribute('aria-invalid');
+    error.textContent = '';
+    return false;
+  }
+  const check = checkName(value);
+  input.setAttribute('aria-invalid', String(!check.ok));
+  error.textContent = check.ok ? '' : (check.message ?? '');
+  return check.ok;
+}
+
+async function postScore(): Promise<void> {
+  const route = currentRoute;
+  const outcome = lastOutcome;
+  const status = $('post-status');
+  const post = $<HTMLButtonElement>('btn-post');
+
+  if (!route || !outcome) {
+    status.textContent = 'Nothing to post.';
+    return;
+  }
+  if (!validateNameField()) {
+    $('player-name').focus();
+    if (!$('name-error').textContent) $('name-error').textContent = 'Pick a name first.';
+    return;
+  }
+
+  const name = $<HTMLInputElement>('player-name').value.trim();
+  settings.playerName = name;
+  saveSettings(settings);
+
+  post.disabled = true;
+  post.textContent = 'Posting…';
+  status.textContent = '';
+
+  const car = carById(settings.carId);
+  const { result } = outcome;
+
+  try {
+    // The replay rides along with the score. A gzipped 90-second run is a few
+    // KB, which is small enough to send for every submission rather than only
+    // for a record -- and it is what makes ghost playback possible later.
+    let replay: string | undefined;
+    try {
+      replay = bytesToBase64(await compress(outcome.recorder.encode()));
+    } catch {
+      // Compression unavailable: post the score without a ghost.
+    }
+
+    const response = await submitScore({
+      routeId: route.id,
+      routeVersion: route.version,
+      mode: currentMode,
+      carClass: car.carClass,
+      simVersion: SIM_VERSION,
+      playerName: name,
+      carId: car.id,
+      timeMs: Math.round(result.timeSeconds * 1000),
+      points: result.points,
+      grade: result.grade,
+      assist: settings.assist,
+      tickCount: result.totalTicks,
+      replay,
+    });
+
+    myLastRowId = response.id;
+    post.textContent = 'Posted';
+    status.textContent = response.inTop20
+      ? `Posted — #${response.rank} on the board.`
+      : `Posted — #${response.rank}. Top ${20} to make the board.`;
+    if (response.inTop20) fireMeme('leaderboardTop20');
+  } catch (err) {
+    post.disabled = false;
+    post.textContent = 'Post score';
+    if (err instanceof LeaderboardError) {
+      status.textContent = err.message;
+      // A name the server rejects should land on the field, not in a status line.
+      if (err.code === 'profanity' || err.code === 'reserved') {
+        $('name-error').textContent = err.message;
+        $('player-name').setAttribute('aria-invalid', 'true');
+        status.textContent = '';
+      }
+    } else {
+      status.textContent = 'Could not post that score.';
+    }
+  }
 }
 
 // --- Wiring -----------------------------------------------------------------
@@ -590,6 +791,10 @@ $('btn-result-routes').addEventListener('click', () => {
   showScreen('routes');
 });
 $('btn-result-title').addEventListener('click', () => showScreen('title'));
+$('btn-post').addEventListener('click', () => void postScore());
+$('player-name').addEventListener('input', validateNameField);
+$('board-tab-time').addEventListener('click', () => setBoardMode('timeAttack'));
+$('board-tab-drift').addEventListener('click', () => setBoardMode('driftRun'));
 $('btn-quit').addEventListener('click', quitRun);
 $('btn-resume').addEventListener('click', () => {
   $('overlay-paused').hidden = true;
@@ -628,6 +833,7 @@ window.addEventListener(
 buildRouteList();
 buildCarList();
 buildSettings();
+setBoardMode('timeAttack');
 syncKeyHints();
 controlsEl.dataset.lefty = String(settings.lefty);
 showScreen('title');

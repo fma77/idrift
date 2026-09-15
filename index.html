@@ -81,6 +81,17 @@
 
           <div class="chip-row" id="intro-chips"></div>
 
+          <div class="board">
+            <div class="board__head">
+              <div class="label" style="color: var(--ink-muted)">Leaderboard</div>
+              <div class="board__tabs">
+                <button class="board__tab" id="board-tab-time" data-mode="timeAttack">Time</button>
+                <button class="board__tab" id="board-tab-drift" data-mode="driftRun">Drift</button>
+              </div>
+            </div>
+            <div id="board-rows"><div class="caption">Loading…</div></div>
+          </div>
+
           <div class="spacer"></div>
 
           <div class="btn-row">
@@ -187,6 +198,26 @@
           </div>
 
           <div id="result-stats"></div>
+
+          <div id="result-submit">
+            <div class="label" style="color: var(--ink-muted); margin-bottom: 8px">Leaderboard</div>
+            <div class="row" id="result-name-row">
+              <label for="player-name">Name on the board</label>
+              <input
+                id="player-name"
+                class="text-input"
+                type="text"
+                maxlength="14"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                placeholder="YOUR NAME"
+              />
+            </div>
+            <div class="caption" id="name-error" role="alert"></div>
+            <button class="btn btn--secondary" id="btn-post" style="margin-top: 12px">Post score</button>
+            <div class="caption" id="post-status" role="status" style="margin-top: 8px"></div>
+          </div>
 
           <div class="spacer"></div>
 

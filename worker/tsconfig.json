@@ -1,0 +1,14 @@
+{
+  // The Worker is a separate compilation unit from the game.
+  //
+  // It runs on workerd, not in a browser: pulling in the DOM lib here would let
+  // `document` and `window` typecheck in code that would throw at runtime. The
+  // shared/ modules are deliberately DOM-free so both sides can import them.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"],
+    "noEmit": true
+  },
+  "include": ["./**/*.ts", "../shared/**/*.ts"]
+}
