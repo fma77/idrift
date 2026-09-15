@@ -1,0 +1,161 @@
+import { TICK_RATE } from '../sim/version.ts';
+import type { RouteData, SimMode, SimState } from '../sim/types.ts';
+
+/**
+ * HUD, in DOM rather than on the canvas.
+ *
+ * The design system is heavily typographic -- Bungee display, Work Sans with
+ * tabular numerals, square ink panels, hairline rules. Reproducing that in
+ * canvas text would mean reimplementing font loading, letter-spacing and safe
+ * areas by hand and getting it slightly wrong. DOM gets it exactly right, reads
+ * correctly to a screen reader, and the canvas keeps the whole frame budget for
+ * the world.
+ */
+
+export interface HudElements {
+  root: HTMLElement;
+  comboLabel: HTMLElement;
+  comboValue: HTMLElement;
+  scoreLabel: HTMLElement;
+  scoreValue: HTMLElement;
+  driftLabel: HTMLElement;
+  driftValue: HTMLElement;
+  speedValue: HTMLElement;
+  gearValue: HTMLElement;
+  pace: HTMLElement;
+  flash: HTMLElement;
+}
+
+/** Severity 1-6 to a chevron count. Six is a hairpin. */
+const SEVERITY_GLYPH = ['', '>', '>>', '>>>', '>>>>', '>>>>>', '>>>>>>'];
+
+export class Hud {
+  private lastScore = 0;
+  private lastPaceKey = '';
+
+  constructor(private el: HudElements) {}
+
+  /**
+   * Update the HUD from sim state.
+   *
+   * Every value shown here is read from the sim, never recomputed: the number
+   * on screen during the run has to be the same number the sim banked, or a
+   * replay would disagree with what the player remembers seeing.
+   */
+  update(state: SimState, route: RouteData, mode: SimMode): void {
+    const el = this.el;
+
+    el.speedValue.textContent = String(Math.round(state.speed * 3.6));
+    el.gearValue.textContent = String(state.gear + 1);
+
+    if (mode === 'driftRun') {
+      const total = Math.round(state.drift.banked + state.drift.pending);
+      el.comboLabel.textContent = 'Combo';
+      el.comboValue.textContent = `x${state.drift.multiplier.toFixed(1)}`;
+      el.scoreLabel.textContent = 'Score';
+      el.scoreValue.textContent = total.toLocaleString('en-GB');
+      el.driftLabel.textContent = 'Drift';
+      el.driftValue.textContent = `${(state.drift.driftTicks / TICK_RATE).toFixed(1)}s`;
+
+      // Score pop, retriggered by removing and re-adding the class.
+      if (total > this.lastScore + 250) {
+        el.scoreValue.classList.remove('hud__value--pop');
+        void el.scoreValue.offsetWidth;
+        el.scoreValue.classList.add('hud__value--pop');
+        this.lastScore = total;
+      } else if (total < this.lastScore) {
+        this.lastScore = total;
+      }
+
+      if (state.drift.brokeThisTick) this.flash();
+    } else {
+      const seconds = (state.raceTicks + state.penaltyTicks) / TICK_RATE;
+      el.comboLabel.textContent = 'Penalty';
+      el.comboValue.textContent =
+        state.penaltyTicks > 0 ? `+${(state.penaltyTicks / TICK_RATE).toFixed(0)}s` : '--';
+      el.scoreLabel.textContent = 'Time';
+      el.scoreValue.textContent = formatTime(seconds);
+      el.driftLabel.textContent = 'Left';
+      el.driftValue.textContent = `${Math.max(0, Math.round((route.length - state.distance) / 10) * 10)}m`;
+      if (state.hitThisTick) this.flash();
+    }
+
+    this.updatePace(state, route);
+  }
+
+  /** Combo break / wall contact: a 2-frame red flash, per the design system. */
+  private flash(): void {
+    this.el.flash.classList.remove('hud--break');
+    void this.el.flash.offsetWidth;
+    this.el.flash.classList.add('hud--break');
+  }
+
+  /**
+   * Pace notes.
+   *
+   * Progressive reveal means the player cannot see round a blind corner, which
+   * without this strip would make the first run of a route a memorisation
+   * exercise rather than a driving one. Two notes: what you are arriving at,
+   * and what follows it.
+   */
+  private updatePace(state: SimState, route: RouteData): void {
+    const spacing = route.sampleSpacing;
+    const notes: { sign: number; severity: number; distance: number }[] = [];
+
+    for (let i = 0; i < route.corners.length && notes.length < 2; i++) {
+      const corner = route.corners[i];
+      // Measure to the corner's entry, not its apex: that is the point the
+      // player has to have finished braking by.
+      const distance = corner.startIndex * spacing - state.distance;
+      if (distance < -12) continue;
+      notes.push({ sign: corner.sign, severity: corner.severity, distance: Math.max(0, distance) });
+    }
+
+    // Rebuild only when the corner list changes; the distance readout updates
+    // in place. Rewriting this subtree every frame would thrash layout.
+    const key = notes.map((n) => `${n.sign}:${n.severity}`).join('|');
+    if (key !== this.lastPaceKey) {
+      this.lastPaceKey = key;
+      this.el.pace.replaceChildren(
+        ...notes.map((note, index) => {
+          const div = document.createElement('div');
+          div.className = index === 0 ? 'pace__note pace__note--next' : 'pace__note';
+
+          const arrow = document.createElement('div');
+          arrow.className = 'pace__arrow';
+          const glyph = SEVERITY_GLYPH[note.severity] || '>';
+          arrow.textContent = note.sign > 0 ? mirror(glyph) : glyph;
+
+          const sev = document.createElement('div');
+          sev.className = 'pace__sev';
+          sev.textContent = `${note.sign > 0 ? 'L' : 'R'}${note.severity}`;
+
+          const dist = document.createElement('div');
+          dist.className = 'pace__dist';
+          dist.dataset.role = 'dist';
+
+          div.append(arrow, sev, dist);
+          return div;
+        }),
+      );
+    }
+
+    const distEls = this.el.pace.querySelectorAll<HTMLElement>('[data-role="dist"]');
+    for (let i = 0; i < distEls.length; i++) {
+      const note = notes[i];
+      distEls[i].textContent = note ? `${Math.round(note.distance / 5) * 5}m` : '';
+    }
+  }
+}
+
+function mirror(glyph: string): string {
+  return glyph.split('').map((c) => (c === '>' ? '<' : c)).reverse().join('');
+}
+
+/** m:ss.mmm, always the same width so the timer does not jitter. */
+export function formatTime(seconds: number): string {
+  const safe = Math.max(0, seconds);
+  const m = Math.floor(safe / 60);
+  const s = safe - m * 60;
+  return `${m}:${s.toFixed(2).padStart(5, '0')}`;
+}

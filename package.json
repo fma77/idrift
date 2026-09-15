@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "node --test tests/",
+    "test": "node --test \"tests/*.test.mjs\"",
     "bake": "node tools/bake-route.mjs"
   },
   "devDependencies": {

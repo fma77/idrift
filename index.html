@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#141414" />
+    <meta name="description" content="iDrift — a top-down touge drifting game." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>iDrift</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bungee&family=IBM+Plex+Mono:wght@400;600&family=Work+Sans:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ================= TITLE ================= -->
+      <section class="screen" id="screen-title">
+        <div class="screen-inner">
+          <div class="spacer"></div>
+          <div>
+            <div class="mono" style="color: var(--ink-muted)">TOUGE TIME ATTACK &middot; DRIFT RUN</div>
+            <h1 class="display-xl" style="margin: 8px 0 0">iDRIFT</h1>
+            <p class="caption" style="max-width: 42ch; margin-top: 12px">
+              Top-down drifting on mountain roads. Steer with one thumb, keep the rear out, do not
+              hit anything.
+            </p>
+          </div>
+          <div class="spacer"></div>
+          <div class="btn-row">
+            <button class="btn btn--primary" id="btn-drive">Drive</button>
+            <button class="btn btn--secondary" id="btn-garage">Garage</button>
+            <button class="btn btn--text" id="btn-settings">Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ROUTES ================= -->
+      <section class="screen" id="screen-routes" hidden>
+        <div class="screen-inner">
+          <div class="screen-head">
+            <h2 class="display">Routes</h2>
+            <button class="btn--text" id="btn-routes-back" style="border: none; background: none; cursor: pointer">
+              Back
+            </button>
+          </div>
+          <div class="btn-row" id="route-list"></div>
+          <div class="spacer"></div>
+        </div>
+      </section>
+
+      <!-- ================= ROUTE INTRO / COURSE MAP ================= -->
+      <section class="screen" id="screen-intro" hidden>
+        <div class="screen-inner">
+          <div class="screen-head">
+            <div>
+              <h2 class="display" id="intro-name">ROUTE</h2>
+              <div class="caption" id="intro-location"></div>
+            </div>
+            <button class="btn--text" id="btn-intro-back" style="border: none; background: none; cursor: pointer">
+              Back
+            </button>
+          </div>
+
+          <!--
+            The intro doubles as the course map. Progressive reveal means the
+            in-game camera never shows the whole route, so this is the only
+            place the player can see the corner sequence as a shape.
+          -->
+          <div id="intro-poster" style="background: var(--paper-2); padding: 16px">
+            <canvas id="minimap" style="width: 100%; display: block"></canvas>
+          </div>
+
+          <div id="intro-stats"></div>
+
+          <div class="chip-row" id="intro-chips"></div>
+
+          <div class="spacer"></div>
+
+          <div class="btn-row">
+            <button class="btn btn--primary" id="btn-time-attack">Time Attack</button>
+            <button class="btn btn--secondary" id="btn-drift-run">Drift Run</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= GARAGE ================= -->
+      <section class="screen" id="screen-garage" hidden>
+        <div class="screen-inner">
+          <div class="screen-head">
+            <h2 class="display">Garage</h2>
+            <button class="btn--text" id="btn-garage-back" style="border: none; background: none; cursor: pointer">
+              Back
+            </button>
+          </div>
+          <div class="btn-row" id="car-list"></div>
+          <div class="spacer"></div>
+        </div>
+      </section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section class="screen" id="screen-settings" hidden>
+        <div class="screen-inner">
+          <div class="screen-head">
+            <h2 class="display">Settings</h2>
+            <button class="btn--text" id="btn-settings-back" style="border: none; background: none; cursor: pointer">
+              Back
+            </button>
+          </div>
+
+          <div>
+            <div class="row">
+              <div>
+                <div>Throttle assist</div>
+                <div class="caption" id="assist-help">
+                  Automatic throttle. Higher holds the drift for you.
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px">
+                <input type="range" id="set-assist" min="0" max="100" step="5" />
+                <span class="row__value" id="assist-value" style="min-width: 3ch">60</span>
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <div>Left-handed layout</div>
+                <div class="caption">Mirrors steering and moves the handbrake.</div>
+              </div>
+              <button class="toggle" id="set-lefty" aria-pressed="false" aria-label="Left-handed layout">
+                <span class="toggle__knob"></span>
+              </button>
+            </div>
+
+            <div class="row">
+              <div>
+                <div>Fixed north camera</div>
+                <div class="caption">Stops the world rotating as you drift.</div>
+              </div>
+              <button class="toggle" id="set-north" aria-pressed="false" aria-label="Fixed north camera">
+                <span class="toggle__knob"></span>
+              </button>
+            </div>
+
+            <div class="row">
+              <div><div>Skid marks</div></div>
+              <button class="toggle" id="set-skids" aria-pressed="true" aria-label="Skid marks">
+                <span class="toggle__knob"></span>
+              </button>
+            </div>
+
+            <div class="row">
+              <div><div>Engine sound</div></div>
+              <button class="toggle" id="set-sound" aria-pressed="true" aria-label="Engine sound">
+                <span class="toggle__knob"></span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="label" style="color: var(--ink-muted); margin-bottom: 8px">Keyboard</div>
+            <div id="keybinds"></div>
+            <button class="btn--text" id="btn-reset-keys" style="border: none; background: none; cursor: pointer">
+              Reset to defaults
+            </button>
+          </div>
+
+          <div class="spacer"></div>
+        </div>
+      </section>
+
+      <!-- ================= RESULTS ================= -->
+      <section class="screen" id="screen-results" hidden>
+        <div class="screen-inner">
+          <div class="screen-head">
+            <div>
+              <h2 class="display" id="result-title">Run over</h2>
+              <div class="caption" id="result-route"></div>
+            </div>
+            <div class="chip" id="result-grade">C</div>
+          </div>
+
+          <div id="result-stats"></div>
+
+          <div class="spacer"></div>
+
+          <div class="btn-row">
+            <button class="btn btn--primary" id="btn-retry">Run again</button>
+            <button class="btn btn--secondary" id="btn-result-routes">Routes</button>
+            <button class="btn--text" id="btn-result-title" style="border: none; background: none; cursor: pointer">
+              Main menu
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= GAMEPLAY ================= -->
+      <div id="game" hidden>
+        <canvas id="canvas"></canvas>
+
+        <div class="hud">
+          <div class="hud__top">
+            <div class="pace" id="pace"></div>
+            <div class="hud__panel">
+              <div class="hud__cell">
+                <span class="hud__label" id="hud-combo-label">Combo</span>
+                <span class="hud__value hud__value--display" id="hud-combo">x1.0</span>
+              </div>
+              <div class="hud__cell hud__cell--mid">
+                <span class="hud__label" id="hud-score-label">Score</span>
+                <span class="hud__value" id="hud-score">0</span>
+              </div>
+              <div class="hud__cell hud__cell--end">
+                <span class="hud__label" id="hud-drift-label">Drift</span>
+                <span class="hud__value hud__value--red" id="hud-drift">0.0s</span>
+              </div>
+            </div>
+          </div>
+
+          <div></div>
+
+          <div class="hud__bottom">
+            <div class="hud__speed">
+              <span class="hud__value" id="hud-speed">0</span>
+              <span class="hud__unit">km/h</span>
+            </div>
+            <div class="keyhints">
+              <span class="keyhint"><span class="keyhint__key" id="hint-left">←</span><span class="keyhint__key" id="hint-right">→</span> STEER</span>
+              <span class="keyhint"><span class="keyhint__key" id="hint-accel">↑</span><span class="keyhint__key" id="hint-brake">↓</span> THROTTLE</span>
+              <span class="keyhint"><span class="keyhint__key" id="hint-handbrake">SPACE</span> HANDBRAKE</span>
+              <span class="keyhint"><span class="keyhint__key">ESC</span> QUIT</span>
+            </div>
+
+            <div class="hud__speed">
+              <span class="hud__value" id="hud-gear">1</span>
+              <span class="hud__unit">gear</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud__flash" id="hud-flash"></div>
+
+        <div class="controls" id="controls" data-mode="keyboard" data-lefty="false">
+          <div class="controls__steer" id="steer-zone"></div>
+          <div class="stick" id="stick"><div class="stick__knob" id="stick-knob"></div></div>
+          <button class="controls__handbrake" id="handbrake">HAND<br />BRAKE</button>
+        </div>
+
+        <div class="overlay" id="overlay-countdown" hidden>
+          <div class="overlay__count" id="countdown">3</div>
+          <div class="mono" style="color: var(--ink-faint)" id="countdown-mode">TIME ATTACK</div>
+        </div>
+
+        <div class="overlay" id="overlay-paused" hidden>
+          <div class="display">Paused</div>
+          <button class="btn btn--primary" id="btn-resume">Resume</button>
+          <button class="btn btn--secondary" id="btn-quit">Quit run</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,138 @@
+import { sin, cos, wrapAngle, clamp, lerp, HALF_PI } from '../sim/math/trig.ts';
+import type { SimState } from '../sim/types.ts';
+
+/**
+ * Camera.
+ *
+ * Lives entirely outside the sim: it reads sim state and produces a transform,
+ * and nothing it does can influence the simulation. That separation is why the
+ * camera can be changed freely -- including the settings toggles below -- with
+ * no risk of invalidating a leaderboard.
+ */
+
+export interface CameraSettings {
+  /** Disable rotation entirely. Some players find a rotating world nauseating. */
+  fixedNorth: boolean;
+}
+
+/**
+ * Metres of road visible across the short edge of the screen when stationary.
+ * Widens with speed for lookahead; at 40 m/s the view covers about twice this.
+ */
+const METRES_AT_REST = 34;
+
+export class Camera {
+  x = 0;
+  y = 0;
+  /** World angle currently pointing up-screen. */
+  angle = HALF_PI;
+  /** Pixels per metre. */
+  scale = 12;
+
+  private settled = false;
+
+  /**
+   * Follow the car.
+   *
+   * Two decisions here matter more than they look:
+   *
+   * 1. The camera aligns to the VELOCITY vector, not the heading. In a drift
+   *    those differ by up to 45 degrees, and aligning to heading means the
+   *    whole world snaps sideways the instant the car steps out -- exactly when
+   *    the player most needs a stable frame of reference.
+   *
+   * 2. That alignment is heavily damped. Even following velocity, a flick of
+   *    opposite lock changes the target angle quickly, and an undamped camera
+   *    turns that into a lurch. The damping constant is low enough that fast
+   *    transitions read as the world easing round rather than rotating.
+   */
+  follow(
+    state: SimState,
+    settings: CameraSettings,
+    dtSeconds: number,
+    viewWidth: number,
+    viewHeight: number,
+  ): void {
+    this.x = state.x;
+    this.y = state.y;
+
+    const targetAngle = settings.fixedNorth
+      ? HALF_PI
+      : state.speed > 2.5
+        ? state.heading + state.slipAngle
+        : state.heading;
+
+    if (!this.settled) {
+      this.angle = targetAngle;
+      this.settled = true;
+    } else {
+      // Frame-rate independent exponential damping toward the shortest turn.
+      const delta = wrapAngle(targetAngle - this.angle);
+      const k = 1 - Math.exp(-3.2 * dtSeconds);
+      this.angle = wrapAngle(this.angle + delta * k);
+    }
+
+    // Zoom is expressed as "how many metres fit across the short edge of the
+    // screen", not as pixels per metre.
+    //
+    // An absolute px/m value frames the game completely differently on a 390px
+    // phone and a 1600px desktop -- the same road is a third of the screen on
+    // one and a tenth on the other. Deriving the scale from the viewport means
+    // both platforms see the same amount of road, which is what actually
+    // determines whether a corner is drivable.
+    const metresAcross = clamp(METRES_AT_REST + state.speed * 1.05, METRES_AT_REST, 78);
+    const shortEdge = Math.min(viewWidth, viewHeight);
+    const targetScale = shortEdge / metresAcross;
+    this.scale = lerp(this.scale, targetScale, 1 - Math.exp(-2.5 * dtSeconds));
+  }
+
+  reset(state: SimState, viewWidth = 0, viewHeight = 0): void {
+    this.x = state.x;
+    this.y = state.y;
+    this.angle = state.heading;
+    const shortEdge = Math.min(viewWidth, viewHeight);
+    this.scale = shortEdge > 0 ? shortEdge / METRES_AT_REST : 12;
+    this.settled = true;
+  }
+
+  /**
+   * Apply the world-to-screen transform to a canvas context.
+   *
+   * Maps world (x right, y up) to canvas (x right, y down) with the camera's
+   * forward direction pointing up-screen. The determinant is negative because
+   * of that y flip -- that is the handedness change, not a bug.
+   */
+  applyTo(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number,
+    dpr: number,
+  ): void {
+    const s = this.scale;
+    const sa = sin(this.angle);
+    const ca = cos(this.angle);
+    const cx = viewWidth / 2;
+    // Sit the car below centre so more of the screen shows the road ahead.
+    const cy = viewHeight * 0.62;
+
+    // setTransform REPLACES the current transform rather than multiplying into
+    // it, so any device-pixel-ratio scale the caller set is discarded here. The
+    // dpr therefore has to be folded into this matrix directly -- composing the
+    // two by hand rather than relying on a scale() that this call would wipe
+    // out. Getting this wrong is silent on a 1x display and misplaces the whole
+    // world on every retina device.
+    ctx.setTransform(
+      dpr * s * sa,
+      dpr * -s * ca,
+      dpr * -s * ca,
+      dpr * -s * sa,
+      dpr * (cx - s * sa * this.x + s * ca * this.y),
+      dpr * (cy + s * ca * this.x + s * sa * this.y),
+    );
+  }
+
+  /** Largest world-space radius that can be visible. Used for culling. */
+  visibleRadius(viewWidth: number, viewHeight: number): number {
+    return (Math.sqrt(viewWidth * viewWidth + viewHeight * viewHeight) / 2 / this.scale) * 1.15;
+  }
+}

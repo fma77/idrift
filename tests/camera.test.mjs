@@ -1,0 +1,147 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { Camera } from '../src/render/camera.ts';
+import { sin, cos, HALF_PI } from '../src/sim/math/trig.ts';
+
+/**
+ * The camera transform is pure matrix maths with no DOM dependency beyond the
+ * shape of setTransform, so it is worth testing here rather than by eye in a
+ * browser. Getting it wrong is the kind of bug that looks like "the car is in a
+ * slightly odd place" and survives a long time.
+ */
+
+/** Minimal stand-in for CanvasRenderingContext2D that records the matrix. */
+function fakeCtx() {
+  return {
+    m: null,
+    setTransform(a, b, c, d, e, f) {
+      this.m = { a, b, c, d, e, f };
+    },
+  };
+}
+
+/** Apply a recorded matrix to a world point, giving device pixels. */
+function project(m, x, y) {
+  return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f };
+}
+
+function makeCamera({ x = 0, y = 0, angle = HALF_PI, scale = 12 } = {}) {
+  const cam = new Camera();
+  cam.x = x;
+  cam.y = y;
+  cam.angle = angle;
+  cam.scale = scale;
+  return cam;
+}
+
+const W = 800;
+const H = 600;
+const ANCHOR_X = W / 2;
+const ANCHOR_Y = H * 0.62;
+
+test('the camera position maps to the on-screen anchor', () => {
+  for (const dpr of [1, 2, 1.5]) {
+    for (const angle of [0, 0.7, HALF_PI, 3.0, -2.2]) {
+      const cam = makeCamera({ x: 137.4, y: -82.9, angle, scale: 14 });
+      const ctx = fakeCtx();
+      cam.applyTo(ctx, W, H, dpr);
+      const p = project(ctx.m, cam.x, cam.y);
+      assert.ok(Math.abs(p.x - ANCHOR_X * dpr) < 1e-6, `x at dpr ${dpr}, angle ${angle}`);
+      assert.ok(Math.abs(p.y - ANCHOR_Y * dpr) < 1e-6, `y at dpr ${dpr}, angle ${angle}`);
+    }
+  }
+});
+
+test('device pixel ratio scales the whole transform, not just the origin', () => {
+  // Regression: applyTo calls setTransform, which REPLACES rather than
+  // multiplies. A caller that set a dpr scale beforehand had it silently
+  // discarded, which put the world in the wrong place on every retina device.
+  const cam = makeCamera({ x: 40, y: 15, angle: 1.1, scale: 10 });
+  const one = fakeCtx();
+  const two = fakeCtx();
+  cam.applyTo(one, W, H, 1);
+  cam.applyTo(two, W, H, 2);
+  for (const key of ['a', 'b', 'c', 'd', 'e', 'f']) {
+    assert.ok(
+      Math.abs(two.m[key] - one.m[key] * 2) < 1e-9,
+      `matrix component ${key} did not scale with dpr`,
+    );
+  }
+});
+
+test('the camera forward direction points up the screen', () => {
+  for (const angle of [0, 0.9, HALF_PI, 2.5, -1.3]) {
+    const cam = makeCamera({ x: -12, y: 60, angle, scale: 9 });
+    const ctx = fakeCtx();
+    cam.applyTo(ctx, W, H, 1);
+
+    // 10 metres ahead along the camera's own heading.
+    const ahead = project(ctx.m, cam.x + cos(angle) * 10, cam.y + sin(angle) * 10);
+    assert.ok(Math.abs(ahead.x - ANCHOR_X) < 1e-4, `ahead drifted sideways at angle ${angle}`);
+    // Canvas y grows downward, so "up the screen" is a smaller y.
+    assert.ok(ahead.y < ANCHOR_Y - 1, `ahead was not up-screen at angle ${angle}`);
+    assert.ok(
+      Math.abs(ANCHOR_Y - ahead.y - 10 * cam.scale) < 1e-4,
+      'distance ahead did not scale by pixels-per-metre',
+    );
+  }
+});
+
+test('world left appears on the left of the screen', () => {
+  for (const angle of [0, 0.9, HALF_PI, 2.5, -1.3]) {
+    const cam = makeCamera({ x: 5, y: -5, angle, scale: 9 });
+    const ctx = fakeCtx();
+    cam.applyTo(ctx, W, H, 1);
+
+    // The camera's left is a quarter turn counter-clockwise from its heading.
+    const left = project(ctx.m, cam.x + cos(angle + HALF_PI) * 10, cam.y + sin(angle + HALF_PI) * 10);
+    assert.ok(left.x < ANCHOR_X - 1, `camera-left was not screen-left at angle ${angle}`);
+    assert.ok(Math.abs(left.y - ANCHOR_Y) < 1e-4, `camera-left drifted vertically at angle ${angle}`);
+  }
+});
+
+test('zoom is viewport-relative, so a phone and a desktop see the same road', () => {
+  const state = {
+    x: 0, y: 0, heading: 0, speed: 0, slipAngle: 0,
+  };
+  const settings = { fixedNorth: false };
+
+  const phone = new Camera();
+  const desktop = new Camera();
+  // One long step so the exponential damping has effectively converged.
+  for (let i = 0; i < 400; i++) {
+    phone.follow(state, settings, 1 / 60, 390, 844);
+    desktop.follow(state, settings, 1 / 60, 1920, 1080);
+  }
+
+  const roadWidth = 7;
+  const phoneFraction = (roadWidth * phone.scale) / Math.min(390, 844);
+  const desktopFraction = (roadWidth * desktop.scale) / Math.min(1920, 1080);
+  assert.ok(
+    Math.abs(phoneFraction - desktopFraction) < 1e-6,
+    `road occupied ${phoneFraction} of the phone short edge but ${desktopFraction} of the desktop one`,
+  );
+  // And it should be a sane fraction, not a hairline or a wall.
+  assert.ok(phoneFraction > 0.12 && phoneFraction < 0.4, `road fraction was ${phoneFraction}`);
+});
+
+test('camera rotation damps rather than snapping', () => {
+  const settings = { fixedNorth: false };
+  const cam = new Camera();
+  const state = { x: 0, y: 0, heading: 0, speed: 30, slipAngle: 0 };
+  cam.follow(state, settings, 1 / 60, 800, 600); // settles on the first call
+
+  // A sudden 40-degree change of course, as at the moment a drift breaks loose.
+  state.slipAngle = 0.7;
+  cam.follow(state, settings, 1 / 60, 800, 600);
+  assert.ok(cam.angle > 0, 'camera should move toward the new course');
+  assert.ok(cam.angle < 0.7 * 0.2, `camera snapped ${cam.angle} of 0.7 rad in a single frame`);
+});
+
+test('fixed north disables rotation entirely', () => {
+  const cam = new Camera();
+  const state = { x: 0, y: 0, heading: 2.2, speed: 25, slipAngle: -0.4 };
+  for (let i = 0; i < 600; i++) cam.follow(state, { fixedNorth: true }, 1 / 60, 800, 600);
+  assert.ok(Math.abs(cam.angle - HALF_PI) < 1e-6, `fixed north drifted to ${cam.angle}`);
+});

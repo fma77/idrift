@@ -1,0 +1,434 @@
+/*
+ * Gameplay layer. Ink surfaces over the canvas, HUD pinned to the edges, centre
+ * of the screen always clear.
+ *
+ * The brief specifies portrait thumb control; the design system specifies
+ * landscape gameplay with a three-corner HUD. This lays out from the viewport's
+ * aspect ratio so both are true: the HUD reflows, the control zones move, and
+ * the simulation never knows the difference.
+ */
+
+#game {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  overflow: hidden;
+}
+
+#game[hidden] {
+  display: none;
+}
+
+#canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  padding: max(var(--s-3), env(safe-area-inset-top)) max(var(--s-3), env(safe-area-inset-left))
+    max(var(--s-3), env(safe-area-inset-bottom)) max(var(--s-3), env(safe-area-inset-right));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--s-2);
+}
+
+/* --- Pace notes: the strip that makes blind corners fair ----------------- */
+
+.pace {
+  display: flex;
+  gap: var(--s-2);
+  align-items: stretch;
+  justify-self: center;
+  background: var(--ink);
+  padding: var(--s-2);
+  min-height: 56px;
+}
+
+.pace__note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 56px;
+  padding: 4px 8px;
+  background: var(--ink-2);
+}
+
+.pace__note--next {
+  background: var(--paper);
+}
+
+.pace__arrow {
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--paper);
+}
+
+.pace__note--next .pace__arrow {
+  color: var(--ink);
+}
+
+.pace__sev {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+
+.pace__note--next .pace__sev {
+  color: var(--ink-muted);
+}
+
+.pace__dist {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+.pace__note--next .pace__dist {
+  color: var(--ink-muted);
+}
+
+/* --- Score / combo panel ------------------------------------------------- */
+
+.hud__top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.hud__panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--s-4);
+  background: var(--ink);
+  padding: 12px 16px;
+  min-width: min(420px, 100%);
+}
+
+.hud__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hud__cell--mid {
+  align-items: center;
+}
+.hud__cell--end {
+  align-items: flex-end;
+}
+
+.hud__label {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.hud__value {
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1.05;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__value--display {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 28px;
+}
+
+.hud__value--red {
+  color: var(--red);
+}
+
+/* Score pop: scale 1 -> 1.15 -> 1 over 200ms. */
+.hud__value--pop {
+  animation: pop 200ms ease-out;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Combo break: 2-frame red flash. */
+.hud--break {
+  animation: breakflash 100ms steps(2, end);
+}
+
+@keyframes breakflash {
+  0%,
+  100% {
+    background: transparent;
+  }
+  50% {
+    background: rgba(232, 64, 42, 0.45);
+  }
+}
+
+.hud__flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* --- Bottom row: speed, gear, controls ----------------------------------- */
+
+.hud__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--s-3);
+}
+
+.hud__speed {
+  background: var(--ink);
+  padding: 10px 14px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.hud__speed .hud__value {
+  font-size: 32px;
+}
+
+.hud__unit {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+
+/* --- Touch controls ------------------------------------------------------ */
+
+.controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/*
+ * The steering zone is the whole lower half. Touching anywhere in it recentres
+ * a relative joystick at the touch point -- there is no fixed origin to find
+ * with your thumb while watching the road.
+ */
+.controls__steer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 50%;
+  pointer-events: auto;
+}
+
+.controls__handbrake {
+  position: absolute;
+  right: max(var(--s-3), env(safe-area-inset-right));
+  bottom: max(var(--s-5), env(safe-area-inset-bottom));
+  width: 88px;
+  height: 88px;
+  pointer-events: auto;
+  background: rgba(20, 20, 20, 0.8);
+  border: 2px solid var(--paper);
+  color: var(--paper);
+  font-family: var(--display);
+  font-size: 14px;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+}
+
+.controls__handbrake[data-active='true'] {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+/* Lefty mirror: swap the handbrake to the left. */
+.controls[data-lefty='true'] .controls__handbrake {
+  right: auto;
+  left: max(var(--s-3), env(safe-area-inset-left));
+}
+
+#game[data-input='keyboard'] .controls__steer,
+#game[data-input='keyboard'] .controls__handbrake {
+  display: none;
+}
+
+/*
+ * Desktop replaces the on-screen controls with a key-hint row in the same part
+ * of the screen. It sits inside the bottom HUD row rather than floating over
+ * it: absolutely positioning it centre-bottom put it straight through the speed
+ * and gear panels on any viewport wider than a phone.
+ */
+.keyhints {
+  display: none;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-2) var(--s-3);
+  background: rgba(20, 20, 20, 0.8);
+  padding: 8px 12px;
+}
+
+#game[data-input='keyboard'] .keyhints {
+  display: flex;
+}
+
+.keyhint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+
+.keyhint__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--ink-faint);
+  color: var(--paper);
+}
+
+/* --- Joystick indicator -------------------------------------------------- */
+
+.stick {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border: 2px solid rgba(244, 241, 234, 0.35);
+  pointer-events: none;
+  display: none;
+}
+
+.stick[data-active='true'] {
+  display: block;
+}
+
+.stick__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  background: rgba(244, 241, 234, 0.85);
+}
+
+/* --- Countdown / overlays ------------------------------------------------ */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  background: rgba(20, 20, 20, 0.86);
+  color: var(--paper);
+  pointer-events: auto;
+  padding: var(--gutter);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay__count {
+  font-family: var(--display);
+  font-size: 96px;
+  line-height: 1;
+  color: var(--paper);
+}
+
+.overlay__count--go {
+  color: var(--red);
+}
+
+.overlay .btn {
+  max-width: 320px;
+}
+
+/* --- Landscape: HUD to the corners, centre clear ------------------------- */
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .hud__panel {
+    min-width: 0;
+  }
+  .hud__top {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .pace {
+    order: -1;
+  }
+  .controls__steer {
+    right: 45%;
+    height: 62%;
+  }
+}
+
+/* --- Meme overlay -------------------------------------------------------- */
+
+.meme {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  background: rgba(20, 20, 20, 0.92);
+  pointer-events: none;
+}
+
+.meme[hidden] {
+  display: none;
+}
+
+.meme img,
+.meme video {
+  max-width: min(92vw, 640px);
+  max-height: 70vh;
+}
+
+.meme__caption {
+  color: var(--paper);
+  font-size: 28px;
+  text-align: center;
+  padding: 0 var(--gutter);
+}

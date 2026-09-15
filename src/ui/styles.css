@@ -1,0 +1,384 @@
+/*
+ * iDrift design system -- option 2A, "Touge Paper / Arcade Type".
+ *
+ * Two surfaces only: paper for menus, ink for gameplay HUD and overlays.
+ * Radius 0 everywhere. Red is earned -- one primary button per screen, score
+ * numerals, combo multipliers, failure states. No gradients, no glows, no drop
+ * shadows except the app icon.
+ */
+
+:root {
+  --paper: #f4f1ea;
+  --paper-2: #e0dbd0;
+  --rule: #cdc7bb;
+  --red: #e8402a;
+  --red-press: #c4301a;
+  --ink: #141414;
+  --ink-2: #2b2b2b;
+  --ink-muted: #6d675c; /* captions on paper */
+  --ink-faint: #8d8779; /* captions on ink only -- never swapped */
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 16px;
+  --s-4: 24px;
+  --s-5: 40px;
+  --s-6: 64px;
+
+  --gutter: 20px;
+  --col: 520px;
+
+  --display: 'Bungee', 'Arial Black', sans-serif;
+  --body: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+}
+
+@media (min-width: 720px) {
+  :root {
+    --gutter: 40px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+body {
+  /* Gameplay is a full-bleed canvas; nothing here should ever scroll or bounce. */
+  touch-action: none;
+  user-select: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+/* --- Typography ---------------------------------------------------------- */
+
+.display-xl,
+.display,
+.title,
+.btn {
+  font-family: var(--display);
+  letter-spacing: 0;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.display-xl {
+  font-size: 40px;
+}
+.display {
+  font-size: 28px;
+}
+.title {
+  font-size: 20px;
+}
+
+.stat {
+  font-weight: 800;
+  font-size: 32px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.caption {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Screens ------------------------------------------------------------- */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  padding: max(var(--gutter), env(safe-area-inset-top)) var(--gutter)
+    max(var(--gutter), env(safe-area-inset-bottom));
+  overflow-y: auto;
+  animation: fade 180ms ease-out;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.screen-inner {
+  width: 100%;
+  max-width: var(--col);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--s-4);
+}
+
+.spacer {
+  flex: 1;
+  min-height: var(--s-3);
+}
+
+.screen-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: var(--s-3);
+}
+
+/* --- Buttons ------------------------------------------------------------- */
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: 16px;
+  border: none;
+  background: var(--paper-2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.btn--primary {
+  background: var(--red);
+  color: #fff;
+}
+.btn--primary:active {
+  background: var(--red-press);
+}
+
+.btn--secondary {
+  background: transparent;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+}
+.btn--secondary:active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn--locked,
+.btn:disabled {
+  background: var(--rule);
+  color: #4a463c;
+  cursor: not-allowed;
+}
+
+.btn--text {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  min-height: 44px;
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.btn-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+/* --- Cards, rows, chips -------------------------------------------------- */
+
+.card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--paper-2);
+  border: none;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.card:disabled {
+  background: var(--rule);
+  color: #4a463c;
+  cursor: not-allowed;
+}
+
+.card__name {
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.05;
+}
+
+.card__meta {
+  font-size: 13px;
+  color: #3d3a34;
+  margin-top: 4px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 48px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row__value {
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 7px 10px;
+  background: var(--ink);
+  color: var(--paper);
+  text-transform: uppercase;
+}
+
+.chip--outline {
+  background: none;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  padding: 6px 10px;
+}
+
+.chip--red {
+  background: var(--red);
+  color: #fff;
+}
+
+.chip-row {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* --- Controls ------------------------------------------------------------ */
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 140px;
+  height: 8px;
+  background: var(--paper-2);
+  outline: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 24px;
+  background: var(--ink);
+  cursor: pointer;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 24px;
+  background: var(--ink);
+  border: none;
+  cursor: pointer;
+}
+
+.toggle {
+  width: 56px;
+  height: 30px;
+  background: var(--rule);
+  border: none;
+  padding: 3px;
+  display: flex;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.toggle__knob {
+  width: 24px;
+  height: 24px;
+  background: var(--paper);
+  transition: transform 120ms ease-out;
+}
+
+.toggle[aria-pressed='true'] {
+  background: var(--red);
+}
+
+.toggle[aria-pressed='true'] .toggle__knob {
+  transform: translateX(26px);
+}
+
+/* --- Meter --------------------------------------------------------------- */
+
+.meter {
+  height: 8px;
+  background: var(--paper-2);
+  width: 100%;
+}
+
+.meter__fill {
+  height: 100%;
+  background: var(--red);
+  transition: width 120ms linear;
+}

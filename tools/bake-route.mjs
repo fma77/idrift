@@ -285,7 +285,7 @@ function deriveDriftZones(corners, ds) {
   const leadIn = Math.round(18 / ds);
   const runOut = Math.round(12 / ds);
   return corners
-    .filter((c) => c.severity >= 2)
+    .filter((c) => c.severity >= 3)
     .map((c, i) => ({
       entryIndex: Math.max(0, c.startIndex - leadIn),
       exitIndex: c.endIndex + runOut,
