@@ -32,19 +32,23 @@
     {
       "binding": "DB",
       "database_name": "idrift-db",
-      "database_id": "PLACEHOLDER_RUN_WRANGLER_D1_CREATE",
+      "database_id": "90238e6c-46ec-4ccc-9517-158ffb59c447",
       "migrations_dir": "migrations"
     }
   ],
 
   // Car art, route posters and meme assets. Zero egress fees, which matters
-  // when every player downloads them. Bound now; nothing reads it yet.
-  "r2_buckets": [
-    {
-      "binding": "MEDIA",
-      "bucket_name": "idrift-media"
-    }
-  ],
+  // when every player downloads them.
+  //
+  // Commented out until R2 is enabled on the account (a one-time opt-in in the
+  // Cloudflare dashboard, under R2). Wrangler refuses to deploy when a declared
+  // bucket does not exist, and nothing reads MEDIA yet -- the Worker types it as
+  // optional -- so leaving it declared would block deploys for no benefit.
+  // Uncomment after running `npm run setup:cloudflare` with R2 enabled.
+  //
+  // "r2_buckets": [
+  //   { "binding": "MEDIA", "bucket_name": "idrift-media" }
+  // ],
 
   // Abuse protection on score submission, per the brief.
   //

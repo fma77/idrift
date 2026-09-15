@@ -112,8 +112,21 @@ const buckets = wrangler(['r2', 'bucket', 'list'], { allowFailure: true });
 if (buckets.includes(BUCKET_NAME)) {
   console.log('  already exists');
 } else {
-  wrangler(['r2', 'bucket', 'create', BUCKET_NAME]);
-  console.log('  created');
+  const result = wrangler(['r2', 'bucket', 'create', BUCKET_NAME], { allowFailure: true });
+  if (/enable R2|code: 10042/i.test(result)) {
+    // R2 needs a one-time account-level opt-in. Not fatal: nothing reads the
+    // bucket yet, and the binding is commented out in wrangler.jsonc until it
+    // exists. Warn and carry on rather than blocking the whole deploy on an
+    // asset store with no assets in it.
+    console.log('  SKIPPED — R2 is not enabled on this account.');
+    console.log('    Enable it at dash.cloudflare.com → R2, then re-run this script');
+    console.log('    and uncomment the r2_buckets binding in wrangler.jsonc.');
+  } else if (/error/i.test(result) && !/created/i.test(result)) {
+    console.error(result);
+    process.exit(1);
+  } else {
+    console.log('  created');
+  }
 }
 
 // --- Migrations -------------------------------------------------------------
