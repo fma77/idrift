@@ -15,6 +15,12 @@ npm run deploy
 resource first. It will not touch authentication, and it never asks for an API
 token.
 
+It also migrates the *local* development database, which matters more than it
+sounds: Wrangler keys local D1 state by `database_id`, so writing the real id
+into `wrangler.jsonc` repoints local dev at a fresh empty database. Without the
+local migration every API call in `npm run dev:worker` returns a bare 500 and
+nothing tells you why.
+
 ## Day to day
 
 ```bash

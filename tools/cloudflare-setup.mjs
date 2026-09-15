@@ -134,6 +134,14 @@ if (buckets.includes(BUCKET_NAME)) {
 step('Applying migrations to the remote database');
 console.log(wrangler(['d1', 'migrations', 'apply', DB_NAME, '--remote']).trim());
 
+// The LOCAL database has to be migrated too, and it is easy to miss why.
+// Wrangler keys local D1 state by database_id, so writing the real id into
+// wrangler.jsonc above silently repoints local dev at a brand new, empty
+// database. Every API call then fails with a bare 500 ("no such table") and
+// nothing on screen connects that to having run this script.
+step('Applying migrations to the local development database');
+console.log(wrangler(['d1', 'migrations', 'apply', DB_NAME, '--local']).trim());
+
 // --- Done -------------------------------------------------------------------
 
 console.log(`
