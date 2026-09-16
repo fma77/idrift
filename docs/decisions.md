@@ -22,9 +22,30 @@ Unlike `sin`/`pow`/`exp`, it maps to the hardware `SQRTSD` instruction, which IE
 requires to be correctly rounded, on every engine that matters. Reimplementing it via
 Newton iteration would be slower and no more deterministic.
 
+### Touch controls are ordinary buttons, not a thumb-drag joystick
+
+The brief (§2) specifies a relative joystick: drag anywhere in the lower half, with X
+as steering and Y as throttle, plus a handbrake button. That was built first and
+dropped after a phone play-test. Steering and throttle on one thumb had too steep a
+learning curve for the actual audience -- someone opening a shared link cold, often a
+kid -- and it pushed people away in the first minute.
+
+It is now five ordinary on-screen buttons (left, right, brake, gas, handbrake), which
+is what people already expect from a phone racing game. Each can be dragged anywhere
+from Settings, with a size slider; portrait and landscape are arranged separately,
+because a layout that fits one does not fit the other. The buttons feed the same input
+path as the keyboard, so steering ramps identically and nothing about the simulation,
+replays or leaderboards changed. Defaults are tested against eight real phone and
+tablet sizes in both orientations for overlaps and edge clearance.
+
+Two mobile bugs surfaced while replacing it: the on-screen controls were hidden at the
+start of every run (the input mode was reset to "keyboard" as each run began), and
+there was no way to pause or quit on a phone, since only the Escape key did it. There
+is now a pause button, and backgrounding the app pauses the run.
+
 ### Gameplay is responsive rather than portrait-only or landscape-only
 
-The brief (§2) specifies portrait with a thumb-drag joystick. The design system (§5 of
+The brief (§2) specifies portrait gameplay. The design system (§5 of
 the handoff) specifies "menus portrait, gameplay landscape" with a three-corner HUD.
 Confirmed with Filipe: support both. The HUD reflows from viewport aspect ratio and
 the control zones move with it. The simulation is unaffected either way — it never

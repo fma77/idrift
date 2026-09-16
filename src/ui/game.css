@@ -224,60 +224,110 @@
 
 /* --- Touch controls ------------------------------------------------------ */
 
-.controls {
+/*
+ * Ordinary on-screen buttons, positioned by src/input/touchControls.ts.
+ *
+ * These replaced a "drag anywhere in the lower half" relative joystick after a
+ * phone play-test: it had too steep a learning curve for someone opening a
+ * shared link cold. Per the design system -- ink at ~80% over the track,
+ * square, never below 56px.
+ */
+.touch-controls {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.touch-btn {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  background: rgba(20, 20, 20, 0.78);
+  border: 2px solid rgba(244, 241, 234, 0.85);
+  color: var(--paper);
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1.05;
+  text-align: center;
+  cursor: pointer;
+  transition: background 60ms linear, color 60ms linear;
+}
+
+.touch-btn svg {
+  width: 34%;
+  height: auto;
+  fill: currentColor;
+}
+
+/* Pressed: invert. Instant enough to read as a physical button. */
+.touch-btn[data-active='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+}
+
+.touch-btn__label {
+  pointer-events: none;
+}
+
+/* Only the layout editor names each button; in a run the icons are enough. */
+.touch-btn__name {
+  display: none;
+}
+
+/* Hidden on desktop, where the key hints take their place. */
+#game[data-input='keyboard'] .touch-controls,
+#game[data-input='keyboard'] .pause-btn {
+  display: none;
 }
 
 /*
- * The steering zone is the whole lower half. Touching anywhere in it recentres
- * a relative joystick at the touch point -- there is no fixed origin to find
- * with your thumb while watching the road.
+ * Pause. Phones have no Escape key, so without this a run could only be left by
+ * finishing it. Top-left corner, clear of the pace notes, which sit centred.
  */
-.controls__steer {
+.pause-btn {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 50%;
-  pointer-events: auto;
-}
-
-.controls__handbrake {
-  position: absolute;
-  right: max(var(--s-3), env(safe-area-inset-right));
-  bottom: max(var(--s-5), env(safe-area-inset-bottom));
-  width: 88px;
-  height: 88px;
-  pointer-events: auto;
-  background: rgba(20, 20, 20, 0.8);
-  border: 2px solid var(--paper);
-  color: var(--paper);
-  font-family: var(--display);
-  font-size: 14px;
-  line-height: 1.1;
+  top: max(var(--s-3), env(safe-area-inset-top));
+  left: max(var(--s-3), env(safe-area-inset-left));
+  width: 48px;
+  height: 48px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  background: rgba(20, 20, 20, 0.78);
+  border: 2px solid rgba(244, 241, 234, 0.85);
+  color: var(--paper);
   cursor: pointer;
 }
 
-.controls__handbrake[data-active='true'] {
-  background: var(--red);
-  border-color: var(--red);
+.pause-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
-/* Lefty mirror: swap the handbrake to the left. */
-.controls[data-lefty='true'] .controls__handbrake {
-  right: auto;
-  left: max(var(--s-3), env(safe-area-inset-left));
-}
-
-#game[data-input='keyboard'] .controls__steer,
-#game[data-input='keyboard'] .controls__handbrake {
-  display: none;
+/*
+ * With buttons along the bottom edge, the speed and gear readouts move up to sit
+ * under the score panel. Left where they were, they would be hidden behind the
+ * steering arrows and the throttle.
+ */
+#game[data-input='touch'] .hud__bottom {
+  grid-row: 2;
+  align-self: start;
 }
 
 /*
@@ -318,32 +368,6 @@
   padding: 0 5px;
   border: 1px solid var(--ink-faint);
   color: var(--paper);
-}
-
-/* --- Joystick indicator -------------------------------------------------- */
-
-.stick {
-  position: absolute;
-  width: 96px;
-  height: 96px;
-  margin: -48px 0 0 -48px;
-  border: 2px solid rgba(244, 241, 234, 0.35);
-  pointer-events: none;
-  display: none;
-}
-
-.stick[data-active='true'] {
-  display: block;
-}
-
-.stick__knob {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 36px;
-  height: 36px;
-  margin: -18px 0 0 -18px;
-  background: rgba(244, 241, 234, 0.85);
 }
 
 /* --- Countdown / overlays ------------------------------------------------ */
@@ -395,9 +419,9 @@
   .pace {
     order: -1;
   }
-  .controls__steer {
-    right: 45%;
-    height: 62%;
+  /* In a landscape row the pace notes start at the left edge, under the pause button. */
+  #game[data-input='touch'] .hud__top {
+    padding-left: 60px;
   }
 }
 
@@ -441,12 +465,14 @@
  * renders black on black -- the "Quit run" button was fully present, focusable
  * and clickable, and completely invisible. Overlays get the inverted pair.
  */
-.overlay .btn--secondary {
+.overlay .btn--secondary,
+.layout-editor .btn--secondary {
   border-color: var(--paper);
   color: var(--paper);
 }
 
-.overlay .btn--secondary:active {
+.overlay .btn--secondary:active,
+.layout-editor .btn--secondary:active {
   background: var(--paper);
   color: var(--ink);
 }
@@ -462,4 +488,113 @@
   gap: var(--s-2);
   width: 100%;
   max-width: 320px;
+}
+
+/* --- Touch layout editor ------------------------------------------------- */
+
+.layout-editor {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  color: var(--paper);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.layout-editor[hidden] {
+  display: none;
+}
+
+.layout-editor__panel {
+  position: absolute;
+  top: max(var(--s-3), env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 2 * var(--s-3)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  background: var(--ink-2);
+}
+
+.layout-editor__hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.layout-editor__hint--faint {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.layout-editor__size {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.layout-editor__size input[type='range'] {
+  flex: 1;
+  width: auto;
+}
+
+.layout-editor__value {
+  min-width: 4ch;
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.layout-editor__actions {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+
+.layout-editor__actions .btn {
+  min-height: 44px;
+}
+
+/* In the editor every button is named, and reads as something to pick up. */
+.touch-controls--edit .touch-btn {
+  border-style: dashed;
+  cursor: grab;
+}
+
+.touch-controls--edit .touch-btn__name {
+  display: block;
+  position: absolute;
+  top: calc(100% + 4px);
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+.touch-controls--edit .touch-btn[data-dragging='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  border-style: solid;
+  cursor: grabbing;
+  z-index: 1;
+}
+
+/* Short landscape screens: squeeze the panel so the lower half stays free to arrange. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .layout-editor__panel {
+    width: min(560px, calc(100% - 2 * var(--s-3)));
+    padding: var(--s-2) var(--s-3);
+    gap: 4px;
+  }
+  .layout-editor__panel .display {
+    font-size: 20px;
+  }
+  .layout-editor__hint--faint {
+    display: none;
+  }
 }

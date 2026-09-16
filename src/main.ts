@@ -5,6 +5,8 @@ import { GameSession, type RunOutcome } from './game.ts';
 import { Renderer, type RenderSettings } from './render/renderer.ts';
 import { Hud, formatTime } from './render/hud.ts';
 import { InputController, ACTIONS, DEFAULT_KEYMAP, keyLabel, type Action } from './input/input.ts';
+import { TouchControls } from './input/touchControls.ts';
+import { defaultLayout, orientationOf } from './input/touchLayout.ts';
 import { EngineAudio } from './audio/engine.ts';
 import { CARS, carById } from './data/cars.ts';
 import { ROUTES, ROUTE_IDS, loadRoute, type RouteEntry } from './data/routes.ts';
@@ -54,7 +56,7 @@ const SCREENS: Record<ScreenName, HTMLElement> = {
 
 const gameEl = $('game');
 const canvas = $<HTMLCanvasElement>('canvas');
-const controlsEl = $('controls');
+const editorEl = $('layout-editor');
 
 const settings: Settings = loadSettings();
 let currentEntry: RouteEntry = ROUTES[0];
@@ -82,19 +84,38 @@ const hud = new Hud({
   flash: $('hud-flash'),
 });
 
-const input = new InputController($('steer-zone'), $('handbrake'));
+const input = new InputController();
 input.setKeymap(settings.keymap);
-input.lefty = settings.lefty;
 
-const stick = $('stick');
-const stickKnob = $('stick-knob');
-input.onStick = (active, x, y, dx, dy) => {
-  stick.dataset.active = String(active);
-  if (!active) return;
-  stick.style.left = `${x}px`;
-  stick.style.top = `${y}px`;
-  stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-};
+/** The buttons shown during a run. They press actions exactly as keys do. */
+const touch = new TouchControls($('touch-controls'), {
+  onPress: (action, down) => input.setVirtual(action, down),
+});
+
+/** The same buttons in the layout editor, where dragging moves them instead. */
+const editorTouch = new TouchControls($('layout-controls'), {
+  editable: true,
+  onMove: () => saveSettings(settings),
+});
+
+// --- Input mode -------------------------------------------------------------
+
+/**
+ * Whether to show on-screen buttons or key hints.
+ *
+ * Decided on the device's primary pointer at boot, then switched on real use:
+ * a touch shows the buttons, a bound key hides them. The first version only
+ * ever learned "touch" from a touch on the controls themselves -- which were
+ * hidden until it had -- and then overwrote the mode back to "keyboard" at the
+ * start of every run, so on a phone the controls vanished as each run began.
+ */
+function setInputMode(mode: 'touch' | 'keyboard'): void {
+  if (gameEl.dataset.input === mode) return;
+  gameEl.dataset.input = mode;
+  if (mode === 'touch' && !gameEl.hidden) touch.relayout();
+}
+
+setInputMode(window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keyboard');
 
 // --- Screen routing ---------------------------------------------------------
 
@@ -103,13 +124,42 @@ function showScreen(name: ScreenName): void {
     SCREENS[key].hidden = key !== name;
   }
   gameEl.hidden = true;
+  editorEl.hidden = true;
 }
 
 function showGame(): void {
   for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;
+  editorEl.hidden = true;
   gameEl.hidden = false;
-  // The canvas has no size until it is displayed, so measure now, not at boot.
+  // Neither the canvas nor the buttons have a size until they are displayed,
+  // so measure now, not at boot.
   renderer.resize();
+  touch.setLayout(settings.touchLayout, settings.lefty);
+}
+
+// --- Touch layout editor ----------------------------------------------------
+
+function openLayoutEditor(): void {
+  for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;
+  gameEl.hidden = true;
+  editorEl.hidden = false;
+  syncLayoutEditor();
+}
+
+function syncLayoutEditor(): void {
+  const size = $<HTMLInputElement>('layout-size');
+  size.value = String(Math.round(settings.touchLayout.scale * 100));
+  $('layout-size-value').textContent = `${size.value}%`;
+
+  // Portrait and landscape are arranged separately, because a layout that fits
+  // one does not fit the other. Say which one is being edited.
+  const orientation = orientationOf(editorEl.clientWidth, editorEl.clientHeight);
+  $('layout-orientation').textContent =
+    orientation === 'portrait'
+      ? 'Arranging the upright layout. Turn your phone sideways to arrange that one too.'
+      : 'Arranging the sideways layout. Turn your phone upright to arrange that one too.';
+
+  editorTouch.setLayout(settings.touchLayout, settings.lefty);
 }
 
 // --- Route list -------------------------------------------------------------
@@ -458,8 +508,6 @@ function buildSettings(): void {
     () => settings.lefty,
     (v) => {
       settings.lefty = v;
-      input.lefty = v;
-      controlsEl.dataset.lefty = String(v);
     },
   );
   bindToggle('set-north', () => settings.fixedNorth, (v) => (settings.fixedNorth = v));
@@ -555,8 +603,6 @@ async function startRun(mode: SimMode): Promise<void> {
     showSkidMarks: settings.showSkidMarks,
   };
 
-  controlsEl.dataset.lefty = String(settings.lefty);
-  gameEl.dataset.input = input.mode;
   syncKeyHints();
 
   audio = new EngineAudio(settings.soundOn);
@@ -597,6 +643,7 @@ async function startRun(mode: SimMode): Promise<void> {
 }
 
 async function finishRun(outcome: RunOutcome): Promise<void> {
+  touch.releaseAll();
   lastOutcome = outcome;
   const route = currentRoute;
   if (!route) return;
@@ -681,6 +728,7 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
 }
 
 function quitRun(): void {
+  touch.releaseAll();
   session?.abort();
   session = null;
   $('overlay-countdown').hidden = true;
@@ -826,46 +874,89 @@ $('player-name').addEventListener('input', validateNameField);
 $('board-tab-time').addEventListener('click', () => setBoardMode('timeAttack'));
 $('board-tab-drift').addEventListener('click', () => setBoardMode('driftRun'));
 $('btn-quit').addEventListener('click', quitRun);
-$('btn-resume').addEventListener('click', () => {
+$('btn-resume').addEventListener('click', resumeRun);
+$('btn-pause').addEventListener('click', pauseRun);
+
+function isRunActive(): boolean {
+  return !gameEl.hidden && !!session && session.phase !== 'finished' && session.phase !== 'aborted';
+}
+
+function pauseRun(): void {
+  if (!isRunActive() || !$('overlay-paused').hidden) return;
+  session?.stop();
+  // Fingers still resting on buttons must not come back pressed on resume.
+  touch.releaseAll();
+  $('overlay-paused').hidden = false;
+}
+
+function resumeRun(): void {
+  if (!isRunActive() || $('overlay-paused').hidden) return;
   $('overlay-paused').hidden = true;
   session?.start();
-});
+}
 
 window.addEventListener('keydown', (e) => {
-  if (e.code !== 'Escape' || listeningFor) return;
-  if (!gameEl.hidden && session && session.phase !== 'finished') {
-    e.preventDefault();
-    const paused = $('overlay-paused');
-    if (paused.hidden) {
-      session.stop();
-      paused.hidden = false;
-    } else {
-      paused.hidden = true;
-      session.start();
-    }
-  }
+  // Using a bound key means the keyboard is in use, whatever the device.
+  if (input.isBound(e.code)) setInputMode('keyboard');
+
+  if (e.code !== 'Escape' || listeningFor || !isRunActive()) return;
+  e.preventDefault();
+  if ($('overlay-paused').hidden) pauseRun();
+  else resumeRun();
+});
+
+// Losing the app to a call or a notification pauses rather than leaving the
+// car driving unattended into a wall.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pauseRun();
 });
 
 window.addEventListener('resize', () => {
-  if (!gameEl.hidden) renderer.resize();
+  if (!gameEl.hidden) {
+    renderer.resize();
+    touch.relayout();
+  }
+  if (!editorEl.hidden) syncLayoutEditor();
   if (!SCREENS.intro.hidden && currentRoute) showPoster(currentRoute);
 });
 
-// Touch anywhere switches the control hints over to the on-screen layout.
+// A real touch anywhere switches to the on-screen buttons.
 window.addEventListener(
   'pointerdown',
   (e) => {
-    if (e.pointerType === 'touch') gameEl.dataset.input = 'touch';
+    if (e.pointerType === 'touch') setInputMode('touch');
   },
   { capture: true },
 );
+
+// --- Layout editor controls ---
+
+$('btn-edit-layout').addEventListener('click', openLayoutEditor);
+
+$<HTMLInputElement>('layout-size').addEventListener('input', (e) => {
+  const value = Number((e.target as HTMLInputElement).value);
+  settings.touchLayout.scale = value / 100;
+  $('layout-size-value').textContent = `${value}%`;
+  editorTouch.relayout();
+  saveSettings(settings);
+});
+
+$('btn-layout-reset').addEventListener('click', () => {
+  settings.touchLayout = defaultLayout();
+  saveSettings(settings);
+  syncLayoutEditor();
+});
+
+$('btn-layout-done').addEventListener('click', () => {
+  saveSettings(settings);
+  showScreen('settings');
+});
 
 buildRouteList();
 buildCarList();
 buildSettings();
 setBoardMode('timeAttack');
 syncKeyHints();
-controlsEl.dataset.lefty = String(settings.lefty);
 showScreen('title');
 
 // Expose live state for tuning from the console: camera framing and handling
