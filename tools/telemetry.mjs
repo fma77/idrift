@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { createSimState, stepSim, gradeRun, TICK_RATE, TICKS_PER_INPUT } from '../src/sim/index.ts';
 import { carById, CARS } from '../src/data/cars.ts';
 import { driveBot, DEFAULT_BOT } from '../src/bot/autopilot.ts';
+import { configFor } from '../src/data/assist.ts';
 
 const route = JSON.parse(readFileSync(new URL('../public/routes/akari-downhill.json', import.meta.url), 'utf8'));
 
@@ -26,7 +27,7 @@ const fmt = (v, w = 7, d = 2) => v.toFixed(d).padStart(w);
 
 if (mode === 'accel') {
   const st = createSimState(route, car);
-  const cfg = { mode: 'timeAttack' };
+  const cfg = configFor('timeAttack');
   const input = { steer: 0 };
   console.log(`${car.name} -- driving itself from rest\n`);
   console.log('   t     km/h      vx      vy   yaw/s    dist');
@@ -51,7 +52,7 @@ if (mode === 'hold') {
   const wide = JSON.parse(JSON.stringify(route));
   wide.samples.halfWidth = wide.samples.halfWidth.map(() => 5000);
   const st = createSimState(wide, car);
-  const cfg = { mode: 'timeAttack' };
+  const cfg = configFor('timeAttack');
   console.log(`${car.name} -- straight for 6s, hold steer ${steer} for 5s, let go\n`);
   console.log('   t     km/h   slip°  yaw/s  sliding');
   for (let t = 0; t < TICK_RATE * 14; t++) {
@@ -69,7 +70,7 @@ if (mode === 'hold') {
 if (mode === 'lap' || mode === 'drift') {
   const drifting = mode === 'drift';
   const st = createSimState(route, car);
-  const cfg = { mode: drifting ? 'driftRun' : 'timeAttack' };
+  const cfg = configFor(drifting ? 'driftRun' : 'timeAttack');
   const out = { steer: 0 };
   const input = { steer: 0 };
 

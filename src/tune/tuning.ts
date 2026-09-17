@@ -1,5 +1,6 @@
 import { CARS } from '../data/cars.ts';
-import type { CarParams, HandlingParams } from '../sim/types.ts';
+import { MODE_ASSIST } from '../data/assist.ts';
+import type { AssistParams, CarParams, HandlingParams, SimMode } from '../sim/types.ts';
 
 /**
  * Hand-tuning the handling on a phone.
@@ -22,8 +23,8 @@ export function isTuneMode(): boolean {
   return location.hash === '#tune' || new URLSearchParams(location.search).has('tune');
 }
 
-export interface TuneSpec {
-  key: keyof HandlingParams;
+export interface TuneSpec<K extends string = keyof HandlingParams> {
+  key: K;
   label: string;
   /** Plain-language description of what moving the slider does. */
   help: string;
@@ -121,11 +122,87 @@ export const TUNE_SPECS: TuneSpec[] = [
   },
 ];
 
-type Overrides = Record<string, Partial<HandlingParams>>;
+/** The game's help, per mode. Shared by every car. */
+export const ASSIST_SPECS: TuneSpec<keyof AssistParams>[] = [
+  {
+    key: 'cornerSpeed',
+    label: 'Slowing for corners',
+    help: 'How fast the car lets itself take a corner, compared with what grip allows. Lower slows down more. 0 turns it off.',
+    min: 0, max: 2, step: 0.05, unit: '×',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'cornerBraking',
+    label: 'Corner braking strength',
+    help: 'How hard the car can brake by itself before a corner.',
+    min: 0, max: 20, step: 0.5, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'steerDrag',
+    label: 'Speed lost when steering',
+    help: 'How much speed steering costs, at full steering.',
+    min: 0, max: 15, step: 0.5, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'slideDrag',
+    label: 'Speed lost when sliding',
+    help: 'How much speed a big sideways slide costs.',
+    min: 0, max: 25, step: 0.5, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'roadKeeping',
+    label: 'Road-keeping help',
+    help: 'How firmly the car is kept on the road while you steer the right way. It never helps if you do not steer.',
+    min: 0, max: 2, step: 0.05, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'maxSlideAngle',
+    label: 'Biggest slide allowed',
+    help: 'Past this angle the car pulls itself straighter.',
+    min: 5, max: 90, step: 1, unit: '°',
+    toDisplay: (v) => v * DEG, fromDisplay: (v) => v / DEG,
+  },
+  {
+    key: 'gripScale',
+    label: 'Grip, this mode',
+    help: "Multiplies every car's grip in this mode. Lower lets the rear come round more easily.",
+    min: 0.3, max: 2.5, step: 0.05, unit: '×',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'slideHoldScale',
+    label: 'Slide hold, this mode',
+    help: "Multiplies every car's slide hold in this mode. Higher closes slides sooner.",
+    min: 0.3, max: 3, step: 0.05, unit: '×',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'throttlePulse',
+    label: 'Throttle pulsing in slides',
+    help: 'How much the throttle comes and goes in a slide, like a driver working the pedal.',
+    min: 0, max: 1, step: 0.05, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+];
+
+type Overrides = Record<string, Partial<HandlingParams> | Partial<AssistParams>>;
 
 /** The shipped handling for every car, captured before any overrides are applied. */
 const DEFAULTS: Record<string, HandlingParams> = {};
 for (const car of CARS) DEFAULTS[car.id] = { ...car.handling };
+
+/** The shipped help for each mode, likewise. */
+const ASSIST_DEFAULTS = {
+  timeAttack: { ...MODE_ASSIST.timeAttack },
+  driftRun: { ...MODE_ASSIST.driftRun },
+} satisfies Record<SimMode, AssistParams>;
+
+const MODES: SimMode[] = ['timeAttack', 'driftRun'];
+const assistKey = (mode: SimMode) => `mode:${mode}`;
 
 function readOverrides(): Overrides {
   try {
@@ -144,17 +221,33 @@ function writeOverrides(overrides: Overrides): void {
   }
 }
 
-/** Apply stored tuning to every car. Call once at boot, in tuning mode only. */
+/** Apply stored tuning to every car and mode. */
 export function applyStoredTuning(): void {
   const overrides = readOverrides();
   for (const car of CARS) {
-    const o = overrides[car.id];
+    const o = overrides[car.id] as Partial<HandlingParams> | undefined;
     if (!o) continue;
     for (const spec of TUNE_SPECS) {
       const v = o[spec.key];
       if (typeof v === 'number' && Number.isFinite(v)) car.handling[spec.key] = v;
     }
   }
+  for (const mode of MODES) {
+    const o = overrides[assistKey(mode)] as Partial<AssistParams> | undefined;
+    if (!o) continue;
+    for (const spec of ASSIST_SPECS) {
+      const v = o[spec.key];
+      if (typeof v === 'number' && Number.isFinite(v)) MODE_ASSIST[mode][spec.key] = v;
+    }
+  }
+}
+
+/** Change one help value for a mode, live, for every car. */
+export function setAssist(mode: SimMode, key: keyof AssistParams, value: number): void {
+  MODE_ASSIST[mode][key] = value;
+  const overrides = readOverrides();
+  overrides[assistKey(mode)] = { ...(overrides[assistKey(mode)] ?? {}), [key]: value };
+  writeOverrides(overrides);
 }
 
 /**
@@ -170,19 +263,23 @@ export function setHandling(car: CarParams, key: keyof HandlingParams, value: nu
   writeOverrides(overrides);
 }
 
-/** Put every car back on its shipped handling, keeping the stored tuning for next time. */
+/** Put every car and mode back on shipped values, keeping the stored tuning for next time. */
 export function restoreShippedHandling(): void {
   for (const car of CARS) {
     const shipped = DEFAULTS[car.id];
     if (shipped) Object.assign(car.handling, shipped);
   }
+  for (const mode of MODES) Object.assign(MODE_ASSIST[mode], ASSIST_DEFAULTS[mode]);
 }
 
-export function resetHandling(car: CarParams): void {
+/** Forget the tuning for this car and this mode's help. */
+export function resetTuning(car: CarParams, mode: SimMode): void {
   const shipped = DEFAULTS[car.id];
   if (shipped) Object.assign(car.handling, shipped);
+  Object.assign(MODE_ASSIST[mode], ASSIST_DEFAULTS[mode]);
   const overrides = readOverrides();
   delete overrides[car.id];
+  delete overrides[assistKey(mode)];
   writeOverrides(overrides);
 }
 
@@ -193,9 +290,15 @@ export function isTuned(car: CarParams): boolean {
 }
 
 /** A block of text a player can paste back into a chat to make these the defaults. */
-export function describeTuning(car: CarParams, steerSensitivity: number): string {
+export function describeTuning(car: CarParams, mode: SimMode, steerSensitivity: number): string {
   const round = (v: number) => Number(v.toFixed(3));
   const handling: Record<string, number> = {};
   for (const spec of TUNE_SPECS) handling[spec.key] = round(car.handling[spec.key]);
-  return JSON.stringify({ car: car.id, steerSensitivity: round(steerSensitivity), handling }, null, 2);
+  const assist: Record<string, number> = {};
+  for (const spec of ASSIST_SPECS) assist[spec.key] = round(MODE_ASSIST[mode][spec.key]);
+  return JSON.stringify(
+    { car: car.id, mode, steerSensitivity: round(steerSensitivity), handling, assist },
+    null,
+    2,
+  );
 }

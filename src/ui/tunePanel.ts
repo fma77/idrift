@@ -1,6 +1,14 @@
-import { TUNE_SPECS, setHandling, resetHandling, describeTuning } from '../tune/tuning.ts';
+import {
+  TUNE_SPECS,
+  ASSIST_SPECS,
+  setHandling,
+  setAssist,
+  resetTuning,
+  describeTuning,
+} from '../tune/tuning.ts';
+import { MODE_ASSIST } from '../data/assist.ts';
 import { MIN_SENSITIVITY, MAX_SENSITIVITY } from '../input/thumbSteer.ts';
-import type { CarParams } from '../sim/types.ts';
+import type { CarParams, SimMode } from '../sim/types.ts';
 
 /**
  * The tuning sheet shown over a paused run.
@@ -22,6 +30,7 @@ export class TunePanel {
   private readonly status: HTMLElement;
   private readonly options: TunePanelOptions;
   private car: CarParams | null = null;
+  private mode: SimMode = 'timeAttack';
 
   constructor(root: HTMLElement, options: TunePanelOptions) {
     this.root = root;
@@ -48,14 +57,14 @@ export class TunePanel {
 
     const actions = document.createElement('div');
     actions.className = 'tune__actions';
-    const reset = button('Reset car', 'btn btn--secondary');
+    const reset = button('Reset', 'btn btn--secondary');
     const copy = button('Copy values', 'btn btn--secondary');
     const drive = button('Drive', 'btn btn--primary');
     reset.addEventListener('click', () => {
       if (!this.car) return;
-      resetHandling(this.car);
+      resetTuning(this.car, this.mode);
       this.render();
-      this.status.textContent = 'Back to the shipped values.';
+      this.status.textContent = 'This car and this mode are back to the shipped values.';
     });
     copy.addEventListener('click', () => void this.copy());
     drive.addEventListener('click', () => options.onClose());
@@ -65,8 +74,9 @@ export class TunePanel {
     root.append(head, this.body, foot);
   }
 
-  open(car: CarParams): void {
+  open(car: CarParams, mode: SimMode): void {
     this.car = car;
+    this.mode = mode;
     this.status.textContent = '';
     this.render();
     this.root.hidden = false;
@@ -99,6 +109,25 @@ export class TunePanel {
       }),
     ];
 
+    const modeName = this.mode === 'timeAttack' ? 'Time Attack' : 'Drift Run';
+    rows.push(heading(`${modeName} help`, 'Applies to every car in this mode.'));
+    const assist = MODE_ASSIST[this.mode];
+    for (const spec of ASSIST_SPECS) {
+      rows.push(
+        row({
+          label: spec.label,
+          help: spec.help,
+          min: spec.min,
+          max: spec.max,
+          step: spec.step,
+          unit: spec.unit,
+          value: spec.toDisplay(assist[spec.key]),
+          onInput: (v) => setAssist(this.mode, spec.key, spec.fromDisplay(v)),
+        }),
+      );
+    }
+
+    rows.push(heading(`${car.name} handling`, 'Applies to this car in both modes.'));
     for (const spec of TUNE_SPECS) {
       rows.push(
         row({
@@ -118,7 +147,7 @@ export class TunePanel {
 
   private async copy(): Promise<void> {
     if (!this.car) return;
-    const text = describeTuning(this.car, this.options.getSensitivity());
+    const text = describeTuning(this.car, this.mode, this.options.getSensitivity());
     try {
       await navigator.clipboard.writeText(text);
       this.status.textContent = 'Copied. Paste it into the chat to make these the defaults.';
@@ -135,6 +164,19 @@ export class TunePanel {
       this.status.textContent = 'Could not copy automatically. Select the text above and copy it.';
     }
   }
+}
+
+function heading(title: string, note: string): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'tune__section';
+  const t = document.createElement('div');
+  t.className = 'tune__section-title';
+  t.textContent = title;
+  const n = document.createElement('div');
+  n.className = 'tune__help';
+  n.textContent = note;
+  el.append(t, n);
+  return el;
 }
 
 function button(text: string, className: string): HTMLButtonElement {

@@ -15,16 +15,23 @@ import type { RouteData, SimState } from '../types.ts';
 
 /** Radians (~8 degrees). Below this the car is cornering, not drifting. */
 const MIN_DRIFT_ANGLE = 0.14;
-/** Radians (~70 degrees). Past this the car has spun and the combo dies. */
-const SPIN_ANGLE = 1.22;
+/**
+ * Radians (~83 degrees). Past this the car has spun and the combo dies. Wide,
+ * because Drift Run lets the car hang out at 60 degrees and more, and a lurid
+ * slide that briefly overshoots is the thing being rewarded, not a spin.
+ */
+const SPIN_ANGLE = 1.45;
+/** Radians (~52 degrees). Slide angle worth the most points. */
+const BEST_ANGLE = 0.9;
+/** m/s (90 km/h). Drift speed worth full points; faster is worth up to 1.4x. */
+const REFERENCE_SPEED = 25;
 /** m/s (~29 km/h). Slow-speed wiggling should not bank points. */
 const MIN_DRIFT_SPEED = 8;
-/** Ticks of straightening tolerated before the combo breaks. */
+/** Ticks of straightening tolerated before the combo ends and banks. */
 const STRAIGHTEN_GRACE = 36;
 
 /** Time Attack penalty for hitting a wall, in sim ticks (2 seconds at 120Hz). */
 export const WALL_PENALTY_TICKS = 240;
-/** Drift Run combo penalty: a wall always breaks the combo, forfeiting pending points. */
 
 /** Ceiling on the combo multiplier so a single long zone cannot run away. */
 const MAX_MULTIPLIER = 8;
@@ -56,26 +63,25 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
     d.ticksToInitiation = 0;
   }
 
-  // --- Combo break conditions ---
+  // --- How a combo ends ---
+  // A wall or a spin forfeits what is pending. Straightening up banks it: with
+  // the assist keeping the car on the road, the slides are shorter and more
+  // frequent than they were, and losing a whole corner's points for the moment
+  // between two of them felt like being robbed.
   if (state.hitThisTick) {
     breakCombo(d);
   } else if (absSlip > SPIN_ANGLE) {
     breakCombo(d);
   } else if (absSlip < MIN_DRIFT_ANGLE || state.speed < MIN_DRIFT_SPEED) {
     d.driftTicks = 0;
-    if (d.pending > 0) {
-      d.correctionSum += 0; // straightening is not a correction, just an end
-      if (++d.ticksToInitiation > STRAIGHTEN_GRACE) breakCombo(d);
-    }
+    if (d.pending > 0 && ++d.ticksToInitiation > STRAIGHTEN_GRACE) bankCombo(d);
   }
 
   // --- Leaving a zone with the combo intact banks it ---
   if (!d.inZone && wasInZone) {
-    if (d.pending > 0) {
-      d.banked += d.pending;
-      d.pending = 0;
-      d.zonesCleared++;
-    }
+    if (d.pending > 0) bankCombo(d);
+    if (d.zoneScored) d.zonesCleared++;
+    d.zoneScored = false;
     d.multiplier = 1;
     d.driftTicks = 0;
   }
@@ -96,10 +102,13 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
     if (d.inZone) {
       const zone = route.driftZones[zoneIndex];
 
-      // Angle: peaks near 45 degrees, falls away as the car approaches a spin.
-      const angleFactor = clamp(absSlip / 0.79, 0, 1) * (absSlip > 0.79 ? clamp((SPIN_ANGLE - absSlip) / 0.43, 0.2, 1) : 1);
-      // Speed: normalised against 40 m/s (~144 km/h).
-      const speedFactor = clamp(state.speed / 40, 0, 1.4);
+      // Angle: builds to BEST_ANGLE, then falls away as the car approaches a spin.
+      const angleFactor =
+        absSlip <= BEST_ANGLE
+          ? absSlip / BEST_ANGLE
+          : clamp((SPIN_ANGLE - absSlip) / (SPIN_ANGLE - BEST_ANGLE), 0.2, 1);
+      // Speed: holding angle while carrying speed is the hard part.
+      const speedFactor = clamp(state.speed / REFERENCE_SPEED, 0, 1.4);
       // Line: how close to the prescribed clipping point.
       const lineFactor = proximityFactor(state, route, zone.entryIndex, zone.exitIndex);
 
@@ -114,6 +123,15 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
       d.correctionSum += state.steerChange * 2;
     }
   }
+}
+
+function bankCombo(d: SimState['drift']): void {
+  d.banked += d.pending;
+  d.pending = 0;
+  d.multiplier = 1;
+  d.driftTicks = 0;
+  d.ticksToInitiation = 0;
+  d.zoneScored = true;
 }
 
 function breakCombo(d: SimState['drift']): void {

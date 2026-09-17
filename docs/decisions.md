@@ -51,16 +51,43 @@ feel. Tests pin the behaviours that matter: gentle input corners on grip, a held
 settles at a steady angle for every car, wider slides scrub more speed, and letting go
 straightens the car.
 
-Tuning is done by feel, on a phone: open the game with `#tune` on the URL and a TUNE
-button appears in runs, opening sliders for every handling value that apply live. Tuned
-values stay on that device, and nothing driven in tuning mode is saved or posted.
-"Copy values" exports them to become the shipped defaults.
+### The game drives the pedals, differently per mode
 
-Knock-on changes: replays are 2 bytes a sample (steer only); `SIM_VERSION` is 3, so old
+The first play-test of the one-thumb car showed the missing half: at full speed, steering
+alone cannot get a car round a touge corner. With no pedals, the game has to manage speed,
+so the sim now carries a per-mode assist (`src/sim/model/assist.ts`, values in
+`src/data/assist.ts`):
+
+- **Corner braking.** The car reads the centreline ahead, works out the fastest it can be
+  going now and still brake to grip speed for every corner in view, and brakes to that.
+- **Steering and sliding cost speed.** This is the brake pedal the player does not have.
+- **Road keeping.** When the car is predicted to run wide, its path is bent back towards
+  the road -- but only while the player steers roughly the right way (into the corner, or
+  back towards the road). No steering, or the wrong way, gets no help and still crashes.
+- **Per-mode handling.** Time Attack gets more grip, slides that close early and firmer
+  braking, so a tidy line is quickest. Drift Run gets less grip, a wide slide limit, speed
+  bled through the slide rather than braking, firmer road keeping, and a throttle that
+  pulses in a slide (heard in the engine note too).
+
+Being inside the sim, all of it is deterministic, identical for every player, and replays
+exactly. Tests hold the promise both ways: a simulated player who reacts late and misjudges
+by 40% gets round every route in both modes without touching a wall; a player who never
+steers still crashes; and Time Attack is quicker while Drift Run spends more time sideways.
+
+Drift scoring was retuned with it: a combo that ends by straightening up now banks its
+points (only a wall or a spin forfeits them), the best-scoring angle is about 52 degrees,
+and speed is judged against 90 km/h.
+
+Tuning is done by feel, on a phone: switch on **Settings → Tuning mode** (or open the game
+with `#tune` or `?tune`) and a TUNE button appears in runs, opening sliders for the
+current mode's help and the current car's handling, applied live. Tuned values stay on
+that device, and nothing driven in tuning mode is saved or posted. "Copy values" exports
+them to become the shipped defaults.
+
+Knock-on changes: replays are 2 bytes a sample (steer only); `SIM_VERSION` moved to 3 (and 4 with the assists), so old
 boards and bests are separate; the throttle assist setting, the button layout editor
 and left-handed mode are gone. The API's `assist` field is kept (always 1) so the
-Worker and database need no migration. Scoring and the test driver have not yet been
-retuned for the new handling.
+Worker and database need no migration.
 
 ### Gameplay is responsive rather than portrait-only or landscape-only
 

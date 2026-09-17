@@ -157,9 +157,43 @@ export interface RouteData {
 
 export type SimMode = 'timeAttack' | 'driftRun';
 
+/**
+ * The help the game gives, per mode.
+ *
+ * With one thumb and no pedals, the player cannot manage speed, so the car does:
+ * it slows for corners it can see coming, loses speed to steering and sliding,
+ * and bends its path back onto the road -- but only while the player is
+ * steering roughly the right way. The two modes use the same model with
+ * different numbers: Time Attack keeps slides short and favours grip, Drift Run
+ * lets the car hang out and bleeds speed through the slide instead.
+ *
+ * Global rather than per car, so every car in a mode plays by the same rules.
+ */
+export interface AssistParams {
+  /** Multiplies the car's grip. */
+  gripScale: number;
+  /** Multiplies both slide frictions. Higher snaps slides shut sooner. */
+  slideHoldScale: number;
+  /** Radians. Past this slide angle the nose is pulled back towards the direction of travel. */
+  maxSlideAngle: number;
+  /** Corner speed as a multiple of what grip allows. 0 turns corner braking off. */
+  cornerSpeed: number;
+  /** m/s^2. How hard the car may brake by itself for a corner ahead. */
+  cornerBraking: number;
+  /** m/s^2 of speed lost at full steering and top speed. */
+  steerDrag: number;
+  /** m/s^2 of speed lost in a slide at 90 degrees. */
+  slideDrag: number;
+  /** 0..1. How firmly the path is bent back onto the road while the player steers the right way. */
+  roadKeeping: number;
+  /** 0..1. How much the throttle pulses in a slide, like a driver working the pedal. */
+  throttlePulse: number;
+}
+
 /** Per-run constants. Fixed at run start, recorded with the replay. */
 export interface SimConfig {
   mode: SimMode;
+  assist: AssistParams;
 }
 
 /** Live drift-run scoring state. Lives in the sim so replays reproduce it exactly. */
@@ -183,6 +217,8 @@ export interface DriftScoreState {
   ticksToInitiation: number;
   zonesEntered: number;
   zonesCleared: number;
+  /** True once anything has been banked in the current zone. */
+  zoneScored: boolean;
   /** Sign of the drift angle last tick, for reversal counting. */
   lastDriftSign: number;
 }
@@ -210,6 +246,10 @@ export interface SimState {
   steer: number;
 
   // --- Derived, cached for renderer/audio/scoring; never an integration input ---
+  /** 0..1. How much drive the car is using: 0 while it brakes for a corner, pulsing in a slide. */
+  throttle: number;
+  /** True on ticks where road keeping bent the car's path. */
+  roadKept: boolean;
   /** How much the steering moved this tick. Sawing at it is a save, not a clean drift. */
   steerChange: number;
   /** Radians. Drawn front-wheel angle, positive = left. Cosmetic. */

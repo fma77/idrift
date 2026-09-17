@@ -10,6 +10,7 @@ import { TunePanel } from './ui/tunePanel.ts';
 import { isTuneMode, applyStoredTuning, restoreShippedHandling, isTuned } from './tune/tuning.ts';
 import { EngineAudio } from './audio/engine.ts';
 import { CARS, carById } from './data/cars.ts';
+import { configFor } from './data/assist.ts';
 import { ROUTES, ROUTE_IDS, loadRoute, type RouteEntry } from './data/routes.ts';
 import { loadSettings, saveSettings, type Settings } from './storage/settings.ts';
 import {
@@ -599,7 +600,7 @@ async function startRun(mode: SimMode): Promise<void> {
   session = new GameSession(
     currentRoute,
     car,
-    { mode },
+    configFor(mode),
     input,
     renderer,
     hud,
@@ -911,7 +912,7 @@ function openTuning(): void {
   session?.stop();
   thumb.releaseAll();
   $('overlay-paused').hidden = true;
-  tunePanel.open(carById(settings.carId));
+  tunePanel.open(carById(settings.carId), currentMode);
 }
 
 function closeTuning(): void {

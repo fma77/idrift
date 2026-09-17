@@ -551,6 +551,16 @@
   padding: var(--s-2) var(--gutter);
 }
 
+.tune__section {
+  padding: var(--s-4) 0 var(--s-1);
+}
+
+.tune__section-title {
+  font-family: var(--display);
+  font-size: 16px;
+  color: var(--red);
+}
+
 .tune__row {
   display: block;
   padding: var(--s-3) 0;

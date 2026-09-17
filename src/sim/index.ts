@@ -35,6 +35,8 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
     sliding: false,
     steer: 0,
     steerChange: 0,
+    throttle: 0,
+    roadKept: false,
     steerAngle: 0,
     slipAngle: 0,
     speed: 0,
@@ -60,6 +62,7 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
       ticksToInitiation: 0,
       zonesEntered: 0,
       zonesCleared: 0,
+      zoneScored: false,
       lastDriftSign: 0,
     },
     rngS0: rng.s0,
@@ -94,7 +97,7 @@ export function stepSim(
   state.hitThisTick = false;
 
   const grip = surfaceGripAt(state, route);
-  stepVehicle(state, car, input, grip, DT);
+  stepVehicle(state, car, input, config.assist, route, grip, DT);
   updateProgress(state, route);
 
   // --- Wall contact: penalty and a reset, never a restart ---

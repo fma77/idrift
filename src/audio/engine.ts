@@ -148,8 +148,9 @@ export class EngineAudio {
     // Load, not throttle position: a car at full throttle near the redline is a
     // different sound from one bogging at 2000rpm, and load is what separates
     // them.
-    // Always on the throttle, so load is high whenever the car is still pulling.
-    const load = clamp01((1 - speedFraction * 0.5) * (0.35 + rpmFraction * 0.65));
+    // Load follows the sim's throttle: off while the car brakes itself for a
+    // corner, pulsing in a Drift Run slide, so the pulse is heard as well as felt.
+    const load = clamp01(state.throttle * (0.35 + rpmFraction * 0.65));
     this.filter.frequency.setTargetAtTime(
       params.filterBase + params.filterRange * load,
       now,
