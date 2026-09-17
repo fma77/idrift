@@ -81,7 +81,7 @@ const car = carById('kaido-zen-r');
 test('steering does not move the wheels, only turns them', () => {
   const straight = wheelsAt(car, 0);
 
-  for (const angle of [-car.maxSteerAngle, -0.2, 0.2, car.maxSteerAngle]) {
+  for (const angle of [-car.maxWheelAngle, -0.2, 0.2, car.maxWheelAngle]) {
     const steered = wheelsAt(car, angle);
 
     for (let i = 0; i < 2; i++) {
@@ -98,7 +98,7 @@ test('steering does not move the wheels, only turns them', () => {
 });
 
 test('the front wheels turn with the steering, the rears do not', () => {
-  for (const angle of [-0.4, 0.4, car.maxSteerAngle]) {
+  for (const angle of [-0.4, 0.4, car.maxWheelAngle]) {
     const wheels = wheelsAt(car, angle);
     for (let i = 0; i < 2; i++) {
       assert.ok(

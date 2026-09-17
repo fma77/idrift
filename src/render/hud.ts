@@ -21,7 +21,7 @@ export interface HudElements {
   driftLabel: HTMLElement;
   driftValue: HTMLElement;
   speedValue: HTMLElement;
-  gearValue: HTMLElement;
+  angleValue: HTMLElement;
   pace: HTMLElement;
   flash: HTMLElement;
 }
@@ -50,7 +50,9 @@ export class Hud {
     const el = this.el;
 
     el.speedValue.textContent = String(Math.round(state.speed * 3.6));
-    el.gearValue.textContent = String(state.gear + 1);
+    // Drift angle in place of the old gear readout: with no gearbox left, the
+    // angle is the number that says whether a slide is working.
+    el.angleValue.textContent = String(Math.round(Math.min(Math.abs(state.slipAngle), Math.PI / 2) * 57.29578));
 
     if (mode === 'driftRun') {
       const total = Math.round(state.drift.banked + state.drift.pending);

@@ -1,29 +1,25 @@
 /**
  * Input.
  *
- * Keys and on-screen buttons both write into one mutable "current input" struct, which
- * the game loop samples once per sim tick. Events are never queued and consumed
- * inside the sim: a tick must see a snapshot of the controls, not a replay of
- * everything that happened since the last one, or the sim's output would depend
- * on browser event timing and stop being reproducible.
+ * Keys and the thumb slider both write into one mutable "current input" struct,
+ * which the game loop samples once per sim tick. Events are never queued and
+ * consumed inside the sim: a tick must see a snapshot of the controls, not a
+ * replay of everything that happened since the last one, or the sim's output
+ * would depend on browser event timing and stop being reproducible.
+ *
+ * Steering is the only control. The car drives itself.
  */
 
 export interface RawInput {
   /** -1 (full left) .. +1 (full right). */
   steer: number;
-  /** -1 (full brake) .. +1 (full throttle). */
-  throttle: number;
-  handbrake: boolean;
 }
 
-export type Action = 'left' | 'right' | 'accelerate' | 'brake' | 'handbrake';
+export type Action = 'left' | 'right';
 
 export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'left', label: 'Steer left' },
   { id: 'right', label: 'Steer right' },
-  { id: 'accelerate', label: 'Accelerate' },
-  { id: 'brake', label: 'Brake / reverse' },
-  { id: 'handbrake', label: 'Handbrake' },
 ];
 
 export type Keymap = Record<Action, string[]>;
@@ -31,30 +27,25 @@ export type Keymap = Record<Action, string[]>;
 export const DEFAULT_KEYMAP: Keymap = {
   left: ['ArrowLeft', 'KeyA'],
   right: ['ArrowRight', 'KeyD'],
-  accelerate: ['ArrowUp', 'KeyW'],
-  brake: ['ArrowDown', 'KeyS'],
-  handbrake: ['Space'],
 };
 
-/** Seconds from neutral to full lock, and back to neutral. */
-const STEER_ATTACK = 0.22;
-const STEER_RELEASE = 0.12;
+/** Seconds from neutral to full steering on a key, and back to neutral. */
+const STEER_ATTACK = 0.18;
+const STEER_RELEASE = 0.1;
 
 export class InputController {
-  readonly raw: RawInput = { steer: 0, throttle: 0, handbrake: false };
+  readonly raw: RawInput = { steer: 0 };
 
   private keymap: Keymap = DEFAULT_KEYMAP;
   /** Physical keys currently held, by KeyboardEvent.code. */
-  private held = new Set<string>();
+  private held: string[] = [];
   /**
-   * Actions held through the on-screen touch buttons.
+   * The thumb slider's position, or null while no finger is down.
    *
-   * These are treated exactly like held keys. Touch and keyboard therefore
-   * share one input path -- the same steering ramp, the same throttle mapping
-   * -- so a run cannot behave differently depending on which a player used, and
-   * the replay format needs no idea that touch exists.
+   * Already analogue, so it is used as-is rather than ramped: the thumb is the
+   * smoothing. Keys are binary and still ramp, or every tap would be a flick.
    */
-  private virtual = new Set<Action>();
+  private touchSteer: number | null = null;
 
   private enabled = false;
   private boundKeyDown = (e: KeyboardEvent) => this.onKeyDown(e);
@@ -65,10 +56,12 @@ export class InputController {
     this.keymap = map;
   }
 
-  /** Press or release an action from an on-screen button. */
-  setVirtual(action: Action, down: boolean): void {
-    if (down) this.virtual.add(action);
-    else this.virtual.delete(action);
+  /** Steering from the thumb slider, -1..1, or null when the thumb lifts. */
+  setTouchSteer(value: number | null): void {
+    // Lifting the thumb lets go at once rather than ramping down like a key:
+    // the car's own turn response already smooths the straightening.
+    if (value === null && this.touchSteer !== null) this.raw.steer = 0;
+    this.touchSteer = value;
   }
 
   enable(): void {
@@ -89,44 +82,36 @@ export class InputController {
   }
 
   releaseAll(): void {
-    this.held.clear();
-    this.virtual.clear();
+    this.held.length = 0;
+    this.touchSteer = null;
     this.raw.steer = 0;
-    this.raw.throttle = 0;
-    this.raw.handbrake = false;
   }
 
   /**
-   * Fold held keys and buttons into the analogue struct.
+   * Fold the thumb or held keys into the analogue struct.
    *
    * Called once per rendered frame, not per sim tick: this is the only part of
    * input handling that depends on wall-clock time, and it is deliberately
-   * outside the sim. A key or a button is a binary signal and the car needs a
-   * continuous one, so steering ramps rather than stepping -- without it, full
-   * lock would arrive in a single frame and every tap would be a flick.
+   * outside the sim.
    */
   update(dtSeconds: number): void {
-    const left = this.isDown('left');
-    const right = this.isDown('right');
-    const target = (right ? 1 : 0) - (left ? 1 : 0);
+    if (this.touchSteer !== null) {
+      this.raw.steer = this.touchSteer;
+      return;
+    }
 
+    const target = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
     const rate = target === 0 ? 1 / STEER_RELEASE : 1 / STEER_ATTACK;
     const step = rate * dtSeconds;
     const d = target - this.raw.steer;
     this.raw.steer = Math.abs(d) <= step ? target : this.raw.steer + Math.sign(d) * step;
-
-    const up = this.isDown('accelerate');
-    const down = this.isDown('brake');
-    this.raw.throttle = (up ? 1 : 0) - (down ? 1 : 0);
-    this.raw.handbrake = this.isDown('handbrake');
   }
 
-  /** True if the action is held on the keyboard or on screen. */
+  /** True if the action's key is held. */
   isDown(action: Action): boolean {
-    if (this.virtual.has(action)) return true;
     const codes = this.keymap[action];
     for (let i = 0; i < codes.length; i++) {
-      if (this.held.has(codes[i])) return true;
+      if (this.held.includes(codes[i])) return true;
     }
     return false;
   }
@@ -139,19 +124,23 @@ export class InputController {
     return false;
   }
 
+  /** For tests and tooling: hold or release a key by code, as a keydown would. */
+  press(code: string, down: boolean): void {
+    const i = this.held.indexOf(code);
+    if (down && i < 0) this.held.push(code);
+    if (!down && i >= 0) this.held.splice(i, 1);
+  }
+
   private onKeyDown(e: KeyboardEvent): void {
-    if (e.repeat) return;
-    if (this.isBound(e.code)) {
-      e.preventDefault();
-      this.held.add(e.code);
-    }
+    if (e.repeat || !this.isBound(e.code)) return;
+    e.preventDefault();
+    this.press(e.code, true);
   }
 
   private onKeyUp(e: KeyboardEvent): void {
-    if (this.isBound(e.code)) {
-      e.preventDefault();
-      this.held.delete(e.code);
-    }
+    if (!this.isBound(e.code)) return;
+    e.preventDefault();
+    this.press(e.code, false);
   }
 }
 

@@ -109,9 +109,9 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
       const perSecond = 900 * angleFactor * speedFactor * lineFactor * zone.baseMultiplier;
       d.pending += perSecond * d.multiplier * dt;
 
-      // Correction magnitude: how much counter-steer is being sawed in. Small
-      // continuous input is a clean drift; large rapid input is a save.
-      d.correctionSum += Math.abs(state.frontSlip) * dt;
+      // Correction magnitude: how much the player is sawing at the steering.
+      // Small, steady input is a clean drift; large rapid input is a save.
+      d.correctionSum += state.steerChange * 2;
     }
   }
 }

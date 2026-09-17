@@ -29,7 +29,6 @@ export interface BestRecord {
   /** Drift run only. */
   points: number;
   grade: string;
-  assist: number;
   recordedAt: number;
 }
 

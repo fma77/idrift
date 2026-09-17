@@ -5,8 +5,9 @@ import { GameSession, type RunOutcome } from './game.ts';
 import { Renderer, type RenderSettings } from './render/renderer.ts';
 import { Hud, formatTime } from './render/hud.ts';
 import { InputController, ACTIONS, DEFAULT_KEYMAP, keyLabel, type Action } from './input/input.ts';
-import { TouchControls } from './input/touchControls.ts';
-import { defaultLayout, orientationOf } from './input/touchLayout.ts';
+import { ThumbSteer } from './input/thumbSteer.ts';
+import { TunePanel } from './ui/tunePanel.ts';
+import { isTuneMode, applyStoredTuning, isTuned } from './tune/tuning.ts';
 import { EngineAudio } from './audio/engine.ts';
 import { CARS, carById } from './data/cars.ts';
 import { ROUTES, ROUTE_IDS, loadRoute, type RouteEntry } from './data/routes.ts';
@@ -56,7 +57,17 @@ const SCREENS: Record<ScreenName, HTMLElement> = {
 
 const gameEl = $('game');
 const canvas = $<HTMLCanvasElement>('canvas');
-const editorEl = $('layout-editor');
+
+/**
+ * Tuning mode (#tune on the URL): handling sliders over a paused run, applied
+ * live. Read once at boot; a change of hash reloads, so a run never switches
+ * between tuned and shipped handling halfway through.
+ */
+const tuneMode = isTuneMode();
+if (tuneMode) applyStoredTuning();
+window.addEventListener('hashchange', () => {
+  if (isTuneMode() !== tuneMode) location.reload();
+});
 
 const settings: Settings = loadSettings();
 let currentEntry: RouteEntry = ROUTES[0];
@@ -79,7 +90,7 @@ const hud = new Hud({
   driftLabel: $('hud-drift-label'),
   driftValue: $('hud-drift'),
   speedValue: $('hud-speed'),
-  gearValue: $('hud-gear'),
+  angleValue: $('hud-angle'),
   pace: $('pace'),
   flash: $('hud-flash'),
 });
@@ -87,32 +98,20 @@ const hud = new Hud({
 const input = new InputController();
 input.setKeymap(settings.keymap);
 
-/** The buttons shown during a run. They press actions exactly as keys do. */
-const touch = new TouchControls($('touch-controls'), {
-  onPress: (action, down) => input.setVirtual(action, down),
-});
-
-/** The same buttons in the layout editor, where dragging moves them instead. */
-const editorTouch = new TouchControls($('layout-controls'), {
-  editable: true,
-  onMove: () => saveSettings(settings),
-});
+/** Touch anywhere during a run and slide sideways to steer. */
+const thumb = new ThumbSteer($('steer-surface'), (value) => input.setTouchSteer(value));
+thumb.setSensitivity(settings.steerSensitivity);
 
 // --- Input mode -------------------------------------------------------------
 
 /**
- * Whether to show on-screen buttons or key hints.
+ * Whether to show touch hints or key hints.
  *
  * Decided on the device's primary pointer at boot, then switched on real use:
- * a touch shows the buttons, a bound key hides them. The first version only
- * ever learned "touch" from a touch on the controls themselves -- which were
- * hidden until it had -- and then overwrote the mode back to "keyboard" at the
- * start of every run, so on a phone the controls vanished as each run began.
+ * a touch means touch, a bound key means keyboard.
  */
 function setInputMode(mode: 'touch' | 'keyboard'): void {
-  if (gameEl.dataset.input === mode) return;
   gameEl.dataset.input = mode;
-  if (mode === 'touch' && !gameEl.hidden) touch.relayout();
 }
 
 setInputMode(window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keyboard');
@@ -124,42 +123,13 @@ function showScreen(name: ScreenName): void {
     SCREENS[key].hidden = key !== name;
   }
   gameEl.hidden = true;
-  editorEl.hidden = true;
 }
 
 function showGame(): void {
   for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;
-  editorEl.hidden = true;
   gameEl.hidden = false;
-  // Neither the canvas nor the buttons have a size until they are displayed,
-  // so measure now, not at boot.
+  // The canvas has no size until it is displayed, so measure now, not at boot.
   renderer.resize();
-  touch.setLayout(settings.touchLayout, settings.lefty);
-}
-
-// --- Touch layout editor ----------------------------------------------------
-
-function openLayoutEditor(): void {
-  for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;
-  gameEl.hidden = true;
-  editorEl.hidden = false;
-  syncLayoutEditor();
-}
-
-function syncLayoutEditor(): void {
-  const size = $<HTMLInputElement>('layout-size');
-  size.value = String(Math.round(settings.touchLayout.scale * 100));
-  $('layout-size-value').textContent = `${size.value}%`;
-
-  // Portrait and landscape are arranged separately, because a layout that fits
-  // one does not fit the other. Say which one is being edited.
-  const orientation = orientationOf(editorEl.clientWidth, editorEl.clientHeight);
-  $('layout-orientation').textContent =
-    orientation === 'portrait'
-      ? 'Arranging the upright layout. Turn your phone sideways to arrange that one too.'
-      : 'Arranging the sideways layout. Turn your phone upright to arrange that one too.';
-
-  editorTouch.setLayout(settings.touchLayout, settings.lefty);
 }
 
 // --- Route list -------------------------------------------------------------
@@ -457,8 +427,8 @@ function buildCarList(): void {
       name.textContent = car.name;
       const meta = document.createElement('div');
       meta.className = 'card__meta';
-      const power = Math.max(...car.engine.torqueCurve);
-      meta.textContent = `${car.mass}kg · ${power}Nm · ${car.engine.gearRatios.length}-speed`;
+      meta.textContent =
+        `Top ${Math.round(car.handling.topSpeed * 3.6)} km/h` + (tuneMode && isTuned(car) ? ' · tuned' : '');
       left.append(name, meta);
 
       const right = document.createElement('div');
@@ -492,24 +462,26 @@ function bindToggle(id: string, get: () => boolean, set: (value: boolean) => voi
   });
 }
 
-function buildSettings(): void {
-  const assist = $<HTMLInputElement>('set-assist');
-  const assistValue = $('assist-value');
-  assist.value = String(Math.round(settings.assist * 100));
-  assistValue.textContent = assist.value;
-  assist.addEventListener('input', () => {
-    settings.assist = Number(assist.value) / 100;
-    assistValue.textContent = assist.value;
-    saveSettings(settings);
-  });
+let syncSettingsSensitivity: () => void = () => {};
 
-  bindToggle(
-    'set-lefty',
-    () => settings.lefty,
-    (v) => {
-      settings.lefty = v;
-    },
-  );
+function setSensitivity(value: number): void {
+  settings.steerSensitivity = value;
+  thumb.setSensitivity(value);
+  saveSettings(settings);
+  syncSettingsSensitivity();
+}
+
+function buildSettings(): void {
+  const sensitivity = $<HTMLInputElement>('set-sensitivity');
+  const sensitivityValue = $('sensitivity-value');
+  const syncSensitivity = () => {
+    sensitivity.value = String(Math.round(settings.steerSensitivity * 100));
+    sensitivityValue.textContent = `${sensitivity.value}%`;
+  };
+  syncSensitivity();
+  sensitivity.addEventListener('input', () => setSensitivity(Number(sensitivity.value) / 100));
+  syncSettingsSensitivity = syncSensitivity;
+
   bindToggle('set-north', () => settings.fixedNorth, (v) => (settings.fixedNorth = v));
   bindToggle('set-skids', () => settings.showSkidMarks, (v) => (settings.showSkidMarks = v));
   bindToggle('set-sound', () => settings.soundOn, (v) => (settings.soundOn = v));
@@ -580,9 +552,6 @@ function syncKeyHints(): void {
   const map: [string, Action][] = [
     ['hint-left', 'left'],
     ['hint-right', 'right'],
-    ['hint-accel', 'accelerate'],
-    ['hint-brake', 'brake'],
-    ['hint-handbrake', 'handbrake'],
   ];
   for (const [id, action] of map) {
     $(id).textContent = keyLabel(settings.keymap[action][0]);
@@ -613,7 +582,7 @@ async function startRun(mode: SimMode): Promise<void> {
   session = new GameSession(
     currentRoute,
     car,
-    { mode, assist: settings.assist },
+    { mode },
     input,
     renderer,
     hud,
@@ -624,6 +593,10 @@ async function startRun(mode: SimMode): Promise<void> {
   const countdownOverlay = $('overlay-countdown');
   const countdownEl = $('countdown');
   $('countdown-mode').textContent = mode === 'timeAttack' ? 'TIME ATTACK' : 'DRIFT RUN';
+  $('countdown-hint').textContent =
+    gameEl.dataset.input === 'keyboard'
+      ? `${keyLabel(settings.keymap.left[0])} ${keyLabel(settings.keymap.right[0])} to steer. The car drives itself.`
+      : 'Touch anywhere and slide to steer. The car drives itself.';
   countdownOverlay.hidden = false;
 
   session.onCountdown = (value) => {
@@ -643,13 +616,21 @@ async function startRun(mode: SimMode): Promise<void> {
 }
 
 async function finishRun(outcome: RunOutcome): Promise<void> {
-  touch.releaseAll();
+  thumb.releaseAll();
+  tunePanel.close();
   lastOutcome = outcome;
   const route = currentRoute;
   if (!route) return;
 
   const car = carById(settings.carId);
   const { result } = outcome;
+
+  // Tuned handling is not the game everyone else is playing, so nothing driven
+  // with it counts: no best, no replay, no unlock, no leaderboard.
+  if (tuneMode) {
+    showResults(result, false);
+    return;
+  }
 
   markCompleted(route.id);
 
@@ -662,12 +643,11 @@ async function finishRun(outcome: RunOutcome): Promise<void> {
     timeSeconds: result.timeSeconds,
     points: result.points,
     grade: result.grade,
-    assist: settings.assist,
     recordedAt: Date.now(),
   });
 
   // Store the replay for the personal best only. Everything needed to replay it
-  // exactly -- sim version, route version, car, assist, seed -- is in the best
+  // exactly -- sim version, route version, car, seed -- is in the best
   // record above; this is just the input stream.
   if (isBest) {
     try {
@@ -719,16 +699,20 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
 
   $('result-stats').replaceChildren(...rows);
   resetSubmitPanel();
+  $('result-tune-note').hidden = !tuneMode;
+  $('result-submit').hidden = tuneMode;
   showScreen('results');
 
   // Meme triggers fire here -- on a results screen, never mid-drive.
+  if (tuneMode) return;
   if (isBest) fireMeme('personalBest');
   else fireMeme('routeComplete');
   if (result.grade === 'S') fireMeme('sRank');
 }
 
 function quitRun(): void {
-  touch.releaseAll();
+  thumb.releaseAll();
+  tunePanel.close();
   session?.abort();
   session = null;
   $('overlay-countdown').hidden = true;
@@ -815,7 +799,9 @@ async function postScore(): Promise<void> {
       timeMs: Math.round(result.timeSeconds * 1000),
       points: result.points,
       grade: result.grade,
-      assist: settings.assist,
+      // No throttle assist any more: the car always drives itself. The field
+      // stays in the API so the worker and database need no migration.
+      assist: 1,
       tickCount: result.totalTicks,
       replay,
     });
@@ -884,8 +870,8 @@ function isRunActive(): boolean {
 function pauseRun(): void {
   if (!isRunActive() || !$('overlay-paused').hidden) return;
   session?.stop();
-  // Fingers still resting on buttons must not come back pressed on resume.
-  touch.releaseAll();
+  // A thumb resting on the screen must not come back steering on resume.
+  thumb.releaseAll();
   $('overlay-paused').hidden = false;
 }
 
@@ -895,32 +881,55 @@ function resumeRun(): void {
   session?.start();
 }
 
+// --- Tuning -----------------------------------------------------------------
+
+const tunePanel = new TunePanel($('tune-panel'), {
+  getSensitivity: () => settings.steerSensitivity,
+  setSensitivity,
+  onClose: closeTuning,
+});
+
+function openTuning(): void {
+  if (!isRunActive() || tunePanel.isOpen) return;
+  session?.stop();
+  thumb.releaseAll();
+  $('overlay-paused').hidden = true;
+  tunePanel.open(carById(settings.carId));
+}
+
+function closeTuning(): void {
+  if (!tunePanel.isOpen) return;
+  tunePanel.close();
+  if (isRunActive()) session?.start();
+}
+
+$('btn-tune').hidden = !tuneMode;
+$('tune-chip').hidden = !tuneMode;
+$('btn-tune').addEventListener('click', openTuning);
+
 window.addEventListener('keydown', (e) => {
   // Using a bound key means the keyboard is in use, whatever the device.
   if (input.isBound(e.code)) setInputMode('keyboard');
 
   if (e.code !== 'Escape' || listeningFor || !isRunActive()) return;
   e.preventDefault();
-  if ($('overlay-paused').hidden) pauseRun();
+  if (tunePanel.isOpen) closeTuning();
+  else if ($('overlay-paused').hidden) pauseRun();
   else resumeRun();
 });
 
 // Losing the app to a call or a notification pauses rather than leaving the
 // car driving unattended into a wall.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pauseRun();
+  if (document.hidden && !tunePanel.isOpen) pauseRun();
 });
 
 window.addEventListener('resize', () => {
-  if (!gameEl.hidden) {
-    renderer.resize();
-    touch.relayout();
-  }
-  if (!editorEl.hidden) syncLayoutEditor();
+  if (!gameEl.hidden) renderer.resize();
   if (!SCREENS.intro.hidden && currentRoute) showPoster(currentRoute);
 });
 
-// A real touch anywhere switches to the on-screen buttons.
+// A real touch anywhere switches to touch hints.
 window.addEventListener(
   'pointerdown',
   (e) => {
@@ -928,29 +937,6 @@ window.addEventListener(
   },
   { capture: true },
 );
-
-// --- Layout editor controls ---
-
-$('btn-edit-layout').addEventListener('click', openLayoutEditor);
-
-$<HTMLInputElement>('layout-size').addEventListener('input', (e) => {
-  const value = Number((e.target as HTMLInputElement).value);
-  settings.touchLayout.scale = value / 100;
-  $('layout-size-value').textContent = `${value}%`;
-  editorTouch.relayout();
-  saveSettings(settings);
-});
-
-$('btn-layout-reset').addEventListener('click', () => {
-  settings.touchLayout = defaultLayout();
-  saveSettings(settings);
-  syncLayoutEditor();
-});
-
-$('btn-layout-done').addEventListener('click', () => {
-  saveSettings(settings);
-  showScreen('settings');
-});
 
 buildRouteList();
 buildCarList();

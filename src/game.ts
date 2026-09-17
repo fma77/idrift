@@ -56,8 +56,8 @@ export class GameSession {
   private rafId = 0;
 
   /** The mutable "current input" the sim samples. Never an event queue. */
-  private simInput: SimInput = { steer: 0, throttle: 0, handbrake: false };
-  private heldSample: QuantisedInput = { steer: 0, throttle: 0, flags: 0 };
+  private simInput: SimInput = { steer: 0 };
+  private heldSample: QuantisedInput = { steer: 0 };
 
   onCountdown: ((value: number) => void) | null = null;
   onFinish: ((outcome: RunOutcome) => void) | null = null;
@@ -155,7 +155,7 @@ export class GameSession {
     // the live run consumes exactly the bytes a replay will.
     if (this.state.tick % TICKS_PER_INPUT === 0) {
       const raw = this.input.raw;
-      this.heldSample = quantiseInput(raw.steer, raw.throttle, raw.handbrake);
+      this.heldSample = quantiseInput(raw.steer);
       this.recorder.push(this.heldSample);
     }
     dequantiseInput(this.heldSample, this.simInput);

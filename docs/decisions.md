@@ -22,26 +22,45 @@ Unlike `sin`/`pow`/`exp`, it maps to the hardware `SQRTSD` instruction, which IE
 requires to be correctly rounded, on every engine that matters. Reimplementing it via
 Newton iteration would be slower and no more deterministic.
 
-### Touch controls are ordinary buttons, not a thumb-drag joystick
+### One thumb steers; the car drives itself, with arcade handling
 
-The brief (§2) specifies a relative joystick: drag anywhere in the lower half, with X
-as steering and Y as throttle, plus a handbrake button. That was built first and
-dropped after a phone play-test. Steering and throttle on one thumb had too steep a
-learning curve for the actual audience -- someone opening a shared link cold, often a
-kid -- and it pushed people away in the first minute.
+The brief (§2, §3) specifies a physically based car -- bicycle model, Pacejka tyres,
+engine, gearbox, brakes, handbrake -- controlled by a thumb joystick with an optional
+throttle assist. All of that was built. It played correctly, and it never looked like a
+drift line should: fluid and continuous. The limit was not the model but the controls:
+steering, throttle, brakes and handbrake on glass are too much for a thumb to do
+smoothly. A detour through five ordinary on-screen buttons confirmed it.
 
-It is now five ordinary on-screen buttons (left, right, brake, gas, handbrake), which
-is what people already expect from a phone racing game. Each can be dragged anywhere
-from Settings, with a size slider; portrait and landscape are arranged separately,
-because a layout that fits one does not fit the other. The buttons feed the same input
-path as the keyboard, so steering ramps identically and nothing about the simulation,
-replays or leaderboards changed. Defaults are tested against eight real phone and
-tablet sizes in both orientations for overlaps and edge clearance.
+It was replaced with the approach Drifto: Infinite Drifting takes, as described by its
+developer:
 
-Two mobile bugs surfaced while replacing it: the on-screen controls were hidden at the
-start of every run (the input mode was reset to "keyboard" as each run began), and
-there was no way to pause or quit on a phone, since only the Escape key did it. There
-is now a pause button, and backgrounding the app pauses the run.
+- **One control.** Touch anywhere and slide sideways to steer; lift to straighten.
+  Wherever the thumb lands is centre, and overshooting drags centre along so reversing
+  responds at once (`src/input/thumbSteer.ts`). No throttle, brake or handbrake: the
+  car always drives itself. Keyboard play is the arrow keys.
+- **Steering rotates the body directly.** The slider sets a yaw rate and the body
+  follows it within a fraction of a second. No steering geometry and no tyre force
+  building up, so no lag between thumb and nose.
+- **Sideways friction rises with slide angle.** Constant while gripping; once the tyres
+  let go it runs from a low value at a shallow angle to a high one at 90 degrees. A
+  wider slide scrubs harder and pulls itself back, so a held thumb gives a held drift
+  instead of a spin -- and sliding is the only way to shed speed, which is the skill.
+
+The result is openly unrealistic and every handling number is something a player can
+feel. Tests pin the behaviours that matter: gentle input corners on grip, a held slide
+settles at a steady angle for every car, wider slides scrub more speed, and letting go
+straightens the car.
+
+Tuning is done by feel, on a phone: open the game with `#tune` on the URL and a TUNE
+button appears in runs, opening sliders for every handling value that apply live. Tuned
+values stay on that device, and nothing driven in tuning mode is saved or posted.
+"Copy values" exports them to become the shipped defaults.
+
+Knock-on changes: replays are 2 bytes a sample (steer only); `SIM_VERSION` is 3, so old
+boards and bests are separate; the throttle assist setting, the button layout editor
+and left-handed mode are gone. The API's `assist` field is kept (always 1) so the
+Worker and database need no migration. Scoring and the test driver have not yet been
+retuned for the new handling.
 
 ### Gameplay is responsive rather than portrait-only or landscape-only
 
@@ -73,16 +92,6 @@ The first pass marked every corner with severity ≥ 2, which on a touge is esse
 the entire route, and made the course map ~70% red — breaking the rule the design
 system is most insistent about. Zones now start at severity 3, and the course map marks
 clipping points rather than shading whole zones.
-
-### Assist level is stored in the run header, not in local settings
-
-§2 calls for the assist slider to be a real input to the physics rather than a
-difficulty flag. It is: the automatic throttle is computed and then blended with the
-player's before going through the same engine and tyre equations. The consequence is
-that a run recorded at assist 0.6 only replays identically at assist 0.6, so the value
-must travel with the replay. It lives in `SimConfig` and in the stored run record.
-There is a test asserting that changing assist changes the run — if it ever stops
-changing it, the assist has quietly become a no-op.
 
 ### Hosting is one Worker with Static Assets, not Pages plus an API Worker
 

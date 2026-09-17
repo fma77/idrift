@@ -3,61 +3,56 @@
  * with behaviour, nothing that holds a reference to anything outside the sim.
  */
 
-/** Steering / throttle / handbrake, already dequantised to sim units. */
+/**
+ * The player's whole say in the matter: one steering value, already
+ * dequantised to sim units. The car drives itself forward; there is no
+ * throttle, brake or handbrake.
+ */
 export interface SimInput {
   /** -1 (full left) .. +1 (full right). */
   steer: number;
-  /** -1 (full brake) .. +1 (full throttle). */
-  throttle: number;
-  handbrake: boolean;
 }
 
-/**
- * Quantised input as stored in a replay: 4 bytes per sampled tick.
- * steer int16, throttle int8, flags uint8 (bit 0 = handbrake).
- */
+/** Quantised input as stored in a replay: steer as int16, 2 bytes per sampled tick. */
 export const STEER_QUANT = 32767;
-export const THROTTLE_QUANT = 127;
-export const FLAG_HANDBRAKE = 1 << 0;
 
 export type CarClass = 'C' | 'B' | 'A' | 'S';
 
-/** Simplified Pacejka lateral coefficients, per axle. */
-export interface TyreParams {
-  /** Stiffness. Higher = force builds faster with slip angle. */
-  b: number;
-  /** Shape. ~1.3-1.5 for lateral. */
-  c: number;
-  /** Peak friction coefficient at nominal load. */
-  d: number;
-  /** Curvature. Controls how sharply force falls off past the peak. */
-  e: number;
+/**
+ * Arcade drift handling.
+ *
+ * Deliberately not a tyre model. The steering sets how fast the body rotates,
+ * and sideways friction decides how the velocity follows it. Every number here
+ * is something a player can feel directly, which is what makes it tunable by
+ * hand on a phone rather than by telemetry.
+ */
+export interface HandlingParams {
+  /** m/s. The car accelerates towards this on its own. */
+  topSpeed: number;
+  /** m/s^2 from a standstill, tapering to zero at top speed. */
+  acceleration: number;
+  /** rad/s of body rotation at full steering. */
+  turnRate: number;
+  /** 1/s. How quickly the body's rotation reaches what the steering asks for. */
+  turnResponse: number;
+  /** m/s. Below this the car turns proportionally less, so it cannot spin on the spot. */
+  turnInSpeed: number;
+  /** g. Sideways friction while the tyres are gripping. */
+  grip: number;
+  /** g. Sideways friction in a slide at a shallow angle. */
+  slideFrictionLow: number;
   /**
-   * Load sensitivity, 0..1. Real tyres lose grip per newton as load rises;
-   * this is what makes weight transfer actually matter rather than being a
-   * cosmetic term. 0 = grip scales linearly with load (unrealistic, very
-   * grippy under transfer), 0.3 is roughly road-tyre-like.
+   * g. Sideways friction in a slide at 90 degrees. Higher than the shallow
+   * value on purpose: a wider slide scrubs harder and pulls itself back into
+   * line, which is what makes a long drift hold instead of spinning.
    */
-  loadSensitivity: number;
-}
-
-export interface EngineParams {
-  idleRpm: number;
-  redlineRpm: number;
-  /**
-   * Torque (Nm) sampled at evenly spaced RPM fractions from 0 to redline.
-   * A curve rather than a single peak number so cars can differ in character
-   * (peaky turbo vs flat NA) without bespoke code.
-   */
-  torqueCurve: number[];
-  gearRatios: number[];
-  finalDrive: number;
-  /** Fraction of redline at which the auto gearbox upshifts. */
-  shiftUpFraction: number;
-  shiftDownFraction: number;
-  /** Seconds of torque interruption on a shift. */
-  shiftTime: number;
-  drivetrainEfficiency: number;
+  slideFrictionHigh: number;
+  /** Radians of slip at which the tyres let go. */
+  breakAngle: number;
+  /** Radians of slip below which they grip again. Smaller than breakAngle. */
+  regripAngle: number;
+  /** 1/s. How strongly the nose swings back to the direction of travel when not steering. */
+  selfAlign: number;
 }
 
 export interface AudioParams {
@@ -77,36 +72,16 @@ export interface CarParams {
   id: string;
   name: string;
   carClass: CarClass;
-  /** kg. */
-  mass: number;
-  /** Yaw inertia, kg m^2. */
-  inertiaZ: number;
-  /** Metres, CG to front axle. */
+  handling: HandlingParams;
+  /** Metres, centre to front axle. Rendering only: where the front wheels are drawn. */
   cgToFront: number;
-  /** Metres, CG to rear axle. */
+  /** Metres, centre to rear axle. Rendering and skid marks. */
   cgToRear: number;
-  /** Metres. Drives weight transfer magnitude. */
-  cgHeight: number;
-  /** Metres, for rendering and wall collision extents. */
+  /** Metres, for rendering. */
   bodyLength: number;
   bodyWidth: number;
-  wheelRadius: number;
-  /** Radians at full lock. */
-  maxSteerAngle: number;
-  /** Radians per second of steering rate at the road wheel. */
-  steerRate: number;
-  tyreFront: TyreParams;
-  tyreRear: TyreParams;
-  engine: EngineParams;
-  /** 0.5 * rho * Cd * A, so drag force = dragCoeff * v^2. */
-  dragCoeff: number;
-  rollingResistance: number;
-  /** Nm at the wheels under full brake. */
-  brakeTorque: number;
-  /** Nm at the rear wheels when the handbrake is held. */
-  handbrakeTorque: number;
-  /** Fraction of brake torque at the front axle. */
-  brakeBias: number;
+  /** Radians. How far the drawn front wheels turn. Cosmetic. */
+  maxWheelAngle: number;
   audio: AudioParams;
   /** Rendering only; never read by the sim step. */
   sprite?: { path: string; pixelsPerMetre: number };
@@ -185,13 +160,6 @@ export type SimMode = 'timeAttack' | 'driftRun';
 /** Per-run constants. Fixed at run start, recorded with the replay. */
 export interface SimConfig {
   mode: SimMode;
-  /**
-   * 0 = fully manual throttle, 1 = fully automatic. Blended inside the engine
-   * torque calculation rather than switching code paths, so a run recorded at
-   * assist 0.6 replays identically only when replayed at assist 0.6 -- which is
-   * why it lives here, in the recorded run header, and not in local settings.
-   */
-  assist: number;
 }
 
 /** Live drift-run scoring state. Lives in the sim so replays reproduce it exactly. */
@@ -236,24 +204,19 @@ export interface SimState {
   /** Yaw rate, rad/s. */
   yawRate: number;
 
-  // --- Drivetrain ---
-  gear: number;
-  rpm: number;
-  shiftTimer: number;
-  /** Rear wheel angular speed, rad/s. Diverges from road speed on spin/lock. */
-  rearWheelSpeed: number;
-
-  // --- Actuators (rate-limited, so input steps do not become force steps) ---
-  steerAngle: number;
-  throttleApplied: number;
+  /** True once the tyres have let go, until the slip falls back under the regrip angle. */
+  sliding: boolean;
+  /** The steering applied last tick, -1..1. */
+  steer: number;
 
   // --- Derived, cached for renderer/audio/scoring; never an integration input ---
+  /** How much the steering moved this tick. Sawing at it is a save, not a clean drift. */
+  steerChange: number;
+  /** Radians. Drawn front-wheel angle, positive = left. Cosmetic. */
+  steerAngle: number;
   /** Angle between velocity vector and heading, radians. The drift angle. */
   slipAngle: number;
   speed: number;
-  frontSlip: number;
-  rearSlip: number;
-  lateralG: number;
 
   // --- Route progress ---
   /** Nearest centreline sample index. Searched incrementally from the last one. */

@@ -9,6 +9,7 @@
  *   node tools/telemetry.mjs accel   kaido-zen-r
  *   node tools/telemetry.mjs lap     onibi-silhouette
  *   node tools/telemetry.mjs drift   tengu-gt-x
+ *   node tools/telemetry.mjs hold    kaido-zen-r 0.45
  */
 import { readFileSync } from 'node:fs';
 import { createSimState, stepSim, gradeRun, TICK_RATE, TICKS_PER_INPUT } from '../src/sim/index.ts';
@@ -25,10 +26,10 @@ const fmt = (v, w = 7, d = 2) => v.toFixed(d).padStart(w);
 
 if (mode === 'accel') {
   const st = createSimState(route, car);
-  const cfg = { mode: 'timeAttack', assist: 0 };
-  const input = { steer: 0, throttle: 1, handbrake: false };
-  console.log(`${car.name} -- full throttle from rest\n`);
-  console.log('   t     km/h      vx      vy   yaw/s  gear    rpm   thr    dist');
+  const cfg = { mode: 'timeAttack' };
+  const input = { steer: 0 };
+  console.log(`${car.name} -- driving itself from rest\n`);
+  console.log('   t     km/h      vx      vy   yaw/s    dist');
   let to100 = null;
   for (let t = 0; t < TICK_RATE * 20; t++) {
     stepSim(st, input, car, route, cfg);
@@ -36,33 +37,50 @@ if (mode === 'accel') {
     if (t % 60 === 0) {
       console.log(
         `${fmt(t / TICK_RATE, 4, 1)} ${fmt(st.vx * 3.6, 8)} ${fmt(st.vx)} ${fmt(st.vy)} ` +
-          `${fmt(st.yawRate)} ${String(st.gear + 1).padStart(5)} ${fmt(st.rpm, 6, 0)} ` +
-          `${fmt(st.throttleApplied, 5)} ${fmt(st.distance, 7, 1)}`,
+          `${fmt(st.yawRate)} ${fmt(st.distance, 7, 1)}`,
       );
     }
   }
   console.log(`\n0-100 km/h: ${to100 === null ? 'never' : to100.toFixed(2) + 's'}`);
-  console.log(`top speed after 20s: ${(st.vx * 3.6).toFixed(1)} km/h`);
+  console.log(`speed after 20s: ${(st.vx * 3.6).toFixed(1)} km/h`);
+}
+
+if (mode === 'hold') {
+  // Hold a fixed slider value at speed and watch the slide settle.
+  const steer = Number(process.argv[4] ?? 0.45);
+  const wide = JSON.parse(JSON.stringify(route));
+  wide.samples.halfWidth = wide.samples.halfWidth.map(() => 5000);
+  const st = createSimState(wide, car);
+  const cfg = { mode: 'timeAttack' };
+  console.log(`${car.name} -- straight for 6s, hold steer ${steer} for 5s, let go\n`);
+  console.log('   t     km/h   slip°  yaw/s  sliding');
+  for (let t = 0; t < TICK_RATE * 14; t++) {
+    const s = t < TICK_RATE * 6 ? 0 : t < TICK_RATE * 11 ? steer : 0;
+    stepSim(st, { steer: s }, car, wide, cfg);
+    if (t % 30 === 0 && t >= TICK_RATE * 5) {
+      console.log(
+        `${fmt(t / TICK_RATE, 4, 1)} ${fmt(st.speed * 3.6, 8, 1)} ${fmt((st.slipAngle * 180) / Math.PI, 7, 1)} ` +
+          `${fmt(st.yawRate, 6)}  ${st.sliding ? 'yes' : ''}`,
+      );
+    }
+  }
 }
 
 if (mode === 'lap' || mode === 'drift') {
   const drifting = mode === 'drift';
-  const botConfig = drifting ? { aggression: 1.05, useHandbrake: true } : DEFAULT_BOT;
   const st = createSimState(route, car);
-  const cfg = { mode: drifting ? 'driftRun' : 'timeAttack', assist: 0 };
-  const out = { steer: 0, throttle: 0, handbrake: false };
-  const input = { steer: 0, throttle: 0, handbrake: false };
+  const cfg = { mode: drifting ? 'driftRun' : 'timeAttack' };
+  const out = { steer: 0 };
+  const input = { steer: 0 };
 
   console.log(`${car.name} -- ${route.name} (${mode})\n`);
-  console.log('   t    dist     km/h   slip°   off   gear  mult    pending  zone');
+  console.log('   t    dist     km/h   slip°   off  mult    pending  zone');
 
   let peakSpeed = 0;
   let peakSlip = 0;
   while (!st.finished && st.tick < TICK_RATE * 300) {
-    if (st.tick % TICKS_PER_INPUT === 0) driveBot(st, route, car, botConfig, out);
+    if (st.tick % TICKS_PER_INPUT === 0) driveBot(st, route, car, DEFAULT_BOT, out);
     input.steer = out.steer;
-    input.throttle = out.throttle;
-    input.handbrake = out.handbrake;
     stepSim(st, input, car, route, cfg);
     peakSpeed = Math.max(peakSpeed, st.speed);
     peakSlip = Math.max(peakSlip, Math.abs(st.slipAngle));
@@ -70,8 +88,7 @@ if (mode === 'lap' || mode === 'drift') {
       console.log(
         `${fmt(st.tick / TICK_RATE, 4, 1)} ${fmt(st.distance, 7, 0)} ${fmt(st.speed * 3.6, 8, 1)} ` +
           `${fmt((st.slipAngle * 180) / Math.PI, 7, 1)} ${fmt(st.lateralOffset, 5, 1)} ` +
-          `${String(st.gear + 1).padStart(5)} ${fmt(st.drift.multiplier, 5, 1)} ` +
-          `${fmt(st.drift.pending, 10, 0)} ${String(st.drift.activeZone).padStart(5)}`,
+          `${fmt(st.drift.multiplier, 5, 1)} ${fmt(st.drift.pending, 10, 0)} ${String(st.drift.activeZone).padStart(5)}`,
       );
     }
   }

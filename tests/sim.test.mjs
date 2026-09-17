@@ -25,11 +25,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const route = JSON.parse(readFileSync(resolve(here, '../public/routes/akari-downhill.json'), 'utf8'));
 
 /** Drive a full run with the bot, returning the finished state and hash stream. */
-function runBot(car, mode, { assist = 0, maxSeconds = 300, botConfig = DEFAULT_BOT } = {}) {
+function runBot(car, mode, { maxSeconds = 300, botConfig = DEFAULT_BOT } = {}) {
   const state = createSimState(route, car);
-  const config = { mode, assist };
-  const out = { steer: 0, throttle: 0, handbrake: false };
-  const input = { steer: 0, throttle: 0, handbrake: false };
+  const config = { mode };
+  const out = { steer: 0 };
+  const input = { steer: 0 };
   const hashes = [];
   const recorder = new InputRecorder();
 
@@ -42,7 +42,7 @@ function runBot(car, mode, { assist = 0, maxSeconds = 300, botConfig = DEFAULT_B
     // same code path as a player run.
     if (state.tick % TICKS_PER_INPUT === 0) {
       driveBot(state, route, car, botConfig, out);
-      held = quantiseInput(out.steer, out.throttle, out.handbrake);
+      held = quantiseInput(out.steer);
       recorder.push(held);
     }
     dequantiseInput(held, input);
@@ -143,9 +143,9 @@ test('a recorded input stream replays to the same final state', () => {
 
   // Replay from the recorded stream rather than by re-running the bot.
   const state = createSimState(route, car);
-  const config = { mode: 'driftRun', assist: 0 };
-  const input = { steer: 0, throttle: 0, handbrake: false };
-  const q = { steer: 0, throttle: 0, flags: 0 };
+  const config = { mode: 'driftRun' };
+  const input = { steer: 0 };
+  const q = { steer: 0 };
   const hashes = [];
 
   while (!state.finished && state.tick < live.state.tick + 10) {
@@ -160,17 +160,6 @@ test('a recorded input stream replays to the same final state', () => {
   assert.equal(state.drift.banked, live.state.drift.banked);
 });
 
-test('assist level changes the run, so it must be part of the run header', () => {
-  const car = carById('kaido-zen-r');
-  const manual = runBot(car, 'timeAttack', { assist: 0 });
-  const assisted = runBot(car, 'timeAttack', { assist: 1 });
-  assert.notEqual(
-    manual.state.raceTicks,
-    assisted.state.raceTicks,
-    'if assist did not change the physics it would not be a real input to the model',
-  );
-});
-
 // ---------------------------------------------------------------------------
 // Replay encoding
 // ---------------------------------------------------------------------------
@@ -178,13 +167,23 @@ test('assist level changes the run, so it must be part of the run header', () =>
 test('quantise/dequantise round-trips within one quantum', () => {
   for (let i = -100; i <= 100; i++) {
     const steer = i / 100;
-    const throttle = -i / 100;
-    const q = quantiseInput(steer, throttle, i % 2 === 0);
-    const out = { steer: 0, throttle: 0, handbrake: false };
-    dequantiseInput(q, out);
+    const out = { steer: 0 };
+    dequantiseInput(quantiseInput(steer), out);
     assert.ok(Math.abs(out.steer - steer) < 1 / 32767);
-    assert.ok(Math.abs(out.throttle - throttle) < 1 / 127);
-    assert.equal(out.handbrake, i % 2 === 0);
+  }
+});
+
+test('full-left to full-right in one sample survives encoding', () => {
+  // The delta between the two extremes does not fit in an int16. Stored modulo
+  // the field width it round-trips exactly; clamped, it would corrupt the rest
+  // of the replay.
+  const rec = new InputRecorder(4);
+  for (const steer of [-1, 1, -1, 0, 1]) rec.push(quantiseInput(steer));
+  const decoded = InputRecorder.decode(rec.encode());
+  const a = { steer: 0 };
+  const b = { steer: 0 };
+  for (let i = 0; i < rec.length; i++) {
+    assert.deepEqual(decoded.at(i, b), rec.at(i, a), `sample ${i}`);
   }
 });
 
@@ -195,8 +194,8 @@ test('delta-encoded input stream round-trips exactly', () => {
   const decoded = InputRecorder.decode(bytes);
 
   assert.equal(decoded.length, recorder.length);
-  const a = { steer: 0, throttle: 0, flags: 0 };
-  const b = { steer: 0, throttle: 0, flags: 0 };
+  const a = { steer: 0 };
+  const b = { steer: 0 };
   for (let i = 0; i < recorder.length; i++) {
     recorder.at(i, a);
     decoded.at(i, b);
@@ -242,9 +241,7 @@ test('every car completes the route in a plausible time', () => {
 
 test('drift run banks points and grades the run', () => {
   const car = carById('kaido-zen-r');
-  const { state } = runBot(car, 'driftRun', {
-    botConfig: { aggression: 1.05, useHandbrake: true },
-  });
+  const { state } = runBot(car, 'driftRun');
   const result = gradeRun(state, route, TICK_RATE);
   console.log(
     `    banked ${Math.round(state.drift.banked)} -> ${result.points} pts, grade ${result.grade}, ` +
@@ -261,16 +258,14 @@ test('drift run banks points and grades the run', () => {
 test('the sim never produces NaN, even when driven badly', () => {
   const car = carById('tengu-gt-x');
   const state = createSimState(route, car);
-  const config = { mode: 'driftRun', assist: 0.5 };
-  const input = { steer: 0, throttle: 0, handbrake: false };
+  const config = { mode: 'driftRun' };
+  const input = { steer: 0 };
   const rng = createRng(7);
 
-  // Deliberately awful driving: full lock, full throttle, handbrake stabs.
+  // Deliberately awful driving: random full-lock stabs, spins included.
   for (let t = 0; t < TICK_RATE * 90; t++) {
     if (t % 30 === 0) {
       input.steer = (nextUint32(rng) / 4294967296) * 2 - 1;
-      input.throttle = (nextUint32(rng) / 4294967296) * 2 - 1;
-      input.handbrake = nextUint32(rng) % 3 === 0;
     }
     stepSim(state, input, car, route, config);
 
@@ -285,8 +280,8 @@ test('the sim never produces NaN, even when driven badly', () => {
 test('wall contact costs time and puts the car back on the road', () => {
   const car = carById('kaido-zen-r');
   const state = createSimState(route, car);
-  const config = { mode: 'timeAttack', assist: 0 };
-  const input = { steer: 0, throttle: 1, handbrake: false };
+  const config = { mode: 'timeAttack' };
+  const input = { steer: 0 };
 
   // Accelerate, then hold full lock until it runs out of road.
   for (let t = 0; t < TICK_RATE * 20 && state.wallHits === 0; t++) {
@@ -319,9 +314,9 @@ test('decoration cannot reach the simulation', () => {
   delete mutated.decoration;
 
   const state = createSimState(mutated, car);
-  const config = { mode: 'driftRun', assist: 0 };
-  const input = { steer: 0, throttle: 0, handbrake: false };
-  const q = { steer: 0, throttle: 0, flags: 0 };
+  const config = { mode: 'driftRun' };
+  const input = { steer: 0 };
+  const q = { steer: 0 };
   const hashes = [];
   while (!state.finished && state.tick < baseline.state.tick + 10) {
     baseline.recorder.at(Math.floor(state.tick / TICKS_PER_INPUT), q);
@@ -365,30 +360,38 @@ function openRoute() {
   return wide;
 }
 
-/** Bring a car up to `speed` m/s on full throttle, then return its state. */
-function rollingStart(car, cfg, track, speed) {
+const CFG = { mode: 'timeAttack' };
+
+/** Let a car drive itself up to `speed` m/s in a straight line, then return its state. */
+function rollingStart(car, track, speed) {
   const state = createSimState(track, car);
-  const input = { steer: 0, throttle: 1, handbrake: false };
-  while (state.speed < speed) stepSim(state, input, car, track, cfg);
+  const input = { steer: 0 };
+  while (state.speed < speed) stepSim(state, input, car, track, CFG);
   return state;
 }
 
+/** Hold one steering value for `seconds`, returning the slip angle sampled every tick. */
+function hold(state, car, track, steer, seconds) {
+  const slips = [];
+  for (let t = 0; t < TICK_RATE * seconds; t++) {
+    stepSim(state, { steer }, car, track, CFG);
+    slips.push(state.slipAngle);
+  }
+  return slips;
+}
+
 test('steering right turns the car right', () => {
-  // Regression: the sim uses counter-clockwise-positive angles, so a positive
-  // road-wheel angle is a LEFT turn -- while the input contract says +1 is
-  // RIGHT. Without the negation between them the car steered away from the key
-  // you pressed, which is instantly obvious to a player and invisible to every
-  // test that only checked lap times.
+  // Regression: the sim uses counter-clockwise-positive angles, while the input
+  // contract says +1 is RIGHT. Without the negation between them the car
+  // steers away from the thumb, which is instantly obvious to a player and
+  // invisible to every test that only checked lap times.
   const track = openRoute();
   const car = carById('kaido-zen-r');
 
   for (const [label, steer, wantSign] of [['right', 1, -1], ['left', -1, 1]]) {
-    const cfg = { mode: 'timeAttack', assist: 0 };
-    const state = rollingStart(car, cfg, track, 15);
+    const state = rollingStart(car, track, 15);
     const before = state.heading;
-    const input = { steer, throttle: 0.3, handbrake: false };
-    for (let t = 0; t < TICK_RATE * 2; t++) stepSim(state, input, car, track, cfg);
-
+    hold(state, car, track, steer * 0.3, 1);
     const turned = state.heading - before;
     assert.ok(
       Math.sign(turned) === wantSign && Math.abs(turned) > 0.3,
@@ -397,55 +400,77 @@ test('steering right turns the car right', () => {
   }
 });
 
-test('the brake works at every assist level', () => {
-  // Regression: the assist used to be a plain blend with an autopilot that
-  // always wanted ~90% throttle. At the default assist of 0.6 a full brake
-  // application resolved to +0.20 throttle -- the car accelerated when you hit
-  // the brakes. Braking is the driver's; the assist may only ever add lift.
+test('the car drives itself, up to its top speed and no further', () => {
   const track = openRoute();
-  const car = carById('kaido-zen-r');
-
-  for (const assist of [0, 0.3, 0.6, 1]) {
-    const cfg = { mode: 'timeAttack', assist };
-    const state = rollingStart(car, cfg, track, 25);
-    const before = state.speed;
-
-    const input = { steer: 0, throttle: -1, handbrake: false };
-    for (let t = 0; t < TICK_RATE * 2; t++) stepSim(state, input, car, track, cfg);
-
+  for (const car of CARS) {
+    const state = createSimState(track, car);
+    hold(state, car, track, 0, 4);
+    assert.ok(state.speed > 15, `${car.name} only reached ${state.speed.toFixed(1)} m/s unaided in 4s`);
+    hold(state, car, track, 0, 40);
     assert.ok(
-      state.speed < before * 0.6,
-      `at assist ${assist}, two seconds of full brake went ${(before * 3.6).toFixed(0)} -> ${(state.speed * 3.6).toFixed(0)} km/h`,
-    );
-    assert.ok(
-      state.throttleApplied < 0,
-      `at assist ${assist}, a brake request resolved to throttle ${state.throttleApplied.toFixed(2)}`,
+      state.speed <= car.handling.topSpeed + 1e-6,
+      `${car.name} went ${state.speed.toFixed(2)} m/s, past its top speed of ${car.handling.topSpeed}`,
     );
   }
 });
 
-test('assist 0 hands the throttle entirely to the player', () => {
+test('gentle steering corners on grip, without sliding', () => {
   const track = openRoute();
   const car = carById('kaido-zen-r');
-  const cfg = { mode: 'timeAttack', assist: 0 };
-  const state = createSimState(track, car);
-  const input = { steer: 0, throttle: 0, handbrake: false };
-  for (let t = 0; t < TICK_RATE * 3; t++) stepSim(state, input, car, track, cfg);
-  // Not exactly zero: the tyre model's low-speed slip clamp leaves a residue
-  // around 1e-13 m/s. That is a picometre per second -- stationary by any
-  // measure that matters, so the bound is small rather than exact.
-  assert.ok(
-    state.speed < 1e-6,
-    `with no assist and no throttle the car must not move, but reached ${state.speed} m/s`,
-  );
+  const state = rollingStart(car, track, 20);
+  const slips = hold(state, car, track, 0.1, 3);
+  assert.ok(!state.sliding, 'a light, steady input should not break traction');
+  assert.ok(Math.max(...slips.map(Math.abs)) < car.handling.breakAngle, 'slip stayed under the break angle');
 });
 
-test('assist 1 drives the throttle on its own', () => {
+test('a held slide settles into a steady angle instead of spinning', () => {
+  // The whole point of the model: slide friction rises with angle, so a slide
+  // finds an equilibrium. A thumb held still should give a drift held still.
   const track = openRoute();
-  const car = carById('kaido-zen-r');
-  const cfg = { mode: 'timeAttack', assist: 1 };
-  const state = createSimState(track, car);
-  const input = { steer: 0, throttle: 0, handbrake: false };
-  for (let t = 0; t < TICK_RATE * 3; t++) stepSim(state, input, car, track, cfg);
-  assert.ok(state.speed > 5, `full assist should pull away unaided, reached ${state.speed} m/s`);
+  for (const car of CARS) {
+    const state = rollingStart(car, track, car.handling.topSpeed * 0.8);
+    const slips = hold(state, car, track, 0.45, 6);
+    const tail = slips.slice(-TICK_RATE * 2).map(Math.abs);
+    const spread = Math.max(...tail) - Math.min(...tail);
+    const angle = tail[tail.length - 1];
+    assert.ok(state.sliding, `${car.name}: half steering at speed should slide`);
+    assert.ok(angle > 0.2 && angle < 1.2, `${car.name}: settled at ${(angle * 57.3).toFixed(0)} degrees`);
+    assert.ok(spread < 0.08, `${car.name}: slide angle still wandering by ${(spread * 57.3).toFixed(1)} degrees`);
+  }
+});
+
+test('a wider slide scrubs more speed', () => {
+  const track = openRoute();
+  const car = carById('onibi-silhouette');
+  const speeds = [0.3, 0.6].map((steer) => {
+    const state = rollingStart(car, track, 30);
+    hold(state, car, track, steer, 3);
+    return state.speed;
+  });
+  assert.ok(speeds[1] < speeds[0] - 3, `speed after a small slide ${speeds[0].toFixed(1)}, after a big one ${speeds[1].toFixed(1)}`);
+});
+
+test('lifting the thumb straightens the car out of a slide', () => {
+  const track = openRoute();
+  for (const car of CARS) {
+    const state = rollingStart(car, track, 28);
+    hold(state, car, track, -0.5, 2.5);
+    assert.ok(state.sliding, `${car.name}: expected a slide before letting go`);
+    hold(state, car, track, 0, 1.5);
+    assert.ok(!state.sliding, `${car.name}: still sliding 1.5s after letting go`);
+    assert.ok(Math.abs(state.yawRate) < 0.1, `${car.name}: still rotating at ${state.yawRate.toFixed(2)} rad/s`);
+  }
+});
+
+test('handling changes take effect on the next tick', () => {
+  // Tuning mode edits the car object in place, mid-run. That only works if the
+  // sim reads handling every step rather than caching it at run start.
+  const track = openRoute();
+  const shipped = carById('kaido-zen-r');
+  const car = { ...shipped, handling: { ...shipped.handling } };
+  const state = rollingStart(car, track, 20);
+  const before = state.speed;
+  car.handling.topSpeed = 5;
+  hold(state, car, track, 0, 0.5);
+  assert.ok(state.speed < before, 'lowering top speed mid-run should slow the car at once');
 });

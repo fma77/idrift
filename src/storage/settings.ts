@@ -1,5 +1,5 @@
 import { DEFAULT_KEYMAP, type Keymap } from '../input/input.ts';
-import { defaultLayout, normaliseLayout, type TouchLayout } from '../input/touchLayout.ts';
+import { MAX_SENSITIVITY, MIN_SENSITIVITY } from '../input/thumbSteer.ts';
 
 /**
  * Local persistence.
@@ -18,15 +18,11 @@ const KEY = 'idrift.settings.v1';
 
 export interface Settings {
   /**
-   * 0..1. Feeds the physics directly, not a difficulty flag. Defaults to 0.6,
-   * which the brief pitches at new players: enough automatic throttle to hold a
-   * slide, still enough manual authority to matter.
+   * Thumb slider sensitivity, 0.5..2. Higher means less thumb travel for full
+   * steering. Presentation only: the sim sees the resulting steer value, so
+   * this never needs to be in a run's header.
    */
-  assist: number;
-  /** Mirror the on-screen buttons left to right for left-handed play. */
-  lefty: boolean;
-  /** Where each on-screen button sits, per orientation, and how big they are. */
-  touchLayout: TouchLayout;
+  steerSensitivity: number;
   /** Disable camera rotation for players who find it nauseating. */
   fixedNorth: boolean;
   showSkidMarks: boolean;
@@ -37,9 +33,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  assist: 0.6,
-  lefty: false,
-  touchLayout: defaultLayout(),
+  steerSensitivity: 1,
   fixedNorth: false,
   showSkidMarks: true,
   keymap: DEFAULT_KEYMAP,
@@ -49,22 +43,36 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function loadSettings(): Settings {
+  const defaults = (): Settings => ({ ...DEFAULT_SETTINGS, keymap: structuredClone(DEFAULT_KEYMAP) });
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT_SETTINGS, touchLayout: defaultLayout() };
-    const parsed = JSON.parse(raw) as Partial<Settings>;
-    // Merge over defaults rather than trusting the stored shape: a settings
-    // object written by an older build is missing whatever was added since.
+    if (!raw) return defaults();
+    const parsed = JSON.parse(raw) as Partial<Settings> & Record<string, unknown>;
+    const base = defaults();
+    // Pick known fields over defaults rather than trusting the stored shape: a
+    // settings object written by an older build is missing whatever was added
+    // since, and still carries what was removed (the throttle assist, the
+    // on-screen button layout, left-handed mode).
+    const pick = <K extends keyof Settings>(key: K, valid: (v: unknown) => boolean): Settings[K] =>
+      valid(parsed[key]) ? (parsed[key] as Settings[K]) : base[key];
+    const keymap: Partial<Keymap> = parsed.keymap ?? {};
     return {
-      ...DEFAULT_SETTINGS,
-      ...parsed,
-      keymap: { ...DEFAULT_KEYMAP, ...(parsed.keymap ?? {}) },
-      // Validated piece by piece: one damaged button position resets that
-      // button, not the player's whole arrangement.
-      touchLayout: normaliseLayout(parsed.touchLayout),
+      steerSensitivity: Math.min(
+        MAX_SENSITIVITY,
+        Math.max(MIN_SENSITIVITY, pick('steerSensitivity', (v) => typeof v === 'number' && Number.isFinite(v))),
+      ),
+      fixedNorth: pick('fixedNorth', (v) => typeof v === 'boolean'),
+      showSkidMarks: pick('showSkidMarks', (v) => typeof v === 'boolean'),
+      soundOn: pick('soundOn', (v) => typeof v === 'boolean'),
+      playerName: pick('playerName', (v) => typeof v === 'string'),
+      carId: pick('carId', (v) => typeof v === 'string'),
+      keymap: {
+        left: Array.isArray(keymap.left) ? keymap.left : base.keymap.left,
+        right: Array.isArray(keymap.right) ? keymap.right : base.keymap.right,
+      },
     };
   } catch {
-    return { ...DEFAULT_SETTINGS, touchLayout: defaultLayout() };
+    return defaults();
   }
 }
 

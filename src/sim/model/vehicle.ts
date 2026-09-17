@@ -1,164 +1,107 @@
-import { atan2, sin, cos, clamp, moveToward, wrapAngle } from '../math/trig.ts';
-import { lateralForce, longitudinalCapacity, combinedSlipScale } from './tyre.ts';
-import { driveForce, resolveThrottle } from './engine.ts';
-import type { CarParams, SimConfig, SimInput, SimState } from '../types.ts';
+import { atan2, sin, cos, clamp, wrapAngle, lerp, HALF_PI } from '../math/trig.ts';
+import type { CarParams, SimInput, SimState } from '../types.ts';
 
 const GRAVITY = 9.80665;
 
 /**
- * Below this speed the slip-angle atan2 becomes meaningless (dividing a small
- * lateral velocity by a near-zero longitudinal one gives 90 degrees of slip for
- * a car that is basically stationary). Clamping the denominator keeps the tyre
- * model well behaved at walking pace without a separate low-speed code path.
+ * Below this speed a slip angle is meaningless: a small sideways velocity
+ * divided by a near-zero forward one reads as 90 degrees of drift on a car that
+ * is barely moving.
  */
 const MIN_SLIP_SPEED = 2.0;
 
 /**
- * One bicycle-model step, semi-implicit Euler.
+ * One step of the arcade drift model.
  *
- * Front and rear axles are each collapsed to a single tyre on the centreline.
- * That loses roll and per-wheel load, but keeps longitudinal weight transfer,
- * slip angles, the friction circle and the yaw moment -- which between them
- * produce everything a drift game needs: corner entry rotation from trail
- * braking, power oversteer, catchable slides, and spins when you run out of
- * counter-lock.
+ * This replaced a bicycle model with Pacejka tyres, an engine, a gearbox,
+ * brakes and a handbrake. That model was faithful, and that was the problem:
+ * with a real car's controls, a smooth drift line was beyond what a thumb on
+ * glass can do. The approach here is the one Drifto uses, and it is openly
+ * unrealistic in two ways:
  *
- * Mutates `state` in place. Pure with respect to everything else: given the
- * same state, input, car and dt, it always produces the same result.
+ * 1. Steering rotates the body directly. The slider sets a yaw rate and the
+ *    body follows it within a fraction of a second. There is no steering
+ *    geometry and no tyre force building up, so there is no lag between thumb
+ *    and nose -- you point the car and the physics decides where it goes.
+ *
+ * 2. Sideways friction rises with the slide angle. While gripping it is a
+ *    constant; once the tyres let go it is interpolated from a low value at a
+ *    shallow angle to a high one at 90 degrees. A wider slide scrubs harder,
+ *    turns the velocity faster and bleeds speed, so the slide settles instead
+ *    of running away. That self-correction is what makes a long drift feel
+ *    fluid rather than like balancing on a knife edge.
+ *
+ * The car always drives itself forward. Mutates `state` in place and is pure
+ * with respect to everything else.
  */
 export function stepVehicle(
   state: SimState,
   car: CarParams,
   input: SimInput,
-  config: SimConfig,
   surfaceGrip: number,
   dt: number,
 ): void {
-  const wheelbase = car.cgToFront + car.cgToRear;
+  const h = car.handling;
+  const steer = clamp(input.steer, -1, 1);
+  state.steerChange = Math.abs(steer - state.steer);
+  state.steer = steer;
 
-  // --- Steering ---
+  let speed = Math.sqrt(state.vx * state.vx + state.vy * state.vy);
+  let slip = speed < MIN_SLIP_SPEED ? 0 : atan2(state.vy, state.vx);
+
+  // --- Rotation ---
   //
-  // Sign convention, which was wrong for a while and worth spelling out:
-  //   input.steer   -1 = full LEFT,  +1 = full RIGHT  (what a player expects)
-  //   steerAngle    positive = LEFT                   (maths convention: the
-  //                 whole sim uses counter-clockwise-positive angles, so a left
-  //                 turn increases heading)
-  // The two therefore have OPPOSITE signs, hence the negation. Without it the
-  // car steers away from the key you press.
+  // Sign convention: steer +1 is RIGHT, but angles are counter-clockwise
+  // positive, so steering right asks for a negative yaw rate.
   //
-  // Rate limited, so a keyboard's instant full-lock still takes physical time
-  // to arrive at the road wheel and cannot step the tyre force.
-  const targetSteer = -input.steer * car.maxSteerAngle;
-  state.steerAngle = moveToward(state.steerAngle, targetSteer, car.steerRate * dt);
-  const delta = state.steerAngle;
+  // Self-alignment swings the nose back towards the direction of travel, and
+  // fades out as the player steers. Letting go therefore straightens the car
+  // out of a slide on its own, while a held slider is never fought.
+  const turnScale = clamp(speed / h.turnInSpeed, 0, 1);
+  const steerYaw = -steer * h.turnRate;
+  const alignYaw = h.selfAlign * clamp(slip, -HALF_PI, HALF_PI) * (1 - Math.abs(steer));
+  const targetYaw = (steerYaw + alignYaw) * turnScale;
+  state.yawRate += (targetYaw - state.yawRate) * clamp(h.turnResponse * dt, 0, 1);
 
-  // --- Slip angles ---
-  const vxSafe = Math.max(Math.abs(state.vx), MIN_SLIP_SPEED) * (state.vx < 0 ? -1 : 1);
-  const alphaFront = atan2(state.vy + car.cgToFront * state.yawRate, Math.abs(vxSafe)) - delta;
-  const alphaRear = atan2(state.vy - car.cgToRear * state.yawRate, Math.abs(vxSafe));
-  state.frontSlip = alphaFront;
-  state.rearSlip = alphaRear;
+  // Rotating the body leaves the world-frame velocity where it was, so in the
+  // body frame the velocity turns the other way by the same angle.
+  const turn = state.yawRate * dt;
+  state.heading = wrapAngle(state.heading + turn);
+  const sinT = sin(turn);
+  const cosT = cos(turn);
+  const vx = state.vx * cosT + state.vy * sinT;
+  const vy = -state.vx * sinT + state.vy * cosT;
+  state.vx = vx;
+  state.vy = vy;
 
-  // --- Throttle: player and assist resolved, then through one shared path ---
-  const throttle = resolveThrottle(state, input, config.assist);
-  state.throttleApplied = throttle;
+  // --- Drive ---
+  // Tapers linearly to zero at top speed, and pushes back gently above it (after
+  // a downhill wall reset, say) rather than holding a hard cap.
+  const drive = h.acceleration * (1 - speed / h.topSpeed);
+  state.vx += Math.max(drive, -h.acceleration) * dt;
 
-  // --- Longitudinal forces ---
-  // Computed before the tyre lateral forces so the resulting acceleration can
-  // drive weight transfer within the same tick.
-  let fxRear = driveForce(state, car, Math.max(throttle, 0), dt);
-  let fxFront = 0;
+  // --- Sideways friction ---
+  speed = Math.sqrt(state.vx * state.vx + state.vy * state.vy);
+  slip = speed < MIN_SLIP_SPEED ? 0 : atan2(state.vy, state.vx);
+  const absSlip = Math.abs(slip);
 
-  if (throttle < 0) {
-    const brake = -throttle * car.brakeTorque / car.wheelRadius;
-    const dir = state.vx >= 0 ? -1 : 1;
-    fxFront += brake * car.brakeBias * dir;
-    fxRear += brake * (1 - car.brakeBias) * dir;
+  // Hysteresis between letting go and gripping again, so a slide near the
+  // threshold does not flicker between the two every tick.
+  if (state.sliding) {
+    if (absSlip < h.regripAngle) state.sliding = false;
+  } else if (absSlip > h.breakAngle) {
+    state.sliding = true;
   }
 
-  // Handbrake locks the rear axle. The lateral collapse below is what actually
-  // initiates the drift; the retarding force is almost incidental.
-  if (input.handbrake) {
-    const dir = state.vx >= 0 ? -1 : 1;
-    fxRear += (car.handbrakeTorque / car.wheelRadius) * dir;
-  }
-
-  const drag = -car.dragCoeff * state.vx * Math.abs(state.vx);
-  const rolling = -car.rollingResistance * state.vx;
-
-  // --- Weight transfer ---
-  // Estimated from the demanded longitudinal force. It is only an estimate --
-  // the forces get clamped to tyre capacity below -- but load transfer is a
-  // second-order effect on the result and resolving it properly would need an
-  // iteration per tick for no visible gain.
-  const accelEstimate = (fxFront + fxRear + drag + rolling) / car.mass;
-  const transfer = (car.mass * accelEstimate * car.cgHeight) / wheelbase;
-  const staticFront = (car.mass * GRAVITY * car.cgToRear) / wheelbase;
-  const staticRear = (car.mass * GRAVITY * car.cgToFront) / wheelbase;
-  // Braking (negative accel) moves load forwards; a floor of 10% static keeps a
-  // lifted axle from producing exactly zero grip and a divide-by-zero downstream.
-  const loadFront = Math.max(staticFront - transfer, staticFront * 0.1);
-  const loadRear = Math.max(staticRear + transfer, staticRear * 0.1);
-
-  // --- Traction limit ---
-  // A tyre cannot transmit more than mu*Fz however much torque the engine
-  // makes. Without this clamp a first-gear stab produces both impossible
-  // acceleration and (via the friction circle below) a total loss of lateral
-  // grip, so the car launches like a dragster and spins on the spot.
-  //
-  // The 0.95 ceiling leaves a sliver of the friction circle unused. A hard 1.0
-  // would drive combinedSlipScale to exactly zero, and a rear axle with
-  // literally no lateral force is unrecoverable -- the slide becomes a spin
-  // every time, which is not how wheelspin feels in a real car.
-  const frontCapacity = longitudinalCapacity(car.tyreFront, loadFront, surfaceGrip);
-  const rearCapacity = longitudinalCapacity(car.tyreRear, loadRear, surfaceGrip);
-  fxFront = clamp(fxFront, -frontCapacity * 0.95, frontCapacity * 0.95);
-  fxRear = clamp(fxRear, -rearCapacity * 0.95, rearCapacity * 0.95);
-
-  const fxLong = fxFront + fxRear + drag + rolling;
-
-  // --- Lateral forces ---
-  let fyFront = lateralForce(car.tyreFront, alphaFront, loadFront, surfaceGrip);
-  let fyRear = lateralForce(car.tyreRear, alphaRear, loadRear, surfaceGrip);
-
-  // Friction circle. Longitudinal demand eats into cornering capacity.
-  fyFront *= combinedSlipScale(fxFront, frontCapacity);
-  fyRear *= combinedSlipScale(fxRear, rearCapacity);
-
-  if (input.handbrake) {
-    // A locked wheel is sliding, and a sliding tyre makes very little lateral
-    // force regardless of slip angle. Not zero -- zero makes the car feel like
-    // it is on ice and removes any ability to steer the slide.
-    fyRear *= 0.18;
-  }
-
-  // --- Equations of motion, body frame (x forward, y left) ---
-  const sinDelta = sin(delta);
-  const cosDelta = cos(delta);
-
-  const forceX = fxLong - fyFront * sinDelta;
-  const forceY = fyFront * cosDelta + fyRear;
-  const momentZ = car.cgToFront * fyFront * cosDelta - car.cgToRear * fyRear;
-
-  // The v * yawRate terms are the centripetal coupling between the rotating
-  // body frame and the world frame. Leaving them out gives a car that corners
-  // like it is on rails and never transfers speed between axes.
-  const ax = forceX / car.mass + state.vy * state.yawRate;
-  const ay = forceY / car.mass - state.vx * state.yawRate;
-
-  state.vx += ax * dt;
-  state.vy += ay * dt;
-  state.yawRate += (momentZ / car.inertiaZ) * dt;
-
-  // Stop the car cleanly instead of letting rolling resistance oscillate it
-  // around zero forever.
-  if (Math.abs(state.vx) < 0.05 && Math.abs(throttle) < 0.01) {
-    state.vx = 0;
-    state.vy *= 0.5;
-  }
+  const friction = state.sliding
+    ? lerp(h.slideFrictionLow, h.slideFrictionHigh, clamp(absSlip / HALF_PI, 0, 1))
+    : h.grip;
+  const removable = friction * GRAVITY * surfaceGrip * dt;
+  if (state.vy > removable) state.vy -= removable;
+  else if (state.vy < -removable) state.vy += removable;
+  else state.vy = 0;
 
   // --- Integrate pose, world frame ---
-  state.heading = wrapAngle(state.heading + state.yawRate * dt);
   const sinH = sin(state.heading);
   const cosH = cos(state.heading);
   state.x += (state.vx * cosH - state.vy * sinH) * dt;
@@ -166,15 +109,22 @@ export function stepVehicle(
 
   // --- Derived values for renderer, audio and scoring ---
   state.speed = Math.sqrt(state.vx * state.vx + state.vy * state.vy);
-  state.slipAngle = state.speed < 1 ? 0 : atan2(state.vy, Math.abs(state.vx));
-  state.lateralG = ay / GRAVITY;
-  state.rearWheelSpeed = input.handbrake ? 0 : state.vx / car.wheelRadius;
+  state.slipAngle = state.speed < MIN_SLIP_SPEED ? 0 : atan2(state.vy, state.vx);
+  // Drawn front wheels point along the direction of travel, plus a little of
+  // the player's steering. In a slide that reads as opposite lock, which is
+  // what a drifting car looks like from above even though nothing here
+  // simulates it.
+  state.steerAngle = clamp(
+    clamp(state.slipAngle, -HALF_PI, HALF_PI) - steer * car.maxWheelAngle * 0.5,
+    -car.maxWheelAngle,
+    car.maxWheelAngle,
+  );
 }
 
 /**
- * Put the car back on the road after a wall hit or a spin, pointing along the
- * route. Used by the crash handler: the brief calls for a penalty and a reset,
- * never a hard restart.
+ * Put the car back on the road after a wall hit, pointing along the route.
+ * Used by the crash handler: the brief calls for a penalty and a reset, never
+ * a hard restart.
  */
 export function resetToRoad(
   state: SimState,
@@ -189,6 +139,7 @@ export function resetToRoad(
   state.vx = clamp(keepSpeed, 0, 100);
   state.vy = 0;
   state.yawRate = 0;
+  state.sliding = false;
   state.slipAngle = 0;
   state.speed = state.vx;
   state.steerAngle = 0;

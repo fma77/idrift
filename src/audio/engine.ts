@@ -129,7 +129,15 @@ export class EngineAudio {
     const now = this.ctx.currentTime;
     const smooth = 0.035;
 
-    const rpmFraction = clamp01(state.rpm / car.engine.redlineRpm);
+    // There is no engine model any more, so the rev note is invented from road
+    // speed: a notional five-speed box, each gear sweeping the upper part of
+    // the rev range. Wheelspin in a slide lifts the revs a little, as a real
+    // car's would.
+    const speedFraction = clamp01(state.speed / car.handling.topSpeed);
+    const gearSpan = 1 / 5;
+    const inGear = Math.min(speedFraction, 0.999) % gearSpan / gearSpan;
+    const slideRev = state.sliding ? clamp01(Math.abs(state.slipAngle) / 0.8) * 0.25 : 0;
+    const rpmFraction = clamp01(0.3 + inGear * 0.65 + slideRev);
     const fundamental = params.basePitch * firingOrder(params.cylinders) * (0.55 + rpmFraction * 1.85);
 
     const partials = [1, 2, 3, 4.5];
@@ -140,7 +148,8 @@ export class EngineAudio {
     // Load, not throttle position: a car at full throttle near the redline is a
     // different sound from one bogging at 2000rpm, and load is what separates
     // them.
-    const load = clamp01(Math.max(state.throttleApplied, 0) * (0.35 + rpmFraction * 0.65));
+    // Always on the throttle, so load is high whenever the car is still pulling.
+    const load = clamp01((1 - speedFraction * 0.5) * (0.35 + rpmFraction * 0.65));
     this.filter.frequency.setTargetAtTime(
       params.filterBase + params.filterRange * load,
       now,
@@ -157,7 +166,9 @@ export class EngineAudio {
     // Tyre scrub follows rear slip, so the player hears the drift starting
     // slightly before they can see it in a top-down view.
     if (this.noiseGain) {
-      const scrub = clamp01((Math.abs(state.rearSlip) - 0.12) / 0.5) * clamp01(state.speed / 12);
+      const scrub = state.sliding
+        ? clamp01((Math.abs(state.slipAngle) - 0.1) / 0.5) * clamp01(state.speed / 12)
+        : 0;
       this.noiseGain.gain.setTargetAtTime(scrub * 0.16, now, 0.05);
     }
 

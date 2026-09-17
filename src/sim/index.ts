@@ -18,11 +18,10 @@ export * from './replay.ts';
 export { gradeRun } from './model/score.ts';
 export type { RunResult, StyleGrade } from './model/score.ts';
 export { HASH_INTERVAL } from './math/hash.ts';
-export { torqueAtRpm } from './model/engine.ts';
 export { WALL_MARGIN } from './model/progress.ts';
 
 /** Build the starting state for a run. Pure: same route + car => same state. */
-export function createSimState(route: RouteData, car: CarParams): SimState {
+export function createSimState(route: RouteData, _car: CarParams): SimState {
   const s = route.samples;
   const rng = createRng(route.seed);
   return {
@@ -33,17 +32,12 @@ export function createSimState(route: RouteData, car: CarParams): SimState {
     vx: 0,
     vy: 0,
     yawRate: 0,
-    gear: 0,
-    rpm: car.engine.idleRpm,
-    shiftTimer: 0,
-    rearWheelSpeed: 0,
+    sliding: false,
+    steer: 0,
+    steerChange: 0,
     steerAngle: 0,
-    throttleApplied: 0,
     slipAngle: 0,
     speed: 0,
-    frontSlip: 0,
-    rearSlip: 0,
-    lateralG: 0,
     sampleIndex: 0,
     distance: 0,
     lateralOffset: 0,
@@ -100,7 +94,7 @@ export function stepSim(
   state.hitThisTick = false;
 
   const grip = surfaceGripAt(state, route);
-  stepVehicle(state, car, input, config, grip, DT);
+  stepVehicle(state, car, input, grip, DT);
   updateProgress(state, route);
 
   // --- Wall contact: penalty and a reset, never a restart ---
@@ -165,10 +159,8 @@ export function hashSimState(state: SimState): number {
   h = hashFloat(h, state.vx);
   h = hashFloat(h, state.vy);
   h = hashFloat(h, state.yawRate);
-  h = hashFloat(h, state.steerAngle);
-  h = hashFloat(h, state.rearWheelSpeed);
-  h = hashInt(h, state.gear);
-  h = hashFloat(h, state.shiftTimer);
+  h = hashInt(h, state.sliding ? 1 : 0);
+  h = hashFloat(h, state.steer);
   h = hashFloat(h, state.drift.banked);
   h = hashFloat(h, state.drift.pending);
   h = hashInt(h, state.raceTicks);

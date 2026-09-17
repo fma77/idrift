@@ -28,8 +28,9 @@
             <div class="mono" style="color: var(--ink-muted)">TOUGE TIME ATTACK &middot; DRIFT RUN</div>
             <h1 class="display-xl" style="margin: 8px 0 0">iDRIFT</h1>
             <p class="caption" style="max-width: 42ch; margin-top: 12px">
-              Top-down drifting on mountain roads. Keep the rear out, and do not hit anything.
+              Top-down drifting on mountain roads. One thumb: touch anywhere and slide to steer. The car does the rest.
             </p>
+            <div class="chip chip--red" id="tune-chip" style="margin-top: 12px" hidden>TUNING MODE</div>
           </div>
           <div class="spacer"></div>
           <div class="btn-row">
@@ -128,35 +129,13 @@
           <div>
             <div class="row">
               <div>
-                <div>Throttle assist</div>
-                <div class="caption" id="assist-help">
-                  Automatic throttle. Higher holds the drift for you.
-                </div>
+                <div>Steering sensitivity</div>
+                <div class="caption">How far your thumb slides for full steering. Higher means a shorter slide.</div>
               </div>
               <div style="display: flex; align-items: center; gap: 12px">
-                <input type="range" id="set-assist" min="0" max="100" step="5" />
-                <span class="row__value" id="assist-value" style="min-width: 3ch">60</span>
+                <input type="range" id="set-sensitivity" min="50" max="200" step="5" />
+                <span class="row__value" id="sensitivity-value" style="min-width: 4ch">100%</span>
               </div>
-            </div>
-
-            <div class="row">
-              <div>
-                <div>On-screen controls</div>
-                <div class="caption">Move and resize the touch buttons.</div>
-              </div>
-              <button class="btn--text" id="btn-edit-layout" style="border: none; background: none; cursor: pointer">
-                Arrange
-              </button>
-            </div>
-
-            <div class="row">
-              <div>
-                <div>Left-handed layout</div>
-                <div class="caption">Mirrors the touch buttons left to right.</div>
-              </div>
-              <button class="toggle" id="set-lefty" aria-pressed="false" aria-label="Left-handed layout">
-                <span class="toggle__knob"></span>
-              </button>
             </div>
 
             <div class="row">
@@ -208,6 +187,10 @@
           </div>
 
           <div id="result-stats"></div>
+
+          <div class="caption" id="result-tune-note" hidden>
+            Tuning mode. This run is not saved as a best or posted to the leaderboard.
+          </div>
 
           <div id="result-submit">
             <div class="label" style="color: var(--ink-muted); margin-bottom: 8px">Leaderboard</div>
@@ -273,30 +256,31 @@
             </div>
             <div class="keyhints">
               <span class="keyhint"><span class="keyhint__key" id="hint-left">←</span><span class="keyhint__key" id="hint-right">→</span> STEER</span>
-              <span class="keyhint"><span class="keyhint__key" id="hint-accel">↑</span><span class="keyhint__key" id="hint-brake">↓</span> THROTTLE</span>
-              <span class="keyhint"><span class="keyhint__key" id="hint-handbrake">SPACE</span> HANDBRAKE</span>
-              <span class="keyhint"><span class="keyhint__key">ESC</span> QUIT</span>
+              <span class="keyhint"><span class="keyhint__key">ESC</span> PAUSE</span>
             </div>
 
             <div class="hud__speed">
-              <span class="hud__value" id="hud-gear">1</span>
-              <span class="hud__unit">gear</span>
+              <span class="hud__value" id="hud-angle">0</span>
+              <span class="hud__unit">angle °</span>
             </div>
           </div>
         </div>
 
         <div class="hud__flash" id="hud-flash"></div>
 
-        <!-- Touch buttons are built by src/input/touchControls.ts. -->
-        <div class="touch-controls" id="touch-controls"></div>
+        <!-- Touch anywhere and slide to steer. See src/input/thumbSteer.ts. -->
+        <div class="steer-surface" id="steer-surface"></div>
 
         <button class="pause-btn" id="btn-pause" type="button" aria-label="Pause">
           <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>
         </button>
 
-        <div class="overlay" id="overlay-countdown" hidden>
+        <button class="tune-btn" id="btn-tune" type="button" hidden>TUNE</button>
+
+        <div class="overlay overlay--countdown" id="overlay-countdown" hidden>
           <div class="overlay__count" id="countdown">3</div>
           <div class="mono" style="color: var(--ink-faint)" id="countdown-mode">TIME ATTACK</div>
+          <div class="overlay__hint" id="countdown-hint"></div>
         </div>
 
         <div class="overlay" id="overlay-paused" hidden>
@@ -306,30 +290,11 @@
             <button class="btn btn--secondary" id="btn-quit">Back to routes</button>
           </div>
         </div>
+
+        <!-- Tuning mode only (#tune). Built by src/ui/tunePanel.ts. -->
+        <div id="tune-panel" hidden></div>
       </div>
 
-      <!-- ================= TOUCH LAYOUT EDITOR ================= -->
-      <!--
-        Full-bleed and ink, like the gameplay surface, so buttons are arranged
-        against what they will actually sit on during a run.
-      -->
-      <div id="layout-editor" class="layout-editor" hidden>
-        <div class="layout-editor__panel">
-          <div class="display">Controls</div>
-          <p class="layout-editor__hint">Drag each button to where your thumbs rest.</p>
-          <p class="layout-editor__hint layout-editor__hint--faint" id="layout-orientation"></p>
-          <div class="layout-editor__size">
-            <label class="hud__label" for="layout-size">Button size</label>
-            <input type="range" id="layout-size" min="75" max="150" step="5" />
-            <span class="layout-editor__value" id="layout-size-value">100%</span>
-          </div>
-          <div class="layout-editor__actions">
-            <button class="btn btn--secondary" id="btn-layout-reset" type="button">Reset</button>
-            <button class="btn btn--primary" id="btn-layout-done" type="button">Done</button>
-          </div>
-        </div>
-        <div class="touch-controls" id="layout-controls"></div>
-      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

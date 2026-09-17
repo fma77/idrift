@@ -222,72 +222,63 @@
   color: var(--ink-faint);
 }
 
-/* --- Touch controls ------------------------------------------------------ */
+/* --- Thumb steering ----------------------------------------------------- */
 
 /*
- * Ordinary on-screen buttons, positioned by src/input/touchControls.ts.
- *
- * These replaced a "drag anywhere in the lower half" relative joystick after a
- * phone play-test: it had too steep a learning curve for someone opening a
- * shared link cold. Per the design system -- ink at ~80% over the track,
- * square, never below 56px.
+ * The whole screen is the control: touch anywhere, slide sideways to steer.
+ * Sits above the canvas and HUD, below the pause button and the overlays.
  */
-.touch-controls {
+.steer-surface {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-}
-
-.touch-btn {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  touch-action: none;
   -webkit-tap-highlight-color: transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0;
-  background: rgba(20, 20, 20, 0.78);
-  border: 2px solid rgba(244, 241, 234, 0.85);
-  color: var(--paper);
-  font-family: var(--display);
-  font-size: 13px;
-  line-height: 1.05;
-  text-align: center;
-  cursor: pointer;
-  transition: background 60ms linear, color 60ms linear;
 }
 
-.touch-btn svg {
-  width: 34%;
-  height: auto;
-  fill: currentColor;
-}
-
-/* Pressed: invert. Instant enough to read as a physical button. */
-.touch-btn[data-active='true'] {
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--paper);
-}
-
-.touch-btn__label {
+/*
+ * Feedback for the slider: a hairline from full left to full right, with a
+ * square marker at the current steering. Quiet on purpose -- the car is the
+ * feedback that matters; this is for the corner of the eye.
+ */
+.steer-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: rgba(244, 241, 234, 0.35);
   pointer-events: none;
+  will-change: transform;
 }
 
-/* Only the layout editor names each button; in a run the icons are enough. */
-.touch-btn__name {
+.steer-track[hidden] {
   display: none;
 }
 
-/* Hidden on desktop, where the key hints take their place. */
-#game[data-input='keyboard'] .touch-controls,
+.steer-track::before {
+  /* Centre tick. */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -5px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  background: rgba(244, 241, 234, 0.5);
+}
+
+.steer-track__knob {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  background: var(--paper);
+}
+
+/* Hidden on desktop, where Escape pauses. */
 #game[data-input='keyboard'] .pause-btn {
   display: none;
 }
@@ -321,9 +312,9 @@
 }
 
 /*
- * With buttons along the bottom edge, the speed and gear readouts move up to sit
- * under the score panel. Left where they were, they would be hidden behind the
- * steering arrows and the throttle.
+ * On a phone the steering thumb lives along the bottom edge, so the speed and
+ * angle readouts move up to sit under the score panel, where the thumb cannot
+ * cover them.
  */
 #game[data-input='touch'] .hud__bottom {
   grid-row: 2;
@@ -466,13 +457,13 @@
  * and clickable, and completely invisible. Overlays get the inverted pair.
  */
 .overlay .btn--secondary,
-.layout-editor .btn--secondary {
+.tune .btn--secondary {
   border-color: var(--paper);
   color: var(--paper);
 }
 
 .overlay .btn--secondary:active,
-.layout-editor .btn--secondary:active {
+.tune .btn--secondary:active {
   background: var(--paper);
   color: var(--ink);
 }
@@ -490,111 +481,144 @@
   max-width: 320px;
 }
 
-/* --- Touch layout editor ------------------------------------------------- */
-
-.layout-editor {
-  position: absolute;
-  inset: 0;
-  background: var(--ink);
-  color: var(--paper);
-  overflow: hidden;
-  touch-action: none;
+/* The countdown overlay lets the road show through: it is the moment to read the first corner. */
+.overlay--countdown {
+  background: rgba(20, 20, 20, 0.6);
+  pointer-events: none;
 }
 
-.layout-editor[hidden] {
+.overlay__hint {
+  max-width: 28ch;
+  margin-top: var(--s-2);
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--paper);
+}
+
+/* --- Tuning (#tune only) ------------------------------------------------- */
+
+.tune-btn {
+  position: absolute;
+  top: max(var(--s-3), env(safe-area-inset-top));
+  right: max(var(--s-3), env(safe-area-inset-right));
+  height: 48px;
+  padding: 0 14px;
+  background: var(--red);
+  border: 2px solid var(--red);
+  color: var(--paper);
+  font-family: var(--display);
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tune-btn[hidden] {
   display: none;
 }
 
-.layout-editor__panel {
+.tune {
   position: absolute;
-  top: max(var(--s-3), env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(420px, calc(100% - 2 * var(--s-3)));
+  inset: 0;
+  z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
-  padding: var(--s-3);
-  background: var(--ink-2);
+  background: var(--ink);
+  color: var(--paper);
 }
 
-.layout-editor__hint {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.4;
+.tune[hidden] {
+  display: none;
 }
 
-.layout-editor__hint--faint {
-  color: var(--ink-faint);
-  font-size: 12px;
+.tune__head {
+  padding: max(var(--s-3), env(safe-area-inset-top)) var(--gutter) var(--s-2);
+  border-bottom: 1px solid var(--ink-2);
 }
 
-.layout-editor__size {
+.tune__eyebrow {
+  color: var(--red);
+}
+
+.tune__title {
+  margin-top: 4px;
+}
+
+.tune__body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--s-2) var(--gutter);
+}
+
+.tune__row {
+  display: block;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--ink-2);
+}
+
+.tune__row-top {
   display: flex;
-  align-items: center;
+  justify-content: space-between;
+  align-items: baseline;
   gap: var(--s-3);
 }
 
-.layout-editor__size input[type='range'] {
-  flex: 1;
-  width: auto;
+.tune__label {
+  font-weight: 800;
 }
 
-.layout-editor__value {
-  min-width: 4ch;
-  text-align: right;
+.tune__value {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  color: var(--red);
+  white-space: nowrap;
 }
 
-.layout-editor__actions {
-  display: flex;
+.tune__help {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+.tune__row input[type='range'] {
+  width: 100%;
+  margin-top: var(--s-2);
+  height: 32px;
+}
+
+.tune__export {
+  width: 100%;
+  min-height: 180px;
+  margin: var(--s-2) 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--ink-2);
+  color: var(--paper);
+  border: 1px solid var(--ink-faint);
+}
+
+.tune__foot {
+  padding: var(--s-2) var(--gutter) max(var(--s-3), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ink-2);
+}
+
+.tune__status {
+  min-height: 1.4em;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+.tune__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.3fr;
   gap: var(--s-2);
   margin-top: var(--s-1);
 }
 
-.layout-editor__actions .btn {
-  min-height: 44px;
-}
-
-/* In the editor every button is named, and reads as something to pick up. */
-.touch-controls--edit .touch-btn {
-  border-style: dashed;
-  cursor: grab;
-}
-
-.touch-controls--edit .touch-btn__name {
-  display: block;
-  position: absolute;
-  top: calc(100% + 4px);
-  white-space: nowrap;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  pointer-events: none;
-}
-
-.touch-controls--edit .touch-btn[data-dragging='true'] {
-  background: var(--paper);
-  color: var(--ink);
-  border-style: solid;
-  cursor: grabbing;
-  z-index: 1;
-}
-
-/* Short landscape screens: squeeze the panel so the lower half stays free to arrange. */
-@media (orientation: landscape) and (max-height: 560px) {
-  .layout-editor__panel {
-    width: min(560px, calc(100% - 2 * var(--s-3)));
-    padding: var(--s-2) var(--s-3);
-    gap: 4px;
-  }
-  .layout-editor__panel .display {
-    font-size: 20px;
-  }
-  .layout-editor__hint--faint {
-    display: none;
-  }
+.tune__actions .btn {
+  min-height: 48px;
+  padding-left: 8px;
+  padding-right: 8px;
 }

@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "idrift-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--host", "127.0.0.1", "--port", "5318", "--strictPort"],
+      "port": 5318,
+      "url": "http://127.0.0.1:5318"
     }
   ]
 }

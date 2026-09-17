@@ -318,10 +318,11 @@ export class Renderer {
    * makes the drift scoring feel arbitrary.
    */
   private recordSkid(state: SimState, car: CarParams): void {
-    const slipping = Math.abs(state.rearSlip) > 0.16 && state.speed > 4;
+    const slip = Math.abs(state.slipAngle);
+    const slipping = state.sliding && slip > 0.14 && state.speed > 4;
     if (!slipping) return;
 
-    const weight = clamp((Math.abs(state.rearSlip) - 0.16) / 0.5, 0.15, 1);
+    const weight = clamp((slip - 0.14) / 0.5, 0.15, 1);
     const h = state.heading;
     const rearX = state.x - cos(h) * car.cgToRear;
     const rearY = state.y - sin(h) * car.cgToRear;

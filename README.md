@@ -18,7 +18,7 @@ src/sim/          The quarantined, deterministic simulation. Read the rules belo
   math/           Deterministic trig, seeded PRNG, state hashing
   model/          Tyre, engine, vehicle, route progress, scoring
 src/render/       Canvas renderer, camera, DOM HUD. Reads sim state, writes nothing.
-src/input/        Touch + keyboard into one abstract input struct
+src/input/        Thumb slider + keyboard into one steering value
 src/audio/        Procedural engine synthesis. No samples.
 src/data/         Car and route registries
 src/bot/          Pure-pursuit driver: test fixture and future attract mode
