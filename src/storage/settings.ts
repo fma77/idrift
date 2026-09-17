@@ -30,6 +30,8 @@ export interface Settings {
   playerName: string;
   carId: string;
   soundOn: boolean;
+  /** Shows the TUNE button in runs. Runs driven with it on are not saved or posted. */
+  tuneMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   playerName: '',
   carId: 'kaido-zen-r',
   soundOn: true,
+  tuneMode: false,
 };
 
 export function loadSettings(): Settings {
@@ -64,6 +67,7 @@ export function loadSettings(): Settings {
       fixedNorth: pick('fixedNorth', (v) => typeof v === 'boolean'),
       showSkidMarks: pick('showSkidMarks', (v) => typeof v === 'boolean'),
       soundOn: pick('soundOn', (v) => typeof v === 'boolean'),
+      tuneMode: pick('tuneMode', (v) => typeof v === 'boolean'),
       playerName: pick('playerName', (v) => typeof v === 'string'),
       carId: pick('carId', (v) => typeof v === 'string'),
       keymap: {

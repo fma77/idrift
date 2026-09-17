@@ -7,7 +7,7 @@ import { Hud, formatTime } from './render/hud.ts';
 import { InputController, ACTIONS, DEFAULT_KEYMAP, keyLabel, type Action } from './input/input.ts';
 import { ThumbSteer } from './input/thumbSteer.ts';
 import { TunePanel } from './ui/tunePanel.ts';
-import { isTuneMode, applyStoredTuning, isTuned } from './tune/tuning.ts';
+import { isTuneMode, applyStoredTuning, restoreShippedHandling, isTuned } from './tune/tuning.ts';
 import { EngineAudio } from './audio/engine.ts';
 import { CARS, carById } from './data/cars.ts';
 import { ROUTES, ROUTE_IDS, loadRoute, type RouteEntry } from './data/routes.ts';
@@ -59,15 +59,24 @@ const gameEl = $('game');
 const canvas = $<HTMLCanvasElement>('canvas');
 
 /**
- * Tuning mode (#tune on the URL): handling sliders over a paused run, applied
- * live. Read once at boot; a change of hash reloads, so a run never switches
- * between tuned and shipped handling halfway through.
+ * Tuning mode: handling sliders over a paused run, applied live.
+ *
+ * Switched on from Settings. #tune or ?tune on the URL also switches it on, but
+ * a URL alone proved unreliable on a phone -- a tab already open on an older
+ * build never notices the hash change, and some apps strip the fragment from a
+ * shared link -- so the setting is the way in and the URL is a shortcut to it.
  */
-const tuneMode = isTuneMode();
-if (tuneMode) applyStoredTuning();
-window.addEventListener('hashchange', () => {
-  if (isTuneMode() !== tuneMode) location.reload();
-});
+let tuneMode = false;
+
+function setTuneMode(on: boolean): void {
+  tuneMode = on;
+  settings.tuneMode = on;
+  saveSettings(settings);
+  if (on) applyStoredTuning();
+  else restoreShippedHandling();
+  $('tune-chip').hidden = !on;
+  $('btn-tune').hidden = !on;
+}
 
 const settings: Settings = loadSettings();
 let currentEntry: RouteEntry = ROUTES[0];
@@ -463,6 +472,7 @@ function bindToggle(id: string, get: () => boolean, set: (value: boolean) => voi
 }
 
 let syncSettingsSensitivity: () => void = () => {};
+let syncTuneToggle: () => void = () => {};
 
 function setSensitivity(value: number): void {
   settings.steerSensitivity = value;
@@ -485,6 +495,13 @@ function buildSettings(): void {
   bindToggle('set-north', () => settings.fixedNorth, (v) => (settings.fixedNorth = v));
   bindToggle('set-skids', () => settings.showSkidMarks, (v) => (settings.showSkidMarks = v));
   bindToggle('set-sound', () => settings.soundOn, (v) => (settings.soundOn = v));
+  bindToggle('set-tune', () => tuneMode, (v) => {
+    // Only reachable from Settings, never mid-run, so a run is driven entirely
+    // on shipped or entirely on tuned handling.
+    setTuneMode(v);
+    buildCarList();
+  });
+  syncTuneToggle = () => $('set-tune').setAttribute('aria-pressed', String(tuneMode));
 
   buildKeybinds();
   $('btn-reset-keys').addEventListener('click', () => {
@@ -903,9 +920,14 @@ function closeTuning(): void {
   if (isRunActive()) session?.start();
 }
 
-$('btn-tune').hidden = !tuneMode;
-$('tune-chip').hidden = !tuneMode;
 $('btn-tune').addEventListener('click', openTuning);
+setTuneMode(settings.tuneMode || isTuneMode());
+window.addEventListener('hashchange', () => {
+  if (isTuneMode() && !tuneMode && !isRunActive()) {
+    setTuneMode(true);
+    syncTuneToggle();
+  }
+});
 
 window.addEventListener('keydown', (e) => {
   // Using a bound key means the keyboard is in use, whatever the device.

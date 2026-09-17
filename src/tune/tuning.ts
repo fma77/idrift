@@ -9,15 +9,17 @@ import type { CarParams, HandlingParams } from '../sim/types.ts';
  * drive straight back into the corner that felt wrong, then copy the values out
  * so they can become the defaults.
  *
- * Opened with #tune on the URL. Tuned values are kept on this device only, and
- * nothing driven in tuning mode is saved as a best or posted to a leaderboard:
- * a time set with hand-edited grip is not comparable with anyone else's.
+ * Switched on in Settings, or with #tune on the URL. Tuned values are kept on
+ * this device only, and nothing driven in tuning mode is saved as a best or
+ * posted to a leaderboard: a time set with hand-edited grip is not comparable
+ * with anyone else's.
  */
 
 const STORAGE_KEY = 'idrift.tune.v1';
 
+/** True when the URL asks for tuning mode, as #tune or ?tune. */
 export function isTuneMode(): boolean {
-  return location.hash === '#tune';
+  return location.hash === '#tune' || new URLSearchParams(location.search).has('tune');
 }
 
 export interface TuneSpec {
@@ -166,6 +168,14 @@ export function setHandling(car: CarParams, key: keyof HandlingParams, value: nu
   const overrides = readOverrides();
   overrides[car.id] = { ...(overrides[car.id] ?? {}), [key]: value };
   writeOverrides(overrides);
+}
+
+/** Put every car back on its shipped handling, keeping the stored tuning for next time. */
+export function restoreShippedHandling(): void {
+  for (const car of CARS) {
+    const shipped = DEFAULTS[car.id];
+    if (shipped) Object.assign(car.handling, shipped);
+  }
 }
 
 export function resetHandling(car: CarParams): void {
