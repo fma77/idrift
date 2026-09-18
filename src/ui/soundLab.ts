@@ -60,6 +60,7 @@ export class SoundLab {
       <div class="lab__controls">
         <button class="btn btn--secondary lab__mode" type="button"></button>
         <button class="lab__throttle" type="button">HOLD<br />THROTTLE</button>
+        <button class="btn btn--secondary lab__lock" type="button">Handbrake</button>
       </div>
       <label class="tune__row lab__slide">
         <div class="tune__row-top"><span class="tune__label">Slide</span><span class="tune__value">0°</span></div>
@@ -94,6 +95,11 @@ export class SoundLab {
       b.addEventListener('click', () => this.select(kind));
       this.picker.appendChild(b);
     }
+
+    (root.querySelector('.lab__lock') as HTMLElement).addEventListener('click', () => {
+      this.ensureAudio();
+      this.audio?.triggerLock();
+    });
 
     this.modeButton.addEventListener('click', () => {
       this.driving = !this.driving;

@@ -51,6 +51,12 @@ const SPIN_DECEL = 14;
 /** How the game steers: rad/s per radian of heading error, and the pull back to the line. */
 const HEADING_GAIN = 5;
 const LINE_GAIN = 1.2;
+/** In a drift the line matters more than the heading: hold it firmly. */
+const DRIFT_LINE_GAIN = 3.5;
+/** Fraction of the sideways grip a drift is allowed to use for speed; the rest is for the line. */
+const DRIFT_SPEED_MARGIN = 0.85;
+/** Metres ahead a corner has to be for the car to start setting up on its outside. */
+const SETUP_REACH = 45;
 /** Radius under which a bend counts as a corner to flick into. */
 const CORNER_CURVATURE = 1 / 90;
 /** Metres. How close a corner the other way has to be before an unswitched drift unwinds. */
@@ -103,7 +109,13 @@ export function stepThrottleControls(
     // Not drifting: the game steers along the road and the normal model does
     // the rest, braking for corners it can see.
     const h = car.handling;
-    const yaw = autoSteerYaw(state, route, 0);
+    // Before a corner, drift towards its outside, so a tap has room to throw
+    // the car in. Only on the approach: once in the corner, grip takes the
+    // ordinary line.
+    const coming = upcomingCornerSign(state, route, SETUP_REACH);
+    const inCorner = Math.abs(route.samples.curvature[state.sampleIndex]) >= CORNER_CURVATURE;
+    const setup = coming !== 0 && !inCorner ? -coming * route.samples.halfWidth[state.sampleIndex] * config.drift.setupLine : 0;
+    const yaw = autoSteerYaw(state, route, setup);
     const turnScale = clamp(state.speed / h.turnInSpeed, 0.2, 1);
     const steer = clamp(-yaw / (h.turnRate * turnScale), -1, 1);
     stepVehicle(state, car, { steer, throttle, initiate: false }, gripAssist(config), route, surfaceGrip, dt, throttle);
@@ -166,11 +178,18 @@ function stepDrift(
   }
 
   // --- Path: the game steers the direction of travel along the road ---
-  // A bigger angle pushes the line towards the outside of the corner.
+  // The drifty line is judged by the tail: the rear of the car should draw its
+  // arc round the outside of the corner. So the target is where the tail
+  // should be, and the car's centre sits inside that by however far the angle
+  // swings the tail out. The first version steered the centre along the
+  // middle of the road and let the angle widen it a little, which in practice
+  // put the car halfway to the apex with the tail in the middle: quick, and
+  // nothing like a drift line.
   const i = state.sampleIndex;
   const half = route.samples.halfWidth[i];
-  const outside = -dir * clamp(angle / d.limitAngle, 0, 1.3) * half * d.angleWidening;
-  const want = autoSteerYaw(state, route, outside);
+  const tailSwing = (car.bodyLength / 2) * sin(clamp(angle, 0, HALF_PI));
+  const centre = Math.max(0, half * d.tailLine - tailSwing);
+  const want = autoSteerYaw(state, route, -dir * centre, DRIFT_LINE_GAIN);
   let v = state.speed;
   const maxTurn = (d.driftGrip * GRAVITY * surfaceGrip) / Math.max(v, 1);
   let travel = travelHeading(state);
@@ -184,7 +203,10 @@ function stepDrift(
   // Corner speed is judged at the drift grip, with no allowance over it: a
   // drift carried in too fast runs wide, and the tail finds the wall.
   const assist = gripAssist(config);
-  const limit = cornerSpeedLimit(state, route, assist, d.driftGrip * surfaceGrip);
+  // Keep some grip in hand: arriving at exactly the grip limit leaves nothing
+  // to hold the outside line with, and a heavy car then slides wide into the
+  // wall at the one corner that is a shade tighter than it looked.
+  const limit = cornerSpeedLimit(state, route, assist, d.driftGrip * surfaceGrip * DRIFT_SPEED_MARGIN);
   if (v > limit) decel += Math.min(assist.cornerBraking, (v - limit) * 6);
   v = Math.max(0, v - decel * dt);
 
@@ -285,14 +307,30 @@ export function endDrift(state: SimState): void {
  * How fast the game wants the direction of travel to turn, rad/s, to follow the
  * road `targetOffset` metres left of the centreline.
  */
-export function autoSteerYaw(state: SimState, route: RouteData, targetOffset: number): number {
+export function autoSteerYaw(
+  state: SimState,
+  route: RouteData,
+  targetOffset: number,
+  lineGain = LINE_GAIN,
+): number {
   const s = route.samples;
   const last = s.x.length - 1;
   const ahead = Math.min(last, state.sampleIndex + Math.round((3 + state.speed * 0.22) / route.sampleSpacing));
   const travel = travelHeading(state);
-  const line = atan2(-LINE_GAIN * (state.lateralOffset - targetOffset), state.speed + 4);
-  const error = wrapAngle(s.heading[ahead] - travel) + line;
-  return s.curvature[ahead] * state.speed + HEADING_GAIN * error;
+  const line = atan2(-lineGain * (state.lateralOffset - targetOffset), state.speed + 4);
+  // Heading error against the road where the car is, not where it is going.
+  // Comparing with the heading a few metres ahead builds in a turn-in the
+  // curvature term below already provides, so on any bend the car settled two
+  // or three metres to the inside -- which is exactly the apex-hugging line it
+  // was not supposed to take. The look-ahead belongs to the curvature alone.
+  const error = wrapAngle(s.heading[state.sampleIndex] - travel) + line;
+  // A line offset from the centreline is a different circle: wider round the
+  // outside of a bend, tighter round the inside. Feeding forward the
+  // centreline's curvature on an outside line turns the car in too early, and
+  // it ends up at the apex whatever the line term says.
+  const k = s.curvature[ahead];
+  const pathCurvature = k / Math.max(0.2, 1 - k * targetOffset);
+  return pathCurvature * state.speed + HEADING_GAIN * error;
 }
 
 /**

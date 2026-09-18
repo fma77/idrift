@@ -27,6 +27,7 @@ export interface Settings {
   /** Disable camera rotation for players who find it nauseating. */
   fixedNorth: boolean;
   showSkidMarks: boolean;
+  showSmoke: boolean;
   keymap: Keymap;
   playerName: string;
   carId: string;
@@ -44,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   steerSensitivity: 1,
   fixedNorth: false,
   showSkidMarks: true,
+  showSmoke: true,
   keymap: DEFAULT_KEYMAP,
   playerName: '',
   carId: 'kaido-zen-r',
@@ -73,6 +75,7 @@ export function loadSettings(): Settings {
       ),
       fixedNorth: pick('fixedNorth', (v) => typeof v === 'boolean'),
       showSkidMarks: pick('showSkidMarks', (v) => typeof v === 'boolean'),
+      showSmoke: pick('showSmoke', (v) => typeof v === 'boolean'),
       soundOn: pick('soundOn', (v) => typeof v === 'boolean'),
       tuneMode: pick('tuneMode', (v) => typeof v === 'boolean'),
       playerName: pick('playerName', (v) => typeof v === 'string'),

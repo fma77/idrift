@@ -528,6 +528,7 @@ function buildSettings(): void {
 
   bindToggle('set-north', () => settings.fixedNorth, (v) => (settings.fixedNorth = v));
   bindToggle('set-skids', () => settings.showSkidMarks, (v) => (settings.showSkidMarks = v));
+  bindToggle('set-smoke', () => settings.showSmoke, (v) => (settings.showSmoke = v));
   bindToggle('set-sound', () => settings.soundOn, (v) => (settings.soundOn = v));
   bindToggle(
     'set-drift-steer',
@@ -630,6 +631,7 @@ async function startRun(mode: SimMode): Promise<void> {
   const renderSettings: RenderSettings = {
     fixedNorth: settings.fixedNorth,
     showSkidMarks: settings.showSkidMarks,
+    showSmoke: settings.showSmoke,
   };
 
   syncKeyHints();

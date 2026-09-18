@@ -56,7 +56,8 @@ export const DRIFT_CONTROL: DriftControlParams = {
   flickAngle: 25 * DEG,
   flickTime: 0.35,
   driftGrip: 1.5,
-  angleWidening: 0.6,
+  tailLine: 0.75,
+  setupLine: 0.5,
   angleDrag: 3.5,
   exitRate: 1.8,
 };

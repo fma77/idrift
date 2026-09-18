@@ -795,6 +795,11 @@
   font-size: 13px;
 }
 
+.lab__controls .lab__lock {
+  grid-column: 1 / -1;
+  min-height: 48px;
+}
+
 .lab__throttle {
   min-height: 72px;
   background: var(--paper);

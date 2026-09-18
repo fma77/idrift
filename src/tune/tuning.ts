@@ -249,10 +249,17 @@ export const DRIFT_SPECS: TuneSpec<keyof DriftControlParams>[] = [
     toDisplay: same, fromDisplay: same,
   },
   {
-    key: 'angleWidening',
-    label: 'Big angle runs wide',
-    help: 'How far a big angle pushes the line to the outside, towards the wall.',
-    min: 0, max: 1.2, step: 0.05, unit: '',
+    key: 'tailLine',
+    label: 'Tail to the outside',
+    help: 'Where the back of the car runs through a drift: 0 is the middle of the road, 1 the outside edge.',
+    min: 0, max: 1.1, step: 0.05, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'setupLine',
+    label: 'Set up on the outside',
+    help: 'How far towards the outside the car moves before a corner, ready to throw it in.',
+    min: 0, max: 0.9, step: 0.05, unit: '',
     toDisplay: same, fromDisplay: same,
   },
   {

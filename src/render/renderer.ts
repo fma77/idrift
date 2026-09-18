@@ -3,6 +3,7 @@ import type { CarParams, RouteData, SimState } from '../sim/types.ts';
 import { Camera, type CameraSettings } from './camera.ts';
 import { getSprite } from './sprites.ts';
 import { drawDecoration, type DecorationData } from './decoration.ts';
+import { TyreSmoke } from './smoke.ts';
 
 /**
  * World renderer.
@@ -39,6 +40,7 @@ interface SkidPoint {
 
 export interface RenderSettings extends CameraSettings {
   showSkidMarks: boolean;
+  showSmoke: boolean;
 }
 
 export class Renderer {
@@ -52,6 +54,7 @@ export class Renderer {
   /** Rear-axle trail, world space. Purely cosmetic. */
   private skidLeft: SkidPoint[] = [];
   private skidRight: SkidPoint[] = [];
+  private readonly smoke = new TyreSmoke();
 
   /**
    * Route scenery. Held on the renderer, not on the route, so there is no field
@@ -122,6 +125,7 @@ export class Renderer {
   clearTrails(): void {
     this.skidLeft.length = 0;
     this.skidRight.length = 0;
+    this.smoke.clear();
   }
 
   resetCamera(state: SimState): void {
@@ -175,6 +179,11 @@ export class Renderer {
     this.drawRoad(ctx, route, state, px);
     this.drawScoringMarks(ctx, route, state, px);
     if (settings.showSkidMarks) this.drawSkids(ctx, px);
+    // Smoke under the car, so the car is never lost in its own cloud.
+    if (settings.showSmoke) {
+      this.smoke.update(view, car, dtSeconds);
+      this.smoke.draw(ctx, PAPER);
+    }
     this.drawCar(ctx, view, car, px);
 
     ctx.restore();

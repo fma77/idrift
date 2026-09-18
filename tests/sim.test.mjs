@@ -681,6 +681,10 @@ function driveThrottle(track, car, kind, maxSeconds = 200) {
   let held = quantiseInput(0, 0, false);
   let spins = 0;
   let driftTicks = 0;
+  // Where the tail runs while drifting through corners: 0 on the centreline,
+  // 1 on the outside edge, negative towards the apex.
+  let tailOutside = 0;
+  let cornerDriftTicks = 0;
   while (!state.finished && state.tick < TICK_RATE * maxSeconds) {
     if (state.tick % TICKS_PER_INPUT === 0) {
       const out = driver(state, track);
@@ -693,8 +697,18 @@ function driveThrottle(track, car, kind, maxSeconds = 200) {
     stepSim(state, input, car, track, config);
     if (!wasSpinning && state.spinTicks > 0) spins++;
     if (state.driftDir !== 0) driftTicks++;
+    const i = state.sampleIndex;
+    if (state.driftDir !== 0 && Math.abs(track.samples.curvature[i]) > 1 / 60) {
+      const h = track.samples.heading[i];
+      const tailX = state.x - Math.cos(state.heading) * (car.bodyLength / 2);
+      const tailY = state.y - Math.sin(state.heading) * (car.bodyLength / 2);
+      const offset = -(tailX - track.samples.x[i]) * Math.sin(h) + (tailY - track.samples.y[i]) * Math.cos(h);
+      tailOutside += (-state.driftDir * offset) / track.samples.halfWidth[i];
+      cornerDriftTicks++;
+    }
   }
-  return { state, spins, driftTicks, recorder, hashes, config };
+  const tailLine = cornerDriftTicks === 0 ? 0 : tailOutside / cornerDriftTicks;
+  return { state, spins, driftTicks, recorder, hashes, config, tailLine };
 }
 
 test('throttle controls: never tapping gets round on grip, with no drift points', () => {
@@ -815,4 +829,18 @@ test('throttle controls: on a straight the drift ends by itself, throttle or not
   assert.equal(state.driftDir, 0, 'still drifting after 0.8s of straight at full throttle');
   assert.equal(state.drift.pending, 0, 'the drift should have banked when it ended');
   assert.ok(state.drift.banked >= 1000);
+});
+
+test('throttle controls: in a drift the tail draws its arc round the outside of the corner', () => {
+  // The drifty line, not the fast one: the first version put the car halfway
+  // to the apex with the tail in the middle of the road.
+  for (const track of ROUTES) {
+    for (const car of CARS) {
+      const { tailLine } = driveThrottle(track, car, 'balancer');
+      assert.ok(
+        tailLine > 0.55,
+        `${car.name} on ${track.name}: tail ran ${tailLine.toFixed(2)} of the way to the outside edge`,
+      );
+    }
+  }
 });

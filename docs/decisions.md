@@ -117,6 +117,13 @@ default there: the game steers, and the player holds a throttle and taps a drift
   on the power out of a corner slid the car on down the straight, bleeding speed while
   looking straight. A drift now also ends at 8 degrees rather than 3, banks its points at
   that moment with a "+points" pop, and the gauge dims whenever no drift is on.
+- **The drift line runs round the outside.** The target is where the *tail* runs --
+  75% of the way to the outside edge -- with the car's centre inside that by however
+  far the angle swings the tail out, and the car sets up on the outside before each
+  corner. The first version hugged the apex: its steering compared the car's direction
+  with the road's direction ten metres ahead, which on any bend builds in a turn-in
+  and settled the car two metres to the inside whatever line was asked for. A test
+  now holds the tail on the outside half of the road through every drifted corner.
 - **The path** is steered by the game within a sideways-grip budget, and a bigger angle
   takes the line wider. The tail counts for wall contact in this scheme, so a big angle
   on a narrow road is a real risk.
@@ -217,6 +224,13 @@ without seams, and the model underneath carries over if recordings replace the v
 later. The trade-off is a ceiling: it sounds like a good arcade game, not an onboard
 video. Settings → Sound lab plays each engine with a hold-to-rev button, in neutral or
 pulling through the gears, with sliders for the voice and "Copy values" to ship them.
+
+The tyres have two sounds: a harsh locked-wheel skid when the drift button flicks the
+car, and a squeal through the slide whose pitch rises with the angle.
+
+Tyre smoke (`src/render/smoke.ts`) grows with both the slide angle and how long the
+slide has lasted, so a flick makes a wisp and a held hairpin fills the road. Flat
+circles, drawn under the car so it is never lost in its own cloud.
 
 Pausing used to close the audio context, so a resumed run came back silent; it now
 suspends and resumes instead.

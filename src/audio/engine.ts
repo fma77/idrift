@@ -18,6 +18,9 @@ export class EngineAudio {
   private exhaust: BiquadFilterNode | null = null;
   private node: AudioWorkletNode | null = null;
   private squealGain: GainNode | null = null;
+  private squealBands: BiquadFilterNode[] = [];
+  private lockGain: GainNode | null = null;
+  private lastFlick = 0;
   private noise: AudioBufferSourceNode | null = null;
   private model: EngineModel | null = null;
   private profile: EngineProfile | null = null;
@@ -65,23 +68,39 @@ export class EngineAudio {
     this.exhaust.Q.value = 0.9;
     this.exhaust.connect(this.master);
 
-    // Tyre squeal: two narrow bands of noise, the sound of rubber sliding.
+    // Tyre squeal: narrow bands of noise, the sound of rubber sliding. Their
+    // pitch rises a little with the angle, so a bigger slide sounds harder.
     this.noise = ctx.createBufferSource();
     this.noise.buffer = makeNoiseBuffer(ctx);
     this.noise.loop = true;
     this.squealGain = ctx.createGain();
     this.squealGain.gain.value = 0;
-    for (const [freq, q] of [
-      [1250, 9],
-      [2150, 12],
-    ]) {
+    this.squealBands = [];
+    for (const [freq, q] of SQUEAL_BANDS) {
       const band = ctx.createBiquadFilter();
       band.type = 'bandpass';
       band.frequency.value = freq;
       band.Q.value = q;
       this.noise.connect(band).connect(this.squealGain);
+      this.squealBands.push(band);
     }
     this.squealGain.connect(this.master);
+
+    // Locked rear wheels, for the handbrake in a flick: lower and rougher than
+    // a slide's squeal -- rubber dragged, not rolled.
+    this.lockGain = ctx.createGain();
+    this.lockGain.gain.value = 0;
+    for (const [freq, q] of [
+      [620, 2.2],
+      [1450, 3.5],
+    ]) {
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = freq;
+      band.Q.value = q;
+      this.noise.connect(band).connect(this.lockGain);
+    }
+    this.lockGain.connect(this.master);
     this.noise.start();
 
     this.master.gain.setTargetAtTime(0.55, ctx.currentTime, 0.15);
@@ -105,6 +124,10 @@ export class EngineAudio {
 
   /** Drive the sound from the sim, once per rendered frame. */
   update(state: SimState, car: CarParams): void {
+    // A flick starting (or a switch of sides) is the handbrake going on.
+    if (state.flickTicks > 0 && this.lastFlick === 0) this.triggerLock();
+    this.lastFlick = state.flickTicks;
+
     this.drive(
       {
         speed: state.speed,
@@ -147,7 +170,47 @@ export class EngineAudio {
 
     // Squeal follows the slide, and needs some speed to be heard.
     const squeal = clamp01((slide - 0.12) / 0.5) * clamp01(inputs.speed / 12);
-    this.squealGain?.gain.setTargetAtTime(squeal * 0.18, now, 0.05);
+    this.squealGain?.gain.setTargetAtTime(squeal * 0.32, now, 0.05);
+    for (let i = 0; i < this.squealBands.length; i++) {
+      // A slow waver, as the tyres' grip comes and goes through a slide.
+      const waver = 1 + 0.03 * Math.sin(now * (5.3 + i * 2.1));
+      const pitch = SQUEAL_BANDS[i][0] * (0.92 + 0.22 * clamp01(slide / 0.9)) * waver;
+      this.squealBands[i].frequency.setTargetAtTime(pitch, now, 0.06);
+    }
+  }
+
+  /**
+   * Rear wheels locking: a short, harsh skid. Played when the drift button
+   * flicks the car, and from the sound lab.
+   */
+  triggerLock(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.lockGain || !this.master) return;
+    const now = ctx.currentTime;
+    const g = this.lockGain.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(0, now);
+    g.linearRampToValueAtTime(0.55, now + 0.015);
+    g.linearRampToValueAtTime(0.3, now + 0.2);
+    g.linearRampToValueAtTime(0, now + 0.42);
+
+    // The tonal part of a skid: a rough note that falls as the wheels scrub
+    // speed off.
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(560, now);
+    osc.frequency.exponentialRampToValueAtTime(360, now + 0.38);
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 900;
+    band.Q.value = 5;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.1, now + 0.02);
+    env.gain.linearRampToValueAtTime(0, now + 0.4);
+    osc.connect(band).connect(env).connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.45);
   }
 
   /** Swap the voice live, for the sound lab. */
@@ -183,6 +246,13 @@ export class EngineAudio {
     this.started = false;
   }
 }
+
+/** Centre frequency and sharpness of each squeal band. */
+const SQUEAL_BANDS: [number, number][] = [
+  [1250, 9],
+  [2150, 12],
+  [3100, 14],
+];
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;

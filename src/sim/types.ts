@@ -49,8 +49,15 @@ export interface DriftControlParams {
   flickTime: number;
   /** g. How hard the game can turn the car's path while it is sideways. */
   driftGrip: number;
-  /** How far towards the outside of the corner a big angle pushes the line, as a fraction of half the road. */
-  angleWidening: number;
+  /**
+   * Where the tail runs through a drift, as a fraction of the way from the
+   * centreline to the outside edge. The drifty line: the rear of the car
+   * drawing an arc round the outside of the corner, not the nose clipping the
+   * apex.
+   */
+  tailLine: number;
+  /** Before a corner, how far towards its outside the game sets the car up, same units. */
+  setupLine: number;
   /** m/s^2 of speed a slide at 90 degrees costs. */
   angleDrag: number;
   /** rad/s. How fast the car straightens once the corner is behind it and the road ahead is straight. */
