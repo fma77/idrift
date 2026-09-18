@@ -57,7 +57,7 @@ export class PedalTouch {
       this.flashTimer = window.setTimeout(() => (this.driftZone.dataset.active = 'false'), 140);
       return;
     }
-    this.throttleFingers.push(e.pointerId);
+    if (!this.throttleFingers.includes(e.pointerId)) this.throttleFingers.push(e.pointerId);
     this.throttleZone.dataset.active = 'true';
     this.callbacks.onThrottle(true);
   }

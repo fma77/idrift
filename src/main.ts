@@ -105,6 +105,7 @@ const hud = new Hud({
   angleValue: $('hud-angle'),
   pace: $('pace'),
   flash: $('hud-flash'),
+  bankPop: $('bank-pop'),
   gauge: new DriftGauge($('drift-gauge')),
 });
 

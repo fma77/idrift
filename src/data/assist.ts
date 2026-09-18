@@ -58,6 +58,7 @@ export const DRIFT_CONTROL: DriftControlParams = {
   driftGrip: 1.5,
   angleWidening: 0.6,
   angleDrag: 3.5,
+  exitRate: 1.8,
 };
 
 /** Throttle controls exist for Drift Run only; Time Attack always steers. */

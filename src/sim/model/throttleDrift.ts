@@ -29,8 +29,14 @@ import type { AssistParams, CarParams, RouteData, SimConfig, SimInput, SimState 
 const GRAVITY = 9.80665;
 /** m/s. Below this a tap does nothing: there is not enough speed to throw sideways. */
 const MIN_INITIATE_SPEED = 8;
-/** Radians. Below this, once the flick is over, the drift has ended. */
-const END_ANGLE = 0.05;
+/**
+ * Radians (~8 degrees). Below this, once the flick is over, the drift has
+ * ended. Not lower: from above, a car at 5 degrees looks straight, and a drift
+ * the player cannot see is one they cannot tell has not finished.
+ */
+const END_ANGLE = 0.14;
+/** Metres of straight road ahead that count as the corner being over. */
+const EXIT_REACH = 25;
 /** Radians. The swing away from the corner at the start of a flick. */
 const FLICK_SWING = 0.15;
 /** rad/s. How fast the flick moves the angle. */
@@ -130,6 +136,13 @@ function stepDrift(
     const target = elapsed < total * 0.3 ? -FLICK_SWING : d.flickAngle;
     if (elapsed < total * 0.3 || angle < target) angle = moveToward(angle, target, FLICK_RATE * dt);
     state.flickTicks--;
+  } else if (onStraight(state, route)) {
+    // Corner exit. The corner is behind and the road ahead is straight, so the
+    // car straightens -- whatever the throttle is doing, because on a straight
+    // the throttle is for speed. Without this, getting back on the power out
+    // of a corner read as "more angle", and the car slid on down the straight
+    // bleeding speed while looking, from above, as if it had finished.
+    angle = Math.max(0, angle - d.exitRate * dt);
   } else {
     // Balance: throttle holds an angle in proportion to itself, so a steady
     // throttle gives a steady angle -- until the limit, past which the slide
@@ -181,6 +194,14 @@ function stepDrift(
   state.sliding = true;
 
   if (state.flickTicks === 0 && angle < END_ANGLE) endDrift(state);
+}
+
+/** No corner under the car and none within EXIT_REACH ahead. */
+function onStraight(state: SimState, route: RouteData): boolean {
+  return (
+    Math.abs(route.samples.curvature[state.sampleIndex]) < CORNER_CURVATURE &&
+    upcomingCornerSign(state, route, EXIT_REACH) === 0
+  );
 }
 
 /** A spin: the car rotates on, scrubbing speed, then is straightened along its path. */

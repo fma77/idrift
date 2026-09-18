@@ -256,6 +256,13 @@ export const DRIFT_SPECS: TuneSpec<keyof DriftControlParams>[] = [
     toDisplay: same, fromDisplay: same,
   },
   {
+    key: 'exitRate',
+    label: 'Straightening on exit',
+    help: 'How fast the car straightens once the corner is behind you and the road is straight.',
+    min: 0, max: 5, step: 0.1, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
     key: 'angleDrag',
     label: 'Speed lost to angle',
     help: 'How much speed a big angle costs.',

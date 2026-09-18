@@ -111,6 +111,12 @@ default there: the game steers, and the player holds a throttle and taps a drift
 - **Throttle sets the angle.** A steady throttle holds a steady angle, in proportion to
   itself -- until the limit angle, past which the slide feeds itself and runs away to a
   spin. A spin costs the combo and most of the speed.
+- **Corner exit.** Once the corner is behind and the road ahead is straight, the car
+  straightens on its own, whatever the throttle is doing: on a straight the throttle is
+  for speed. The first version let the throttle keep adding angle there, so getting back
+  on the power out of a corner slid the car on down the straight, bleeding speed while
+  looking straight. A drift now also ends at 8 degrees rather than 3, banks its points at
+  that moment with a "+points" pop, and the gauge dims whenever no drift is on.
 - **The path** is steered by the game within a sideways-grip budget, and a bigger angle
   takes the line wider. The tail counts for wall contact in this scheme, so a big angle
   on a narrow road is a real risk.

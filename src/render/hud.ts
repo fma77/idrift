@@ -25,6 +25,8 @@ export interface HudElements {
   angleValue: HTMLElement;
   pace: HTMLElement;
   flash: HTMLElement;
+  /** "+2,340" when a drift ends and its points are banked. */
+  bankPop: HTMLElement;
   /** Shown in Drift Run with throttle controls only. */
   gauge: DriftGauge;
 }
@@ -34,6 +36,7 @@ const SEVERITY_GLYPH = ['', '>', '>>', '>>>', '>>>>', '>>>>>', '>>>>>>'];
 
 export class Hud {
   private lastScore = 0;
+  private lastBanked = 0;
   private lastPaceKey = '';
 
   private readonly el: HudElements;
@@ -81,6 +84,18 @@ export class Hud {
       }
 
       if (state.drift.brokeThisTick) this.flash();
+
+      // A drift ending is a moment, so it gets one: the points it banked, big,
+      // for a second. Without it the only sign a drift was over was the combo
+      // quietly resetting.
+      const banked = Math.round(state.drift.banked);
+      if (banked > this.lastBanked) {
+        el.bankPop.textContent = `+${(banked - this.lastBanked).toLocaleString('en-GB')}`;
+        el.bankPop.classList.remove('bank-pop--show');
+        void el.bankPop.offsetWidth;
+        el.bankPop.classList.add('bank-pop--show');
+      }
+      this.lastBanked = banked;
     } else {
       const seconds = (state.raceTicks + state.penaltyTicks) / TICK_RATE;
       el.comboLabel.textContent = 'Penalty';

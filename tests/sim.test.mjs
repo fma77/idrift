@@ -755,7 +755,10 @@ test('throttle controls: the flick goes into the coming corner, nose first', () 
 });
 
 test('throttle controls: a steady throttle holds a steady angle below the limit', () => {
+  // One endless left-hander as far as the drift logic can tell, so this tests
+  // the balance and not the corner exit.
   const track = openRoute();
+  track.samples.curvature = track.samples.curvature.map(() => 1 / 50);
   const car = carById('onibi-silhouette');
   const config = configFor('driftRun', 'throttle');
   const d = DRIFT_CONTROL;
@@ -786,4 +789,30 @@ test('throttle controls: a recorded run replays exactly', () => {
   }
   assert.deepEqual(hashes, live.hashes, 'replay diverged from the live run');
   assert.equal(state.drift.banked, live.state.drift.banked);
+});
+
+test('throttle controls: on a straight the drift ends by itself, throttle or not', () => {
+  // The complaint this answers: getting back on the power out of a corner kept
+  // the car sliding down the straight, slowing, while it looked straight.
+  const car = carById('kaido-zen-r');
+  const config = configFor('driftRun', 'throttle');
+  const k = route.samples.curvature;
+  const need = Math.round(80 / route.sampleSpacing);
+  const start = k.findIndex((_, i) => i > 5 && k.slice(i, i + need).every((c) => Math.abs(c) < 1 / 200));
+  assert.ok(start > 0, 'the route should have an 80m straight');
+
+  const state = createSimState(route, car);
+  state.sampleIndex = start;
+  state.x = route.samples.x[start];
+  state.y = route.samples.y[start];
+  state.heading = route.samples.heading[start];
+  state.vx = 18;
+  state.speed = 18;
+  state.driftDir = 1;
+  state.driftAngle = 0.8;
+  state.drift.pending = 1000;
+  for (let t = 0; t < TICK_RATE * 0.8; t++) stepSim(state, { steer: 0, throttle: 1, initiate: false }, car, route, config);
+  assert.equal(state.driftDir, 0, 'still drifting after 0.8s of straight at full throttle');
+  assert.equal(state.drift.pending, 0, 'the drift should have banked when it ended');
+  assert.ok(state.drift.banked >= 1000);
 });

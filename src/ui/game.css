@@ -306,6 +306,44 @@
   display: none;
 }
 
+/* --- Banked points ------------------------------------------------------ */
+
+.bank-pop {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-size: 40px;
+  color: var(--paper);
+  text-shadow: 0 0 0 transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bank-pop--show {
+  animation: bank-pop 1100ms ease-out;
+}
+
+@keyframes bank-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.8);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -60%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -80%) scale(1);
+  }
+}
+
 /* --- Drift gauge --------------------------------------------------------- */
 
 .drift-gauge {
@@ -320,6 +358,12 @@
   padding: var(--s-2) var(--s-2) var(--s-2);
   background: rgba(20, 20, 20, 0.78);
   pointer-events: none;
+  transition: opacity 150ms linear;
+}
+
+/* Not drifting: the gauge steps back, so a lit gauge always means a drift is on. */
+.drift-gauge[data-zone='idle'] {
+  opacity: 0.4;
 }
 
 .drift-gauge svg {

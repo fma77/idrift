@@ -53,6 +53,8 @@ export interface DriftControlParams {
   angleWidening: number;
   /** m/s^2 of speed a slide at 90 degrees costs. */
   angleDrag: number;
+  /** rad/s. How fast the car straightens once the corner is behind it and the road ahead is straight. */
+  exitRate: number;
 }
 
 /** Radians. Width of the scoring sweet spot, just under the limit angle. */

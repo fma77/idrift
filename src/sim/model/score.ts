@@ -74,6 +74,12 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
     breakCombo(d);
   } else if (absSlip > SPIN_ANGLE || state.spinTicks > 0) {
     breakCombo(d);
+  } else if (throttleControls && state.driftDir === 0 && state.spinTicks === 0) {
+    // With throttle controls the sim says exactly when a drift is over, so bank
+    // at that moment rather than after a grace period: the points should land
+    // when the car visibly straightens, not a beat later.
+    d.driftTicks = 0;
+    if (d.pending > 0) bankCombo(d);
   } else if (absSlip < MIN_DRIFT_ANGLE || state.speed < MIN_DRIFT_SPEED) {
     d.driftTicks = 0;
     if (d.pending > 0 && ++d.ticksToInitiation > STRAIGHTEN_GRACE) bankCombo(d);
@@ -95,6 +101,7 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
     absSlip >= MIN_DRIFT_ANGLE &&
     state.speed >= MIN_DRIFT_SPEED &&
     !state.hitThisTick &&
+    state.spinTicks === 0 &&
     (!throttleControls || state.driftDir !== 0);
 
   if (drifting) {
