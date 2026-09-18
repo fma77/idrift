@@ -6,6 +6,8 @@ import { Renderer, type RenderSettings } from './render/renderer.ts';
 import { Hud, formatTime } from './render/hud.ts';
 import { InputController, ACTIONS, DEFAULT_KEYMAP, keyLabel, type Action } from './input/input.ts';
 import { ThumbSteer } from './input/thumbSteer.ts';
+import { PedalTouch } from './input/pedals.ts';
+import { DriftGauge } from './render/driftGauge.ts';
 import { TunePanel } from './ui/tunePanel.ts';
 import { isTuneMode, applyStoredTuning, restoreShippedHandling, isTuned } from './tune/tuning.ts';
 import { EngineAudio } from './audio/engine.ts';
@@ -30,7 +32,7 @@ import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/
 import { checkName } from '../shared/moderation.ts';
 import type { LeaderboardRow } from '../shared/api.ts';
 import { SIM_VERSION, TICK_RATE } from './sim/version.ts';
-import type { RouteData, SimMode } from './sim/types.ts';
+import type { Controls, RouteData, SimMode } from './sim/types.ts';
 
 /**
  * App shell: screen routing, settings, and the bridge between the menus and a
@@ -103,6 +105,7 @@ const hud = new Hud({
   angleValue: $('hud-angle'),
   pace: $('pace'),
   flash: $('hud-flash'),
+  gauge: new DriftGauge($('drift-gauge')),
 });
 
 const input = new InputController();
@@ -111,6 +114,24 @@ input.setKeymap(settings.keymap);
 /** Touch anywhere during a run and slide sideways to steer. */
 const thumb = new ThumbSteer($('steer-surface'), (value) => input.setTouchSteer(value));
 thumb.setSensitivity(settings.steerSensitivity);
+
+/** Drift Run's throttle controls: tap the left half to drift, hold the right. */
+const pedals = new PedalTouch($('pedal-surface'), {
+  onThrottle: (held) => input.setTouchThrottle(held),
+  onDrift: () => input.pressDrift(),
+});
+
+/** Which controls the current run uses. */
+let currentControls: Controls = 'steer';
+
+/** Runs that are not saved or posted, and why; null when the run counts. */
+function unrankedReason(): string | null {
+  if (tuneMode) return 'Tuning mode. This run is not saved as a best or posted to the leaderboard.';
+  if (currentMode === 'driftRun' && currentControls === 'steer') {
+    return 'Steered Drift Run. This run is not saved or posted: the leaderboard is for the throttle controls.';
+  }
+  return null;
+}
 
 // --- Input mode -------------------------------------------------------------
 
@@ -496,6 +517,11 @@ function buildSettings(): void {
   bindToggle('set-north', () => settings.fixedNorth, (v) => (settings.fixedNorth = v));
   bindToggle('set-skids', () => settings.showSkidMarks, (v) => (settings.showSkidMarks = v));
   bindToggle('set-sound', () => settings.soundOn, (v) => (settings.soundOn = v));
+  bindToggle(
+    'set-drift-steer',
+    () => settings.driftControls === 'steer',
+    (v) => (settings.driftControls = v ? 'steer' : 'throttle'),
+  );
   bindToggle('set-tune', () => tuneMode, (v) => {
     // Only reachable from Settings, never mid-run, so a run is driven entirely
     // on shipped or entirely on tuned handling.
@@ -570,6 +596,8 @@ function syncKeyHints(): void {
   const map: [string, Action][] = [
     ['hint-left', 'left'],
     ['hint-right', 'right'],
+    ['hint-throttle', 'throttle'],
+    ['hint-drift', 'drift'],
   ];
   for (const [id, action] of map) {
     $(id).textContent = keyLabel(settings.keymap[action][0]);
@@ -585,6 +613,8 @@ async function startRun(mode: SimMode): Promise<void> {
   currentMode = mode;
 
   const car = carById(settings.carId);
+  currentControls = mode === 'driftRun' ? settings.driftControls : 'steer';
+  gameEl.dataset.controls = currentControls;
   const renderSettings: RenderSettings = {
     fixedNorth: settings.fixedNorth,
     showSkidMarks: settings.showSkidMarks,
@@ -600,7 +630,7 @@ async function startRun(mode: SimMode): Promise<void> {
   session = new GameSession(
     currentRoute,
     car,
-    configFor(mode),
+    configFor(mode, currentControls),
     input,
     renderer,
     hud,
@@ -611,10 +641,16 @@ async function startRun(mode: SimMode): Promise<void> {
   const countdownOverlay = $('overlay-countdown');
   const countdownEl = $('countdown');
   $('countdown-mode').textContent = mode === 'timeAttack' ? 'TIME ATTACK' : 'DRIFT RUN';
+  const keys = gameEl.dataset.input === 'keyboard';
+  const key = (a: Action) => keyLabel(settings.keymap[a][0]);
   $('countdown-hint').textContent =
-    gameEl.dataset.input === 'keyboard'
-      ? `${keyLabel(settings.keymap.left[0])} ${keyLabel(settings.keymap.right[0])} to steer. The car drives itself.`
-      : 'Touch anywhere and slide to steer. The car drives itself.';
+    currentControls === 'throttle'
+      ? keys
+        ? `Hold ${key('throttle')} for throttle. Tap ${key('drift')} before a corner to drift, then balance the angle with the throttle. Too much and you spin.`
+        : 'Hold the right side for throttle. Tap the left side before a corner to drift, then balance the angle with the throttle. Too much and you spin.'
+      : keys
+        ? `${key('left')} ${key('right')} to steer. The car drives itself.`
+        : 'Touch anywhere and slide to steer. The car drives itself.';
   countdownOverlay.hidden = false;
 
   session.onCountdown = (value) => {
@@ -635,6 +671,7 @@ async function startRun(mode: SimMode): Promise<void> {
 
 async function finishRun(outcome: RunOutcome): Promise<void> {
   thumb.releaseAll();
+  pedals.releaseAll();
   tunePanel.close();
   lastOutcome = outcome;
   const route = currentRoute;
@@ -644,8 +681,9 @@ async function finishRun(outcome: RunOutcome): Promise<void> {
   const { result } = outcome;
 
   // Tuned handling is not the game everyone else is playing, so nothing driven
-  // with it counts: no best, no replay, no unlock, no leaderboard.
-  if (tuneMode) {
+  // with it counts: no best, no replay, no unlock, no leaderboard. Nor does a
+  // Drift Run steered the old way, which is kept for comparison only.
+  if (unrankedReason()) {
     showResults(result, false);
     return;
   }
@@ -717,12 +755,14 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
 
   $('result-stats').replaceChildren(...rows);
   resetSubmitPanel();
-  $('result-tune-note').hidden = !tuneMode;
-  $('result-submit').hidden = tuneMode;
+  const unranked = unrankedReason();
+  $('result-tune-note').textContent = unranked ?? '';
+  $('result-tune-note').hidden = !unranked;
+  $('result-submit').hidden = !!unranked;
   showScreen('results');
 
   // Meme triggers fire here -- on a results screen, never mid-drive.
-  if (tuneMode) return;
+  if (unranked) return;
   if (isBest) fireMeme('personalBest');
   else fireMeme('routeComplete');
   if (result.grade === 'S') fireMeme('sRank');
@@ -730,6 +770,7 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
 
 function quitRun(): void {
   thumb.releaseAll();
+  pedals.releaseAll();
   tunePanel.close();
   session?.abort();
   session = null;
@@ -890,6 +931,7 @@ function pauseRun(): void {
   session?.stop();
   // A thumb resting on the screen must not come back steering on resume.
   thumb.releaseAll();
+  pedals.releaseAll();
   $('overlay-paused').hidden = false;
 }
 
@@ -912,7 +954,8 @@ function openTuning(): void {
   session?.stop();
   thumb.releaseAll();
   $('overlay-paused').hidden = true;
-  tunePanel.open(carById(settings.carId), currentMode);
+  pedals.releaseAll();
+  tunePanel.open(carById(settings.carId), currentMode, currentControls);
 }
 
 function closeTuning(): void {

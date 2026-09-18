@@ -89,6 +89,50 @@ boards and bests are separate; the throttle assist setting, the button layout ed
 and left-handed mode are gone. The API's `assist` field is kept (always 1) so the
 Worker and database need no migration.
 
+### Drift Run: the game steers, the player works the throttle
+
+Steering-only drifting played better with the assists, but had a low ceiling on how
+much fun there was in it. Drift Run now has a second control scheme, and it is the
+default there: the game steers, and the player holds a throttle and taps a drift button
+(`src/sim/model/throttleDrift.ts`).
+
+- **Touch:** hold the right half of the screen for throttle, tap the left half to drift.
+  Halves rather than buttons so no thumb has to find a target. Phones cannot sense
+  pressure, so partial throttle comes from holding and letting go: the throttle builds
+  over ~0.45s and falls over ~0.3s, and feathering it is the skill. Keyboard: up arrow
+  and space.
+- **Until the tap,** the car corners on grip, steered along the road with Time Attack's
+  grip and corner braking. The game never starts a drift by itself, and cornering on
+  grip never scores.
+- **The tap** flicks the car into the next corner -- a short swing the other way, then
+  in, with a little handbrake scrub. Tapping again when the road turns the other way
+  switches sides. Not tapping in an S-bend unwinds the drift rather than carrying the
+  tail into the wall.
+- **Throttle sets the angle.** A steady throttle holds a steady angle, in proportion to
+  itself -- until the limit angle, past which the slide feeds itself and runs away to a
+  spin. A spin costs the combo and most of the speed.
+- **The path** is steered by the game within a sideways-grip budget, and a bigger angle
+  takes the line wider. The tail counts for wall contact in this scheme, so a big angle
+  on a narrow road is a real risk.
+- **Scoring** pays for angle up to the limit, and a quarter more inside the sweet spot
+  just under it. The line factor becomes entry timing: a flick up to 30m before the
+  corner is best. An angle gauge (sweet spot, spin zone, needle, throttle bar) replaces
+  judging the angle by eye.
+
+The drift phase is kinematic rather than force-based -- direction of travel follows the
+road, the body is placed at the drift angle to it -- because the angle has to respond to
+the throttle directly and legibly; that response is the whole game.
+
+The steering scheme is still available in Drift Run from Settings, for comparison. Runs
+driven that way are not saved or posted, so one board never mixes two games. Replays
+grew to 4 bytes a sample (steer, throttle, drift flag), laid out in planes so a steering
+run's constant throttle bytes compress away; `SIM_VERSION` is 5.
+
+Tests drive the scheme with stand-in players: one who never taps finishes every route
+clean with no drift points; one who balances just under the limit and switches sides in
+S-bends finishes every route on every car with no walls and no spins; one who holds the
+throttle flat spins repeatedly and scores next to nothing.
+
 ### Gameplay is responsive rather than portrait-only or landscape-only
 
 The brief (§2) specifies portrait gameplay. The design system (§5 of

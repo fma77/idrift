@@ -56,8 +56,8 @@ export class GameSession {
   private rafId = 0;
 
   /** The mutable "current input" the sim samples. Never an event queue. */
-  private simInput: SimInput = { steer: 0 };
-  private heldSample: QuantisedInput = { steer: 0 };
+  private simInput: SimInput = { steer: 0, throttle: 1, initiate: false };
+  private heldSample: QuantisedInput = { steer: 0, throttle: 0, flags: 0 };
 
   onCountdown: ((value: number) => void) | null = null;
   onFinish: ((outcome: RunOutcome) => void) | null = null;
@@ -155,7 +155,11 @@ export class GameSession {
     // the live run consumes exactly the bytes a replay will.
     if (this.state.tick % TICKS_PER_INPUT === 0) {
       const raw = this.input.raw;
-      this.heldSample = quantiseInput(raw.steer);
+      // Steering runs record a pinned throttle; the sim ignores it there anyway.
+      const throttle = this.config.controls === 'throttle' ? raw.throttle : 1;
+      this.heldSample = quantiseInput(raw.steer, throttle, raw.initiate);
+      // A tap is an event, not a held key: it goes into exactly one sample.
+      this.input.consumeInitiate();
       this.recorder.push(this.heldSample);
     }
     dequantiseInput(this.heldSample, this.simInput);
@@ -189,7 +193,7 @@ export class GameSession {
       this.renderSettings,
       deltaSeconds,
     );
-    this.hud.update(this.state, this.route, this.config.mode);
+    this.hud.update(this.state, this.route, this.config);
     this.audio?.update(this.state, this.car);
   }
 

@@ -7,19 +7,27 @@
  * replay of everything that happened since the last one, or the sim's output
  * would depend on browser event timing and stop being reproducible.
  *
- * Steering is the only control. The car drives itself.
+ * Two control schemes feed it. Steering: the car drives itself and the player
+ * steers. Throttle (Drift Run only): the game steers, the player holds a
+ * throttle and taps to drift.
  */
 
 export interface RawInput {
   /** -1 (full left) .. +1 (full right). */
   steer: number;
+  /** 0..1. Builds while the throttle is held and falls away when it is not. */
+  throttle: number;
+  /** A drift tap waiting to be recorded. Latched until the game consumes it. */
+  initiate: boolean;
 }
 
-export type Action = 'left' | 'right';
+export type Action = 'left' | 'right' | 'throttle' | 'drift';
 
 export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'left', label: 'Steer left' },
   { id: 'right', label: 'Steer right' },
+  { id: 'throttle', label: 'Throttle (Drift Run)' },
+  { id: 'drift', label: 'Drift (Drift Run)' },
 ];
 
 export type Keymap = Record<Action, string[]>;
@@ -27,14 +35,24 @@ export type Keymap = Record<Action, string[]>;
 export const DEFAULT_KEYMAP: Keymap = {
   left: ['ArrowLeft', 'KeyA'],
   right: ['ArrowRight', 'KeyD'],
+  throttle: ['ArrowUp', 'KeyW'],
+  drift: ['Space'],
 };
+
+/**
+ * Seconds for the throttle to go from closed to flat out while held, and back
+ * while released. Phones cannot tell how hard a thumb presses, so partial
+ * throttle comes from holding and letting go -- these set how finely that can
+ * be done. Mutable: tuning mode edits it live.
+ */
+export const THROTTLE_FEEL = { rise: 0.45, fall: 0.3 };
 
 /** Seconds from neutral to full steering on a key, and back to neutral. */
 const STEER_ATTACK = 0.18;
 const STEER_RELEASE = 0.1;
 
 export class InputController {
-  readonly raw: RawInput = { steer: 0 };
+  readonly raw: RawInput = { steer: 0, throttle: 0, initiate: false };
 
   private keymap: Keymap = DEFAULT_KEYMAP;
   /** Physical keys currently held, by KeyboardEvent.code. */
@@ -46,6 +64,8 @@ export class InputController {
    * smoothing. Keys are binary and still ramp, or every tap would be a flick.
    */
   private touchSteer: number | null = null;
+  /** The throttle zone is being held. */
+  private touchThrottle = false;
 
   private enabled = false;
   private boundKeyDown = (e: KeyboardEvent) => this.onKeyDown(e);
@@ -62,6 +82,20 @@ export class InputController {
     // the car's own turn response already smooths the straightening.
     if (value === null && this.touchSteer !== null) this.raw.steer = 0;
     this.touchSteer = value;
+  }
+
+  setTouchThrottle(held: boolean): void {
+    this.touchThrottle = held;
+  }
+
+  /** The drift button was tapped. Stays set until the game records it. */
+  pressDrift(): void {
+    this.raw.initiate = true;
+  }
+
+  /** Called by the game once the tap has gone into a recorded input sample. */
+  consumeInitiate(): void {
+    this.raw.initiate = false;
   }
 
   enable(): void {
@@ -84,7 +118,10 @@ export class InputController {
   releaseAll(): void {
     this.held.length = 0;
     this.touchSteer = null;
+    this.touchThrottle = false;
     this.raw.steer = 0;
+    this.raw.throttle = 0;
+    this.raw.initiate = false;
   }
 
   /**
@@ -95,14 +132,18 @@ export class InputController {
    * outside the sim.
    */
   update(dtSeconds: number): void {
+    const held = this.touchThrottle || this.isDown('throttle');
+    const rate = held ? 1 / Math.max(THROTTLE_FEEL.rise, 0.01) : -1 / Math.max(THROTTLE_FEEL.fall, 0.01);
+    this.raw.throttle = Math.min(1, Math.max(0, this.raw.throttle + rate * dtSeconds));
+
     if (this.touchSteer !== null) {
       this.raw.steer = this.touchSteer;
       return;
     }
 
     const target = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
-    const rate = target === 0 ? 1 / STEER_RELEASE : 1 / STEER_ATTACK;
-    const step = rate * dtSeconds;
+    const steerRate = target === 0 ? 1 / STEER_RELEASE : 1 / STEER_ATTACK;
+    const step = steerRate * dtSeconds;
     const d = target - this.raw.steer;
     this.raw.steer = Math.abs(d) <= step ? target : this.raw.steer + Math.sign(d) * step;
   }
@@ -135,6 +176,7 @@ export class InputController {
     if (e.repeat || !this.isBound(e.code)) return;
     e.preventDefault();
     this.press(e.code, true);
+    if (this.keymap.drift.includes(e.code)) this.pressDrift();
   }
 
   private onKeyUp(e: KeyboardEvent): void {

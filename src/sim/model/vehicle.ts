@@ -17,6 +17,8 @@ const SLIDE_LIMIT_GAIN = 6;
 const PULSE_HZ = 2.5;
 /** m/s^2 of corner braking per m/s over the limit, up to the mode's maximum. */
 const CORNER_BRAKE_GAIN = 6;
+/** m/s^2 of engine braking with the throttle fully closed. */
+const ENGINE_BRAKE = 2.5;
 
 /**
  * One step of the arcade drift model.
@@ -43,6 +45,9 @@ const CORNER_BRAKE_GAIN = 6;
  * steering and sliding, pulses the throttle in a slide, and bends its path back
  * onto the road while the player steers the right way.
  *
+ * `playerThrottle` is given when the player works the throttle (Drift Run's
+ * throttle controls, while gripping). Otherwise the car drives itself.
+ *
  * Mutates `state` in place and is pure with respect to everything else.
  */
 export function stepVehicle(
@@ -53,6 +58,7 @@ export function stepVehicle(
   route: RouteData,
   surfaceGrip: number,
   dt: number,
+  playerThrottle?: number,
 ): void {
   const h = car.handling;
   const steer = clamp(input.steer, -1, 1);
@@ -95,15 +101,17 @@ export function stepVehicle(
   // --- Speed ---
   const grip = h.grip * assist.gripScale * surfaceGrip;
   const limit = cornerSpeedLimit(state, route, assist, grip);
-  let throttle = 1;
-  if (state.sliding && assist.throttlePulse > 0) {
+  let throttle = playerThrottle ?? 1;
+  if (playerThrottle === undefined && state.sliding && assist.throttlePulse > 0) {
     // A driver holding a drift works the throttle rather than flooring it. The
     // pulse is on the tick count, so it replays exactly.
     const phase = state.tick * dt * PULSE_HZ * TWO_PI;
     throttle = 1 - assist.throttlePulse * (0.5 + 0.5 * sin(phase));
   }
 
-  let decel = 0;
+  // A closed throttle engine-brakes -- the player's throttle, that is; the
+  // Drift Run pulse is a driver working the pedal, not lifting off.
+  let decel = playerThrottle === undefined ? 0 : (1 - throttle) * ENGINE_BRAKE;
   if (speed > limit) {
     // Too fast for what is coming: off the throttle and on the brakes, firmly
     // enough to close the gap within a few tenths but never past the limit.

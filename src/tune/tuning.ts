@@ -1,6 +1,7 @@
 import { CARS } from '../data/cars.ts';
-import { MODE_ASSIST } from '../data/assist.ts';
-import type { AssistParams, CarParams, HandlingParams, SimMode } from '../sim/types.ts';
+import { MODE_ASSIST, DRIFT_CONTROL } from '../data/assist.ts';
+import { THROTTLE_FEEL } from '../input/input.ts';
+import type { AssistParams, CarParams, DriftControlParams, HandlingParams, SimMode } from '../sim/types.ts';
 
 /**
  * Hand-tuning the handling on a phone.
@@ -189,7 +190,99 @@ export const ASSIST_SPECS: TuneSpec<keyof AssistParams>[] = [
   },
 ];
 
-type Overrides = Record<string, Partial<HandlingParams> | Partial<AssistParams>>;
+/** Drift Run with throttle controls. Shared by every car. */
+export const DRIFT_SPECS: TuneSpec<keyof DriftControlParams>[] = [
+  {
+    key: 'limitAngle',
+    label: 'Limit angle',
+    help: 'Past this the slide runs away towards a spin. The sweet spot sits just under it.',
+    min: 20, max: 80, step: 1, unit: '°',
+    toDisplay: (v) => v * DEG, fromDisplay: (v) => v / DEG,
+  },
+  {
+    key: 'holdAngle',
+    label: 'Angle at full throttle',
+    help: 'The angle flat-out throttle would hold. Higher means less throttle is needed for the same angle.',
+    min: 20, max: 120, step: 1, unit: '°',
+    toDisplay: (v) => v * DEG, fromDisplay: (v) => v / DEG,
+  },
+  {
+    key: 'angleRate',
+    label: 'Angle response',
+    help: 'How quickly the angle follows the throttle. Higher is livelier and harder to balance.',
+    min: 0.5, max: 6, step: 0.1, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'runaway',
+    label: 'Runaway past the limit',
+    help: 'How fast the slide feeds itself once past the limit. Higher punishes going over sooner.',
+    min: 0, max: 10, step: 0.25, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'spinAngle',
+    label: 'Spins at',
+    help: 'The angle at which the car has spun.',
+    min: 40, max: 110, step: 1, unit: '°',
+    toDisplay: (v) => v * DEG, fromDisplay: (v) => v / DEG,
+  },
+  {
+    key: 'flickAngle',
+    label: 'Flick angle',
+    help: 'How far the drift button throws the car sideways.',
+    min: 5, max: 60, step: 1, unit: '°',
+    toDisplay: (v) => v * DEG, fromDisplay: (v) => v / DEG,
+  },
+  {
+    key: 'flickTime',
+    label: 'Flick time',
+    help: 'How long the flick takes, swing the other way included.',
+    min: 0.1, max: 1, step: 0.05, unit: 's',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'driftGrip',
+    label: 'Grip while sideways',
+    help: 'How tightly the car can follow the road in a drift. Lower runs wider and slower.',
+    min: 0.5, max: 3, step: 0.05, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'angleWidening',
+    label: 'Big angle runs wide',
+    help: 'How far a big angle pushes the line to the outside, towards the wall.',
+    min: 0, max: 1.2, step: 0.05, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'angleDrag',
+    label: 'Speed lost to angle',
+    help: 'How much speed a big angle costs.',
+    min: 0, max: 15, step: 0.5, unit: '',
+    toDisplay: same, fromDisplay: same,
+  },
+];
+
+/** How the throttle builds and falls on a phone. */
+export const THROTTLE_SPECS: TuneSpec<keyof typeof THROTTLE_FEEL>[] = [
+  {
+    key: 'rise',
+    label: 'Throttle build-up',
+    help: 'Seconds from closed to flat out while you hold. Longer makes fine control easier.',
+    min: 0.05, max: 1.5, step: 0.05, unit: 's',
+    toDisplay: same, fromDisplay: same,
+  },
+  {
+    key: 'fall',
+    label: 'Throttle fall-off',
+    help: 'Seconds from flat out to closed when you let go.',
+    min: 0.05, max: 1.5, step: 0.05, unit: 's',
+    toDisplay: same, fromDisplay: same,
+  },
+];
+
+type Overrides = Record<string, Record<string, number>>;
 
 /** The shipped handling for every car, captured before any overrides are applied. */
 const DEFAULTS: Record<string, HandlingParams> = {};
@@ -200,6 +293,36 @@ const ASSIST_DEFAULTS = {
   timeAttack: { ...MODE_ASSIST.timeAttack },
   driftRun: { ...MODE_ASSIST.driftRun },
 } satisfies Record<SimMode, AssistParams>;
+
+const DRIFT_DEFAULTS = { ...DRIFT_CONTROL };
+const THROTTLE_DEFAULTS = { ...THROTTLE_FEEL };
+const DRIFT_KEY = 'driftControls';
+const THROTTLE_KEY = 'throttleFeel';
+
+/** Copy numeric overrides for the listed keys onto a target object. */
+function applyTo<K extends string>(target: Record<K, number>, stored: Record<string, number> | undefined, keys: K[]): void {
+  if (!stored) return;
+  for (const key of keys) {
+    const v = stored[key];
+    if (typeof v === 'number' && Number.isFinite(v)) target[key] = v;
+  }
+}
+
+function store(key: string, field: string, value: number): void {
+  const overrides = readOverrides();
+  overrides[key] = { ...(overrides[key] ?? {}), [field]: value };
+  writeOverrides(overrides);
+}
+
+export function setDriftControl(key: keyof DriftControlParams, value: number): void {
+  DRIFT_CONTROL[key] = value;
+  store(DRIFT_KEY, key, value);
+}
+
+export function setThrottleFeel(key: keyof typeof THROTTLE_FEEL, value: number): void {
+  THROTTLE_FEEL[key] = value;
+  store(THROTTLE_KEY, key, value);
+}
 
 const MODES: SimMode[] = ['timeAttack', 'driftRun'];
 const assistKey = (mode: SimMode) => `mode:${mode}`;
@@ -240,6 +363,8 @@ export function applyStoredTuning(): void {
       if (typeof v === 'number' && Number.isFinite(v)) MODE_ASSIST[mode][spec.key] = v;
     }
   }
+  applyTo(DRIFT_CONTROL, overrides[DRIFT_KEY], DRIFT_SPECS.map((s) => s.key));
+  applyTo(THROTTLE_FEEL, overrides[THROTTLE_KEY], THROTTLE_SPECS.map((s) => s.key));
 }
 
 /** Change one help value for a mode, live, for every car. */
@@ -270,6 +395,8 @@ export function restoreShippedHandling(): void {
     if (shipped) Object.assign(car.handling, shipped);
   }
   for (const mode of MODES) Object.assign(MODE_ASSIST[mode], ASSIST_DEFAULTS[mode]);
+  Object.assign(DRIFT_CONTROL, DRIFT_DEFAULTS);
+  Object.assign(THROTTLE_FEEL, THROTTLE_DEFAULTS);
 }
 
 /** Forget the tuning for this car and this mode's help. */
@@ -280,6 +407,12 @@ export function resetTuning(car: CarParams, mode: SimMode): void {
   const overrides = readOverrides();
   delete overrides[car.id];
   delete overrides[assistKey(mode)];
+  if (mode === 'driftRun') {
+    Object.assign(DRIFT_CONTROL, DRIFT_DEFAULTS);
+    Object.assign(THROTTLE_FEEL, THROTTLE_DEFAULTS);
+    delete overrides[DRIFT_KEY];
+    delete overrides[THROTTLE_KEY];
+  }
   writeOverrides(overrides);
 }
 
@@ -290,15 +423,23 @@ export function isTuned(car: CarParams): boolean {
 }
 
 /** A block of text a player can paste back into a chat to make these the defaults. */
-export function describeTuning(car: CarParams, mode: SimMode, steerSensitivity: number): string {
+export function describeTuning(
+  car: CarParams,
+  mode: SimMode,
+  controls: string,
+  steerSensitivity: number,
+): string {
   const round = (v: number) => Number(v.toFixed(3));
   const handling: Record<string, number> = {};
   for (const spec of TUNE_SPECS) handling[spec.key] = round(car.handling[spec.key]);
   const assist: Record<string, number> = {};
   for (const spec of ASSIST_SPECS) assist[spec.key] = round(MODE_ASSIST[mode][spec.key]);
-  return JSON.stringify(
-    { car: car.id, mode, steerSensitivity: round(steerSensitivity), handling, assist },
-    null,
-    2,
-  );
+  const out: Record<string, unknown> = { car: car.id, mode, controls, steerSensitivity: round(steerSensitivity), handling, assist };
+  if (controls === 'throttle') {
+    const drift: Record<string, number> = {};
+    for (const spec of DRIFT_SPECS) drift[spec.key] = round(DRIFT_CONTROL[spec.key]);
+    out.driftControls = drift;
+    out.throttleFeel = { rise: round(THROTTLE_FEEL.rise), fall: round(THROTTLE_FEEL.fall) };
+  }
+  return JSON.stringify(out, null, 2);
 }

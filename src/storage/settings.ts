@@ -1,5 +1,6 @@
 import { DEFAULT_KEYMAP, type Keymap } from '../input/input.ts';
 import { MAX_SENSITIVITY, MIN_SENSITIVITY } from '../input/thumbSteer.ts';
+import type { Controls } from '../sim/types.ts';
 
 /**
  * Local persistence.
@@ -32,6 +33,11 @@ export interface Settings {
   soundOn: boolean;
   /** Shows the TUNE button in runs. Runs driven with it on are not saved or posted. */
   tuneMode: boolean;
+  /**
+   * Drift Run controls: 'throttle' (the game steers; hold to drive, tap to
+   * drift) or 'steer' (the one-thumb steering of Time Attack).
+   */
+  driftControls: Controls;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -43,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   carId: 'kaido-zen-r',
   soundOn: true,
   tuneMode: false,
+  driftControls: 'throttle',
 };
 
 export function loadSettings(): Settings {
@@ -73,7 +80,10 @@ export function loadSettings(): Settings {
       keymap: {
         left: Array.isArray(keymap.left) ? keymap.left : base.keymap.left,
         right: Array.isArray(keymap.right) ? keymap.right : base.keymap.right,
+        throttle: Array.isArray(keymap.throttle) ? keymap.throttle : base.keymap.throttle,
+        drift: Array.isArray(keymap.drift) ? keymap.drift : base.keymap.drift,
       },
+      driftControls: pick('driftControls', (v) => v === 'throttle' || v === 'steer'),
     };
   } catch {
     return defaults();

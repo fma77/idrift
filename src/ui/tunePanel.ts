@@ -5,10 +5,15 @@ import {
   setAssist,
   resetTuning,
   describeTuning,
+  DRIFT_SPECS,
+  THROTTLE_SPECS,
+  setDriftControl,
+  setThrottleFeel,
 } from '../tune/tuning.ts';
-import { MODE_ASSIST } from '../data/assist.ts';
+import { MODE_ASSIST, DRIFT_CONTROL } from '../data/assist.ts';
+import { THROTTLE_FEEL } from '../input/input.ts';
 import { MIN_SENSITIVITY, MAX_SENSITIVITY } from '../input/thumbSteer.ts';
-import type { CarParams, SimMode } from '../sim/types.ts';
+import type { CarParams, Controls, SimMode } from '../sim/types.ts';
 
 /**
  * The tuning sheet shown over a paused run.
@@ -31,6 +36,7 @@ export class TunePanel {
   private readonly options: TunePanelOptions;
   private car: CarParams | null = null;
   private mode: SimMode = 'timeAttack';
+  private controls: Controls = 'steer';
 
   constructor(root: HTMLElement, options: TunePanelOptions) {
     this.root = root;
@@ -74,9 +80,10 @@ export class TunePanel {
     root.append(head, this.body, foot);
   }
 
-  open(car: CarParams, mode: SimMode): void {
+  open(car: CarParams, mode: SimMode, controls: Controls): void {
     this.car = car;
     this.mode = mode;
+    this.controls = controls;
     this.status.textContent = '';
     this.render();
     this.root.hidden = false;
@@ -96,7 +103,31 @@ export class TunePanel {
     if (!car) return;
     this.title.textContent = car.name;
 
-    const rows: HTMLElement[] = [
+    const rows: HTMLElement[] = [];
+
+    if (this.controls === 'throttle') {
+      rows.push(heading('Drift controls', 'Throttle and drift button. Applies to every car.'));
+      for (const spec of THROTTLE_SPECS) {
+        rows.push(
+          row({
+            ...spec,
+            value: spec.toDisplay(THROTTLE_FEEL[spec.key]),
+            onInput: (v) => setThrottleFeel(spec.key, spec.fromDisplay(v)),
+          }),
+        );
+      }
+      for (const spec of DRIFT_SPECS) {
+        rows.push(
+          row({
+            ...spec,
+            value: spec.toDisplay(DRIFT_CONTROL[spec.key]),
+            onInput: (v) => setDriftControl(spec.key, spec.fromDisplay(v)),
+          }),
+        );
+      }
+    }
+
+    rows.push(
       row({
         label: 'Steering sensitivity',
         help: 'How far your thumb slides for full steering. Higher means a shorter slide.',
@@ -107,7 +138,7 @@ export class TunePanel {
         value: this.options.getSensitivity() * 100,
         onInput: (v) => this.options.setSensitivity(v / 100),
       }),
-    ];
+    );
 
     const modeName = this.mode === 'timeAttack' ? 'Time Attack' : 'Drift Run';
     rows.push(heading(`${modeName} help`, 'Applies to every car in this mode.'));
@@ -147,7 +178,7 @@ export class TunePanel {
 
   private async copy(): Promise<void> {
     if (!this.car) return;
-    const text = describeTuning(this.car, this.mode, this.options.getSensitivity());
+    const text = describeTuning(this.car, this.mode, this.controls, this.options.getSensitivity());
     try {
       await navigator.clipboard.writeText(text);
       this.status.textContent = 'Copied. Paste it into the chat to make these the defaults.';

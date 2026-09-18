@@ -222,6 +222,181 @@
   color: var(--ink-faint);
 }
 
+/* --- Which controls a run uses ------------------------------------------ */
+
+/* Steering runs show the steer surface; Drift Run's throttle controls show the pedals and the gauge. */
+.pedal-surface,
+.drift-gauge,
+.keyhint--throttle {
+  display: none;
+}
+
+#game[data-controls='throttle'] .steer-surface,
+#game[data-controls='throttle'] .keyhint--steer {
+  display: none;
+}
+
+#game[data-controls='throttle'] .pedal-surface {
+  display: grid;
+}
+
+#game[data-controls='throttle'] .drift-gauge {
+  display: flex;
+}
+
+#game[data-controls='throttle'] .keyhint--throttle {
+  display: flex;
+}
+
+/* --- Pedals: tap left to drift, hold right for throttle ------------------ */
+
+.pedal-surface {
+  position: absolute;
+  inset: 0;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Each half is the control; the label only says which is which. Quiet, and
+ * down where the thumbs are, so it never competes with the road.
+ */
+.pedal-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0 var(--s-3) max(var(--s-4), env(safe-area-inset-bottom));
+  padding: var(--s-2) 0;
+  border-top: 2px solid rgba(244, 241, 234, 0.25);
+  color: rgba(244, 241, 234, 0.55);
+  pointer-events: none;
+  transition: color 60ms linear, border-color 60ms linear;
+}
+
+.pedal-zone__label {
+  font-family: var(--display);
+  font-size: 18px;
+}
+
+.pedal-zone__hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pedal-zone[data-active='true'] {
+  color: var(--paper);
+  border-color: var(--paper);
+}
+
+.pedal-zone--drift[data-active='true'] {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+/* On a keyboard the halves are not controls, so their labels go. */
+#game[data-input='keyboard'] .pedal-zone {
+  display: none;
+}
+
+/* --- Drift gauge --------------------------------------------------------- */
+
+.drift-gauge {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(var(--s-4), env(safe-area-inset-bottom)) + 64px);
+  transform: translateX(-50%);
+  width: 172px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--s-2) var(--s-2) var(--s-2);
+  background: rgba(20, 20, 20, 0.78);
+  pointer-events: none;
+}
+
+.drift-gauge svg {
+  width: 160px;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.gauge__track,
+.gauge__sweet,
+.gauge__spin {
+  fill: none;
+  stroke-width: 10;
+}
+
+.gauge__track {
+  stroke: var(--ink-2);
+}
+
+.gauge__sweet {
+  stroke: var(--paper);
+}
+
+.gauge__spin {
+  stroke: var(--red);
+}
+
+.gauge__needle {
+  stroke: var(--paper);
+  stroke-width: 3;
+}
+
+.gauge__hub {
+  fill: var(--paper);
+}
+
+.gauge__readout {
+  margin-top: -18px;
+  font-family: var(--display);
+  font-size: 22px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.drift-gauge[data-zone='building'] .gauge__readout {
+  color: var(--paper);
+}
+
+/* In the sweet spot the number goes red: the design system's one accent, for the one thing that pays. */
+.drift-gauge[data-zone='sweet'] .gauge__readout {
+  color: var(--red);
+}
+
+.drift-gauge[data-zone='danger'] .gauge__readout {
+  color: var(--red);
+  animation: gauge-blink 160ms steps(2, end) infinite;
+}
+
+@keyframes gauge-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.gauge__throttle {
+  width: 100%;
+  height: 4px;
+  background: var(--ink-2);
+}
+
+.gauge__throttle-fill {
+  height: 100%;
+  width: 0;
+  background: var(--paper);
+}
+
 /* --- Thumb steering ----------------------------------------------------- */
 
 /*

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readSlider, sliderRange, MIN_SENSITIVITY, MAX_SENSITIVITY } from '../src/input/thumbSteer.ts';
-import { InputController } from '../src/input/input.ts';
+import { InputController, THROTTLE_FEEL } from '../src/input/input.ts';
 
 // --- The thumb slider -------------------------------------------------------
 
@@ -86,12 +86,43 @@ test('the thumb takes priority over a held key', () => {
   assert.equal(input.raw.steer, 0.5);
 });
 
-test('only steering keys are bound; the old pedals are gone', () => {
+test('steering, throttle and drift keys are bound; the old brake is gone', () => {
   const input = new InputController();
-  assert.ok(input.isBound('ArrowLeft') && input.isBound('KeyD'));
-  for (const code of ['ArrowUp', 'ArrowDown', 'Space', 'KeyW', 'KeyS']) {
+  for (const code of ['ArrowLeft', 'KeyD', 'ArrowUp', 'KeyW', 'Space']) {
+    assert.ok(input.isBound(code), `${code} should be bound`);
+  }
+  for (const code of ['ArrowDown', 'KeyS']) {
     assert.ok(!input.isBound(code), `${code} should no longer do anything`);
   }
+});
+
+// --- Drift Run throttle controls --------------------------------------------
+
+test('the throttle builds while held and falls away when let go', () => {
+  const input = new InputController();
+  input.setTouchThrottle(true);
+  input.update(THROTTLE_FEEL.rise / 2);
+  assert.ok(Math.abs(input.raw.throttle - 0.5) < 1e-9, 'half the build-up time is half throttle');
+  input.update(THROTTLE_FEEL.rise);
+  assert.equal(input.raw.throttle, 1, 'and it stops at flat out');
+
+  input.setTouchThrottle(false);
+  input.update(THROTTLE_FEEL.fall / 2);
+  assert.ok(Math.abs(input.raw.throttle - 0.5) < 1e-9);
+  input.update(THROTTLE_FEEL.fall);
+  assert.equal(input.raw.throttle, 0, 'and closed');
+});
+
+test('a drift tap is held until the game records it, then cleared', () => {
+  // Taps are events, not held keys. If one landed between two input samples
+  // and was cleared by the next frame, the sim would never see it.
+  const input = new InputController();
+  input.pressDrift();
+  input.update(1 / 60);
+  input.update(1 / 60);
+  assert.equal(input.raw.initiate, true, 'a tap survives frames until it is recorded');
+  input.consumeInitiate();
+  assert.equal(input.raw.initiate, false);
 });
 
 test('releasing everything straightens the steering', () => {

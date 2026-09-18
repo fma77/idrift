@@ -20,7 +20,7 @@ import { sin, cos, atan2, atan, PI } from '../src/sim/math/trig.ts';
 import { createRng, nextUint32 } from '../src/sim/math/prng.ts';
 import { CARS, carById } from '../src/data/cars.ts';
 import { driveBot, DEFAULT_BOT } from '../src/bot/autopilot.ts';
-import { configFor } from '../src/data/assist.ts';
+import { configFor, DRIFT_CONTROL } from '../src/data/assist.ts';
 import { cornerSpeedLimit, roadKeepingTurn } from '../src/sim/model/assist.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -628,4 +628,162 @@ test('the throttle pulses in a Drift Run slide and stays pinned otherwise', () =
   }
   assert.ok(seen.length > 0, 'expected a slide');
   assert.ok(Math.max(...seen) - Math.min(...seen) > 0.2, 'the throttle should visibly pulse while sliding');
+});
+
+// ---------------------------------------------------------------------------
+// Drift Run with throttle controls
+// ---------------------------------------------------------------------------
+
+/**
+ * Stand-in players for the throttle controls. They see what a player sees --
+ * the road ahead and the angle gauge -- and press what a player presses: a
+ * throttle that builds and falls at the phone's rate, and a drift tap.
+ *
+ *   grip:     never taps; holds the throttle all the way.
+ *   balancer: taps into each corner, taps again to switch sides in S-bends,
+ *             and feathers the throttle to sit just under the limit angle.
+ *   flatout:  taps into each corner, then holds the throttle flat.
+ */
+function throttleDriver(kind) {
+  let throttle = 0;
+  const cornerSign = (state, track, metres) => {
+    const last = track.samples.x.length - 1;
+    for (let j = 0; j <= Math.round(metres / track.sampleSpacing); j++) {
+      const k = track.samples.curvature[Math.min(last, state.sampleIndex + j)];
+      if (Math.abs(k) > 1 / 60) return Math.sign(k);
+    }
+    return 0;
+  };
+  return (state, track) => {
+    let hold = true;
+    let tap = false;
+    if (kind !== 'grip') {
+      const next = cornerSign(state, track, 24);
+      if (state.driftDir === 0 && state.spinTicks === 0 && next !== 0) tap = true;
+      if (kind === 'balancer' && state.driftDir !== 0 && next === -state.driftDir) tap = true;
+      if (kind === 'balancer' && state.driftDir !== 0) {
+        const cornering = cornerSign(state, track, 40) !== 0;
+        hold = cornering && state.driftAngle < DRIFT_CONTROL.limitAngle - 0.12;
+      }
+    }
+    throttle = Math.min(1, Math.max(0, throttle + (hold ? 1 / 0.45 : -1 / 0.3) / 60));
+    return { throttle, tap };
+  };
+}
+
+function driveThrottle(track, car, kind, maxSeconds = 200) {
+  const state = createSimState(track, car);
+  const config = configFor('driftRun', 'throttle');
+  const driver = throttleDriver(kind);
+  const input = { steer: 0, throttle: 0, initiate: false };
+  const recorder = new InputRecorder();
+  const hashes = [];
+  let held = quantiseInput(0, 0, false);
+  let spins = 0;
+  let driftTicks = 0;
+  while (!state.finished && state.tick < TICK_RATE * maxSeconds) {
+    if (state.tick % TICKS_PER_INPUT === 0) {
+      const out = driver(state, track);
+      held = quantiseInput(0, out.throttle, out.tap);
+      recorder.push(held);
+    }
+    dequantiseInput(held, input);
+    if (state.tick % HASH_INTERVAL === 0) hashes.push(hashSimState(state));
+    const wasSpinning = state.spinTicks > 0;
+    stepSim(state, input, car, track, config);
+    if (!wasSpinning && state.spinTicks > 0) spins++;
+    if (state.driftDir !== 0) driftTicks++;
+  }
+  return { state, spins, driftTicks, recorder, hashes, config };
+}
+
+test('throttle controls: never tapping gets round on grip, with no drift points', () => {
+  for (const track of ROUTES) {
+    for (const car of CARS) {
+      const { state, driftTicks } = driveThrottle(track, car, 'grip');
+      assert.ok(state.finished, `${car.name} did not finish ${track.name}`);
+      assert.equal(state.wallHits, 0, `${car.name} hit ${state.wallHits} walls on ${track.name}`);
+      assert.equal(driftTicks, 0, 'the game must never start a drift by itself');
+      assert.equal(Math.round(state.drift.banked), 0, 'cornering on grip scores nothing');
+    }
+  }
+});
+
+test('throttle controls: balancing on the limit scores, cleanly, on every route', () => {
+  for (const track of ROUTES) {
+    for (const car of CARS) {
+      const { state, spins } = driveThrottle(track, car, 'balancer');
+      const result = gradeRun(state, track, TICK_RATE);
+      assert.ok(state.finished, `${car.name} did not finish ${track.name}`);
+      assert.equal(state.wallHits, 0, `${car.name} hit ${state.wallHits} walls on ${track.name}`);
+      assert.equal(spins, 0, `${car.name} spun ${spins} times on ${track.name}`);
+      assert.ok(result.points > 0 && result.zonesCleared > 0, `${car.name} scored nothing on ${track.name}`);
+      assert.ok(result.points < track.theoreticalMaxPoints, 'a real run must stay under the server bound');
+    }
+  }
+});
+
+test('throttle controls: holding it flat spins the car and scores next to nothing', () => {
+  const car = carById('kaido-zen-r');
+  const balanced = driveThrottle(route, car, 'balancer');
+  const flat = driveThrottle(route, car, 'flatout');
+  assert.ok(flat.spins >= 3, `flat out only spun ${flat.spins} times`);
+  assert.ok(
+    gradeRun(flat.state, route, TICK_RATE).points < gradeRun(balanced.state, route, TICK_RATE).points / 10,
+    'spinning must cost the combo',
+  );
+});
+
+test('throttle controls: the flick goes into the coming corner, nose first', () => {
+  const car = carById('kaido-zen-r');
+  const config = configFor('driftRun', 'throttle');
+  // Find the first left-hander and start just before it, at speed.
+  const start = route.samples.curvature.findIndex((k) => k > 1 / 60) - 10;
+  const state = createSimState(route, car);
+  state.sampleIndex = start;
+  state.x = route.samples.x[start];
+  state.y = route.samples.y[start];
+  state.heading = route.samples.heading[start];
+  state.vx = 20;
+  state.speed = 20;
+  stepSim(state, { steer: 0, throttle: 0.7, initiate: true }, car, route, config);
+  assert.equal(state.driftDir, 1, 'a tap before a left-hander drifts left');
+  for (let t = 0; t < TICK_RATE * 0.5; t++) stepSim(state, { steer: 0, throttle: 0.7, initiate: false }, car, route, config);
+  // Nose pointing left of the direction of travel: velocity to the right of
+  // the nose, which is a negative slip angle.
+  assert.ok(state.slipAngle < -0.2, `expected the nose into the corner, slip was ${state.slipAngle.toFixed(2)}`);
+});
+
+test('throttle controls: a steady throttle holds a steady angle below the limit', () => {
+  const track = openRoute();
+  const car = carById('onibi-silhouette');
+  const config = configFor('driftRun', 'throttle');
+  const d = DRIFT_CONTROL;
+  const state = createSimState(track, car);
+  state.speed = 18;
+  state.vx = 18;
+  state.driftDir = 1;
+  state.driftAngle = 0.4;
+  const throttle = 0.6;
+  for (let t = 0; t < TICK_RATE * 4; t++) stepSim(state, { steer: 0, throttle, initiate: false }, car, track, config);
+  const expected = throttle * d.holdAngle;
+  assert.ok(Math.abs(state.driftAngle - expected) < 0.02, `held ${state.driftAngle.toFixed(3)} rad, expected ${expected.toFixed(3)}`);
+});
+
+test('throttle controls: a recorded run replays exactly', () => {
+  const car = carById('tengu-gt-x');
+  const live = driveThrottle(route, car, 'balancer');
+  const decoded = InputRecorder.decode(live.recorder.encode());
+  const state = createSimState(route, car);
+  const input = { steer: 0, throttle: 0, initiate: false };
+  const q = { steer: 0, throttle: 0, flags: 0 };
+  const hashes = [];
+  while (!state.finished && state.tick < live.state.tick + 10) {
+    decoded.at(Math.floor(state.tick / TICKS_PER_INPUT), q);
+    dequantiseInput(q, input);
+    if (state.tick % HASH_INTERVAL === 0) hashes.push(hashSimState(state));
+    stepSim(state, input, car, route, live.config);
+  }
+  assert.deepEqual(hashes, live.hashes, 'replay diverged from the live run');
+  assert.equal(state.drift.banked, live.state.drift.banked);
 });

@@ -1,5 +1,6 @@
 import { sin, cos, clamp } from '../math/trig.ts';
-import type { RouteData, SimState } from '../types.ts';
+import { SWEET_SPOT } from '../types.ts';
+import type { RouteData, SimConfig, SimState } from '../types.ts';
 
 /**
  * Scoring lives inside the sim, on sim ticks, from sim state.
@@ -45,7 +46,8 @@ const MAX_MULTIPLIER = 8;
  * angle/speed/line meters: the multiplier is the one number that tells you
  * whether what you are doing is working.
  */
-export function stepDriftScore(state: SimState, route: RouteData, dt: number): void {
+export function stepDriftScore(state: SimState, route: RouteData, config: SimConfig, dt: number): void {
+  const throttleControls = config.controls === 'throttle';
   const d = state.drift;
   d.brokeThisTick = false;
 
@@ -70,7 +72,7 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
   // between two of them felt like being robbed.
   if (state.hitThisTick) {
     breakCombo(d);
-  } else if (absSlip > SPIN_ANGLE) {
+  } else if (absSlip > SPIN_ANGLE || state.spinTicks > 0) {
     breakCombo(d);
   } else if (absSlip < MIN_DRIFT_ANGLE || state.speed < MIN_DRIFT_SPEED) {
     d.driftTicks = 0;
@@ -87,7 +89,13 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
   }
 
   // --- Accrue ---
-  const drifting = absSlip >= MIN_DRIFT_ANGLE && state.speed >= MIN_DRIFT_SPEED && !state.hitThisTick;
+  // With throttle controls only a drift the player started counts; the game's
+  // own cornering never scores.
+  const drifting =
+    absSlip >= MIN_DRIFT_ANGLE &&
+    state.speed >= MIN_DRIFT_SPEED &&
+    !state.hitThisTick &&
+    (!throttleControls || state.driftDir !== 0);
 
   if (drifting) {
     // Count a steering reversal: the slide swapped sides while still committed.
@@ -102,15 +110,27 @@ export function stepDriftScore(state: SimState, route: RouteData, dt: number): v
     if (d.inZone) {
       const zone = route.driftZones[zoneIndex];
 
-      // Angle: builds to BEST_ANGLE, then falls away as the car approaches a spin.
-      const angleFactor =
-        absSlip <= BEST_ANGLE
+      // Angle. With steering controls: builds to BEST_ANGLE, then falls away as
+      // the car approaches a spin. With throttle controls the balance is the
+      // game, so the reward is for living on the limit: angle builds towards
+      // the limit angle, and inside the sweet spot just under it (or over it,
+      // until it spins) it pays a quarter more.
+      const limit = config.drift.limitAngle;
+      const angleFactor = throttleControls
+        ? absSlip >= limit - SWEET_SPOT
+          ? 1.25
+          : clamp(absSlip / limit, 0, 1)
+        : absSlip <= BEST_ANGLE
           ? absSlip / BEST_ANGLE
           : clamp((SPIN_ANGLE - absSlip) / (SPIN_ANGLE - BEST_ANGLE), 0.2, 1);
       // Speed: holding angle while carrying speed is the hard part.
       const speedFactor = clamp(state.speed / REFERENCE_SPEED, 0, 1.4);
       // Line: how close to the prescribed clipping point.
-      const lineFactor = proximityFactor(state, route, zone.entryIndex, zone.exitIndex);
+      // With throttle controls the game picks the line, so what the player
+      // controls instead is when the drift started.
+      const lineFactor = throttleControls
+        ? d.entryFactor
+        : proximityFactor(state, route, zone.entryIndex, zone.exitIndex);
 
       // Multiplier grows with sustained commitment, then holds at the cap.
       d.multiplier = clamp(1 + d.driftTicks / 90, 1, MAX_MULTIPLIER);

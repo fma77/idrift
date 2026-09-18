@@ -4,17 +4,59 @@
  */
 
 /**
- * The player's whole say in the matter: one steering value, already
- * dequantised to sim units. The car drives itself forward; there is no
- * throttle, brake or handbrake.
+ * The player's input, already dequantised to sim units.
+ *
+ * Which fields matter depends on the controls (SimConfig.controls). With
+ * steering controls the player steers and the car drives itself. With throttle
+ * controls -- Drift Run only -- the game steers, and the player works the
+ * throttle and taps to throw the car into a drift.
  */
 export interface SimInput {
   /** -1 (full left) .. +1 (full right). */
   steer: number;
+  /** 0..1. Throttle controls only. */
+  throttle: number;
+  /** True on the sample where the drift button was tapped. Throttle controls only. */
+  initiate: boolean;
 }
 
-/** Quantised input as stored in a replay: steer as int16, 2 bytes per sampled tick. */
+/** Quantised input as stored in a replay: steer int16, throttle uint8, flags uint8. */
 export const STEER_QUANT = 32767;
+export const THROTTLE_QUANT = 255;
+export const FLAG_INITIATE = 1 << 0;
+
+/** Who steers. See SimInput. */
+export type Controls = 'steer' | 'throttle';
+
+/**
+ * Drift Run with throttle controls: how the game steers and how the throttle
+ * sets the angle. Angles in radians.
+ */
+export interface DriftControlParams {
+  /** rad/s of angle change per unit of throttle imbalance. How lively the angle is. */
+  angleRate: number;
+  /** The angle full throttle would hold, if nothing ran away first. */
+  holdAngle: number;
+  /** Past this angle the slide feeds itself and runs away towards a spin. */
+  limitAngle: number;
+  /** 1/s. How fast it runs away past the limit. */
+  runaway: number;
+  /** At this angle the car has spun. */
+  spinAngle: number;
+  /** The angle the flick throws the car to. */
+  flickAngle: number;
+  /** Seconds the flick takes, the opposite swing included. */
+  flickTime: number;
+  /** g. How hard the game can turn the car's path while it is sideways. */
+  driftGrip: number;
+  /** How far towards the outside of the corner a big angle pushes the line, as a fraction of half the road. */
+  angleWidening: number;
+  /** m/s^2 of speed a slide at 90 degrees costs. */
+  angleDrag: number;
+}
+
+/** Radians. Width of the scoring sweet spot, just under the limit angle. */
+export const SWEET_SPOT = 0.26;
 
 export type CarClass = 'C' | 'B' | 'A' | 'S';
 
@@ -194,6 +236,8 @@ export interface AssistParams {
 export interface SimConfig {
   mode: SimMode;
   assist: AssistParams;
+  controls: Controls;
+  drift: DriftControlParams;
 }
 
 /** Live drift-run scoring state. Lives in the sim so replays reproduce it exactly. */
@@ -221,6 +265,8 @@ export interface DriftScoreState {
   zoneScored: boolean;
   /** Sign of the drift angle last tick, for reversal counting. */
   lastDriftSign: number;
+  /** 0.5..1. How well timed the last drift entry was. Throttle controls only. */
+  entryFactor: number;
 }
 
 export interface SimState {
@@ -244,6 +290,18 @@ export interface SimState {
   sliding: boolean;
   /** The steering applied last tick, -1..1. */
   steer: number;
+
+  // --- Throttle controls ---
+  /** +1 drifting through a left-hander (nose pointing left), -1 right, 0 not drifting. */
+  driftDir: number;
+  /** Radians. How far the nose points into the corner past the direction of travel. */
+  driftAngle: number;
+  /** Ticks left in the flick that starts a drift. */
+  flickTicks: number;
+  /** Ticks left in a spin. */
+  spinTicks: number;
+  /** Whether the drift button was down last tick, so one tap acts once. */
+  initiateHeld: boolean;
 
   // --- Derived, cached for renderer/audio/scoring; never an integration input ---
   /** 0..1. How much drive the car is using: 0 while it brakes for a corner, pulsing in a slide. */

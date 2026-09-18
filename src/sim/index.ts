@@ -1,6 +1,7 @@
 import { createRng, nextUint32 } from './math/prng.ts';
 import { HASH_SEED, hashFloat, hashInt } from './math/hash.ts';
 import { stepVehicle, resetToRoad } from './model/vehicle.ts';
+import { stepThrottleControls, endDrift, isTailAgainstWall } from './model/throttleDrift.ts';
 import {
   updateProgress,
   isAtFinish,
@@ -35,6 +36,11 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
     sliding: false,
     steer: 0,
     steerChange: 0,
+    driftDir: 0,
+    driftAngle: 0,
+    flickTicks: 0,
+    spinTicks: 0,
+    initiateHeld: false,
     throttle: 0,
     roadKept: false,
     steerAngle: 0,
@@ -63,6 +69,7 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
       zonesEntered: 0,
       zonesCleared: 0,
       zoneScored: false,
+      entryFactor: 1,
       lastDriftSign: 0,
     },
     rngS0: rng.s0,
@@ -97,11 +104,16 @@ export function stepSim(
   state.hitThisTick = false;
 
   const grip = surfaceGripAt(state, route);
-  stepVehicle(state, car, input, config.assist, route, grip, DT);
+  if (config.controls === 'throttle') stepThrottleControls(state, car, input, config, route, grip, DT);
+  else stepVehicle(state, car, input, config.assist, route, grip, DT);
   updateProgress(state, route);
 
   // --- Wall contact: penalty and a reset, never a restart ---
-  if (isAgainstWall(state, route)) {
+  // With throttle controls the tail counts too: at a big angle on a narrow road
+  // the back of the car swings into the wall, which is the natural limit on
+  // how much angle a corner will take.
+  const tailHit = config.controls === 'throttle' && isTailAgainstWall(state, car, route);
+  if (isAgainstWall(state, route) || tailHit) {
     state.wallHits++;
     state.hitThisTick = true;
     state.penaltyTicks += WALL_PENALTY_TICKS;
@@ -113,12 +125,13 @@ export function stepSim(
     // Keep a fraction of the speed: a full stop after every brush would be a
     // harsher punishment than the time penalty already is.
     resetToRoad(state, pose.x, pose.y, pose.heading, state.speed * 0.45);
+    endDrift(state);
     state.sampleIndex = backOff;
     updateProgress(state, route);
   }
 
   if (config.mode === 'driftRun') {
-    stepDriftScore(state, route, DT);
+    stepDriftScore(state, route, config, DT);
   }
 
   state.tick++;
@@ -164,6 +177,10 @@ export function hashSimState(state: SimState): number {
   h = hashFloat(h, state.yawRate);
   h = hashInt(h, state.sliding ? 1 : 0);
   h = hashFloat(h, state.steer);
+  h = hashInt(h, state.driftDir);
+  h = hashFloat(h, state.driftAngle);
+  h = hashInt(h, state.flickTicks);
+  h = hashInt(h, state.spinTicks);
   h = hashFloat(h, state.drift.banked);
   h = hashFloat(h, state.drift.pending);
   h = hashInt(h, state.raceTicks);

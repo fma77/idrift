@@ -164,6 +164,16 @@
 
             <div class="row">
               <div>
+                <div>Steer in Drift Run</div>
+                <div class="caption">Off: the game steers, you hold the throttle and tap to drift. On: steer with your thumb, as in Time Attack. Runs steered this way are not saved or posted.</div>
+              </div>
+              <button class="toggle" id="set-drift-steer" aria-pressed="false" aria-label="Steer in Drift Run">
+                <span class="toggle__knob"></span>
+              </button>
+            </div>
+
+            <div class="row">
+              <div>
                 <div>Tuning mode</div>
                 <div class="caption">Adds a TUNE button to runs for adjusting how the car handles. Runs are not saved or posted.</div>
               </div>
@@ -198,9 +208,7 @@
 
           <div id="result-stats"></div>
 
-          <div class="caption" id="result-tune-note" hidden>
-            Tuning mode. This run is not saved as a best or posted to the leaderboard.
-          </div>
+          <div class="caption" id="result-tune-note" hidden></div>
 
           <div id="result-submit">
             <div class="label" style="color: var(--ink-muted); margin-bottom: 8px">Leaderboard</div>
@@ -265,7 +273,9 @@
               <span class="hud__unit">km/h</span>
             </div>
             <div class="keyhints">
-              <span class="keyhint"><span class="keyhint__key" id="hint-left">←</span><span class="keyhint__key" id="hint-right">→</span> STEER</span>
+              <span class="keyhint keyhint--steer"><span class="keyhint__key" id="hint-left">←</span><span class="keyhint__key" id="hint-right">→</span> STEER</span>
+              <span class="keyhint keyhint--throttle"><span class="keyhint__key" id="hint-throttle">↑</span> THROTTLE</span>
+              <span class="keyhint keyhint--throttle"><span class="keyhint__key" id="hint-drift">SPACE</span> DRIFT</span>
               <span class="keyhint"><span class="keyhint__key">ESC</span> PAUSE</span>
             </div>
 
@@ -280,6 +290,9 @@
 
         <!-- Touch anywhere and slide to steer. See src/input/thumbSteer.ts. -->
         <div class="steer-surface" id="steer-surface"></div>
+        <!-- Drift Run throttle controls: tap left to drift, hold right for throttle. -->
+        <div class="pedal-surface" id="pedal-surface"></div>
+        <div class="drift-gauge" id="drift-gauge" aria-hidden="true"></div>
 
         <button class="pause-btn" id="btn-pause" type="button" aria-label="Pause">
           <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>

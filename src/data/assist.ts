@@ -1,4 +1,4 @@
-import type { AssistParams, SimConfig, SimMode } from '../sim/types.ts';
+import type { AssistParams, Controls, DriftControlParams, SimConfig, SimMode } from '../sim/types.ts';
 
 /**
  * How much the game helps, per mode. See AssistParams in src/sim/types.ts.
@@ -40,6 +40,32 @@ export const MODE_ASSIST: Record<SimMode, AssistParams> = {
   },
 };
 
-export function configFor(mode: SimMode): SimConfig {
-  return { mode, assist: MODE_ASSIST[mode] };
+const DEG = Math.PI / 180;
+
+/**
+ * Drift Run with throttle controls. With these numbers, holding the throttle at
+ * about three quarters sits in the sweet spot; holding it flat runs past the
+ * limit and spins within a second or so.
+ */
+export const DRIFT_CONTROL: DriftControlParams = {
+  angleRate: 2.2,
+  holdAngle: 75 * DEG,
+  limitAngle: 55 * DEG,
+  runaway: 3,
+  spinAngle: 85 * DEG,
+  flickAngle: 25 * DEG,
+  flickTime: 0.35,
+  driftGrip: 1.5,
+  angleWidening: 0.6,
+  angleDrag: 3.5,
+};
+
+/** Throttle controls exist for Drift Run only; Time Attack always steers. */
+export function configFor(mode: SimMode, controls: Controls = 'steer'): SimConfig {
+  return {
+    mode,
+    assist: MODE_ASSIST[mode],
+    controls: mode === 'driftRun' ? controls : 'steer',
+    drift: DRIFT_CONTROL,
+  };
 }

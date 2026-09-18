@@ -315,7 +315,8 @@ function theoreticalMinTime(k, ds, grip) {
 
 /** Upper bound on drift points, using the same generous logic in reverse. */
 function theoreticalMaxPoints(zones, ds) {
-  const PER_SECOND = 900 * 1.4 * 1 * 1; // angle, speed, line factors all maxed
+  // Angle (1.25 in the throttle-controls sweet spot), speed and line factors all maxed.
+  const PER_SECOND = 900 * 1.25 * 1.4 * 1;
   const MAX_MULT = 8;
   const MAX_STYLE = 1.5;
   let total = 0;

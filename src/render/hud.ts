@@ -1,5 +1,6 @@
 import { TICK_RATE } from '../sim/version.ts';
-import type { RouteData, SimMode, SimState } from '../sim/types.ts';
+import type { RouteData, SimConfig, SimState } from '../sim/types.ts';
+import type { DriftGauge } from './driftGauge.ts';
 
 /**
  * HUD, in DOM rather than on the canvas.
@@ -24,6 +25,8 @@ export interface HudElements {
   angleValue: HTMLElement;
   pace: HTMLElement;
   flash: HTMLElement;
+  /** Shown in Drift Run with throttle controls only. */
+  gauge: DriftGauge;
 }
 
 /** Severity 1-6 to a chevron count. Six is a hairpin. */
@@ -46,8 +49,12 @@ export class Hud {
    * on screen during the run has to be the same number the sim banked, or a
    * replay would disagree with what the player remembers seeing.
    */
-  update(state: SimState, route: RouteData, mode: SimMode): void {
+  update(state: SimState, route: RouteData, config: SimConfig): void {
     const el = this.el;
+    const mode = config.mode;
+    if (config.controls === 'throttle') {
+      el.gauge.update(state.driftAngle, state.throttle, state.driftDir !== 0 || state.spinTicks > 0, config.drift);
+    }
 
     el.speedValue.textContent = String(Math.round(state.speed * 3.6));
     // Drift angle in place of the old gear readout: with no gearbox left, the
