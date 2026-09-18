@@ -11,6 +11,8 @@ import { DriftGauge } from './render/driftGauge.ts';
 import { TunePanel } from './ui/tunePanel.ts';
 import { isTuneMode, applyStoredTuning, restoreShippedHandling, isTuned } from './tune/tuning.ts';
 import { EngineAudio } from './audio/engine.ts';
+import { applySoundOverrides, PROFILES } from './audio/profiles.ts';
+import { SoundLab } from './ui/soundLab.ts';
 import { CARS, carById } from './data/cars.ts';
 import { configFor } from './data/assist.ts';
 import { ROUTES, ROUTE_IDS, loadRoute, type RouteEntry } from './data/routes.ts';
@@ -82,6 +84,8 @@ function setTuneMode(on: boolean): void {
 }
 
 const settings: Settings = loadSettings();
+// Sound lab changes are presentation only, so they apply everywhere.
+applySoundOverrides();
 let currentEntry: RouteEntry = ROUTES[0];
 let currentRoute: RouteData | null = null;
 let currentMode: SimMode = 'timeAttack';
@@ -150,7 +154,13 @@ setInputMode(window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keybo
 
 // --- Screen routing ---------------------------------------------------------
 
+const soundLab = new SoundLab($('sound-lab'), () => {
+  soundLab.close();
+  showScreen('settings');
+});
+
 function showScreen(name: ScreenName): void {
+  if (!$('sound-lab').hidden) soundLab.close();
   for (const key of Object.keys(SCREENS) as ScreenName[]) {
     SCREENS[key].hidden = key !== name;
   }
@@ -460,7 +470,8 @@ function buildCarList(): void {
       const meta = document.createElement('div');
       meta.className = 'card__meta';
       meta.textContent =
-        `Top ${Math.round(car.handling.topSpeed * 3.6)} km/h` + (tuneMode && isTuned(car) ? ' · tuned' : '');
+        `${PROFILES[car.engine].label} · top ${Math.round(car.handling.topSpeed * 3.6)} km/h` +
+        (tuneMode && isTuned(car) ? ' · tuned' : '');
       left.append(name, meta);
 
       const right = document.createElement('div');
@@ -626,7 +637,7 @@ async function startRun(mode: SimMode): Promise<void> {
   audio = new EngineAudio(settings.soundOn);
   // Started from the click that got us here, which is the gesture the browser
   // requires before an AudioContext will run.
-  void audio.start(car.audio);
+  void audio.start(car.engine);
 
   session = new GameSession(
     currentRoute,
@@ -900,6 +911,10 @@ $('btn-garage').addEventListener('click', () => {
   showScreen('garage');
 });
 $('btn-settings').addEventListener('click', () => showScreen('settings'));
+$('btn-sound-lab').addEventListener('click', () => {
+  for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;
+  soundLab.open(carById(settings.carId).engine);
+});
 $('btn-routes-back').addEventListener('click', () => showScreen('title'));
 $('btn-garage-back').addEventListener('click', () => showScreen('title'));
 $('btn-settings-back').addEventListener('click', () => showScreen('title'));

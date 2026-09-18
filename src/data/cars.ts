@@ -37,14 +37,7 @@ export const CARS: CarParams[] = [
     bodyLength: 4.2,
     bodyWidth: 1.68,
     maxWheelAngle: 0.6,
-    audio: {
-      cylinders: 4,
-      basePitch: 42,
-      distortion: 0.35,
-      filterBase: 420,
-      filterRange: 3600,
-      whine: 0.12,
-    },
+    engine: 'na4',
     tint: '#E8402A',
   },
   {
@@ -70,14 +63,7 @@ export const CARS: CarParams[] = [
     bodyLength: 4.52,
     bodyWidth: 1.76,
     maxWheelAngle: 0.56,
-    audio: {
-      cylinders: 4,
-      basePitch: 38,
-      distortion: 0.5,
-      filterBase: 360,
-      filterRange: 3200,
-      whine: 0.34,
-    },
+    engine: 'rotary',
     // Car tints are picked for legibility on the ink-2 tarmac, not for realism.
     // In a top-down game the car is the one object that must never be hard to
     // find.
@@ -107,15 +93,35 @@ export const CARS: CarParams[] = [
     bodyLength: 4.68,
     bodyWidth: 1.82,
     maxWheelAngle: 0.52,
-    audio: {
-      cylinders: 6,
-      basePitch: 34,
-      distortion: 0.42,
-      filterBase: 300,
-      filterRange: 4200,
-      whine: 0.22,
-    },
+    engine: 'turbo6',
     tint: '#e0dbd0',
+  },
+  {
+    id: 'kaze-b4',
+    name: 'KAZE B4',
+    carClass: 'B',
+    // Four-wheel-drive flat four: the most grip in the roster and the most
+    // stable in a slide, at the cost of a lazier turn-in.
+    handling: {
+      topSpeed: 37,
+      acceleration: 10,
+      turnRate: 1.95,
+      turnResponse: 5.5,
+      turnInSpeed: 8,
+      grip: 1.2,
+      slideFrictionLow: 0.6,
+      slideFrictionHigh: 1.5,
+      breakAngle: 0.14,
+      regripAngle: 0.06,
+      selfAlign: 2.4,
+    },
+    cgToFront: 1.2,
+    cgToRear: 1.3,
+    bodyLength: 4.4,
+    bodyWidth: 1.74,
+    maxWheelAngle: 0.56,
+    engine: 'boxer4',
+    tint: '#cdc7bb',
   },
 ];
 

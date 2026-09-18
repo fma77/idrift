@@ -99,18 +99,14 @@ export interface HandlingParams {
   selfAlign: number;
 }
 
-export interface AudioParams {
-  cylinders: number;
-  /** Hz at idle for the fundamental. */
-  basePitch: number;
-  /** 0..1 waveshaper drive. */
-  distortion: number;
-  /** Lowpass cutoff in Hz at zero load; opens up with throttle. */
-  filterBase: number;
-  filterRange: number;
-  /** Relative level of the induction/whine layer, 0..1. */
-  whine: number;
-}
+/**
+ * Which engine a car sounds like. Presentation only -- the sim never reads it.
+ *   na4:    high-revving naturally aspirated four
+ *   rotary: two-rotor rotary
+ *   turbo6: turbocharged straight six
+ *   boxer4: turbocharged flat four
+ */
+export type EngineKind = 'na4' | 'rotary' | 'turbo6' | 'boxer4';
 
 export interface CarParams {
   id: string;
@@ -126,7 +122,8 @@ export interface CarParams {
   bodyWidth: number;
   /** Radians. How far the drawn front wheels turn. Cosmetic. */
   maxWheelAngle: number;
-  audio: AudioParams;
+  /** Sound only; never read by the sim step. */
+  engine: EngineKind;
   /** Rendering only; never read by the sim step. */
   sprite?: { path: string; pixelsPerMetre: number };
   tint?: string;

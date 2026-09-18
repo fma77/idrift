@@ -196,6 +196,32 @@ paper-2.
 
 ## Additions not in the brief
 
+### Engine sound is synthesised, pulse by pulse
+
+Four engines, one per car: a high-revving NA four, a two-rotor rotary, a turbo straight
+six and a turbo flat four. No recordings. An audio worklet (`src/audio/engineSynth.ts`)
+builds the note the way an engine does -- one short ringing exhaust pulse per firing,
+spaced by the firing pattern -- and each engine's character is numbers in
+`src/audio/profiles.ts`: the flat four's unequal-length headers are an uneven pulse
+pattern, the rotary's brap is firings bunching into groups at idle, the six is three
+even pulses a revolution. Separate layers add intake howl, turbo whistle, the flutter of
+air surging back through the turbo on lift-off, overrun pops, and tyre squeal.
+
+The sim has no engine, so `src/audio/engineModel.ts` invents one for sound: gears from
+road speed, wheelspin revs in a slide, a bouncing limiter, spool, and the lift-off moment
+that triggers flutter and pops. It sits entirely outside the sim.
+
+Chosen over recorded loops because the signature sounds asked for are effects that
+synthesis does well, it costs nothing, has no licensing questions, follows the throttle
+without seams, and the model underneath carries over if recordings replace the voice
+later. The trade-off is a ceiling: it sounds like a good arcade game, not an onboard
+video. Settings → Sound lab plays each engine with a hold-to-rev button, in neutral or
+pulling through the gears, with sliders for the voice and "Copy values" to ship them.
+
+Pausing used to close the audio context, so a resumed run came back silent; it now
+suspends and resumes instead.
+
+
 - **Skid marks.** Cosmetic, and worth the cost: in a top-down view a player otherwise
   cannot see where the car has actually been sliding, which makes the drift scoring
   feel arbitrary. Toggleable in settings.

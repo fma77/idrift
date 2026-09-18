@@ -83,6 +83,7 @@ export class GameSession {
     this.renderer.clearTrails();
     this.renderer.resetCamera(this.state);
     this.input.enable();
+    this.audio?.resume();
     this.lastFrameMs = performance.now();
     document.addEventListener('visibilitychange', this.boundVisibility);
     this.rafId = requestAnimationFrame(this.boundFrame);
@@ -92,13 +93,17 @@ export class GameSession {
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
     this.input.disable();
-    this.audio?.stop();
+    // Paused, not over: silence the engine without tearing it down, so it is
+    // there again on resume. (Stopping it here once meant a paused run came
+    // back silent.)
+    this.audio?.suspend();
     document.removeEventListener('visibilitychange', this.boundVisibility);
   }
 
   abort(): void {
     this.phase = 'aborted';
     this.stop();
+    this.audio?.stop();
   }
 
   /**
@@ -174,6 +179,7 @@ export class GameSession {
     if (this.state.finished) {
       this.phase = 'finished';
       this.stop();
+      this.audio?.stop();
       this.onFinish?.({
         result: gradeRun(this.state, this.route, TICK_RATE),
         state: this.state,

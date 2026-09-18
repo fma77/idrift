@@ -156,6 +156,16 @@
             </div>
 
             <div class="row">
+              <div>
+                <div>Sound lab</div>
+                <div class="caption">Hear and adjust the four engines.</div>
+              </div>
+              <button class="btn--text" id="btn-sound-lab" style="border: none; background: none; cursor: pointer">
+                Open
+              </button>
+            </div>
+
+            <div class="row">
               <div><div>Engine sound</div></div>
               <button class="toggle" id="set-sound" aria-pressed="true" aria-label="Engine sound">
                 <span class="toggle__knob"></span>
@@ -320,6 +330,9 @@
       </div>
 
     </div>
+
+    <!-- Built by src/ui/soundLab.ts. -->
+    <div id="sound-lab" hidden></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

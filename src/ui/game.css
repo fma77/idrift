@@ -715,6 +715,117 @@
   color: var(--paper);
 }
 
+/* --- Sound lab ----------------------------------------------------------- */
+
+#sound-lab.lab {
+  position: fixed;
+  z-index: 20;
+}
+
+.lab__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--s-3);
+}
+
+.lab__back {
+  color: var(--paper);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.lab__picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--gutter) 0;
+}
+
+.lab__engine {
+  min-height: 48px;
+  padding: var(--s-2);
+  background: transparent;
+  border: 2px solid var(--ink-2);
+  color: var(--paper);
+  font-family: var(--body);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.lab__engine[aria-pressed='true'] {
+  border-color: var(--red);
+  background: var(--red);
+}
+
+.lab__meter {
+  padding: var(--s-3) var(--gutter) 0;
+}
+
+.lab__readout {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+
+.lab__boost {
+  margin-top: var(--s-2);
+  height: 4px;
+  background: var(--ink-2);
+}
+
+.lab__boost-fill {
+  height: 100%;
+  width: 0;
+  background: var(--red);
+}
+
+.lab__controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--gutter) 0;
+}
+
+.lab__controls .btn {
+  min-height: 72px;
+  font-size: 13px;
+}
+
+.lab__throttle {
+  min-height: 72px;
+  background: var(--paper);
+  color: var(--ink);
+  border: none;
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.1;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.lab__throttle[data-active='true'] {
+  background: var(--red);
+  color: var(--paper);
+}
+
+.lab__slide {
+  margin: 0 var(--gutter);
+}
+
+.lab__slide[hidden] {
+  display: none;
+}
+
+.lab__actions {
+  grid-template-columns: 1fr 1fr;
+}
+
 /* --- Tuning (#tune only) ------------------------------------------------- */
 
 .tune-btn {
