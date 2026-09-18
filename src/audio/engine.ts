@@ -190,9 +190,9 @@ export class EngineAudio {
     const g = this.lockGain.gain;
     g.cancelScheduledValues(now);
     g.setValueAtTime(0, now);
-    g.linearRampToValueAtTime(0.55, now + 0.015);
-    g.linearRampToValueAtTime(0.3, now + 0.2);
-    g.linearRampToValueAtTime(0, now + 0.42);
+    g.linearRampToValueAtTime(1.3, now + 0.015);
+    g.linearRampToValueAtTime(0.75, now + 0.22);
+    g.linearRampToValueAtTime(0, now + 0.46);
 
     // The tonal part of a skid: a rough note that falls as the wheels scrub
     // speed off.
@@ -206,7 +206,7 @@ export class EngineAudio {
     band.Q.value = 5;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(0.1, now + 0.02);
+    env.gain.linearRampToValueAtTime(0.25, now + 0.02);
     env.gain.linearRampToValueAtTime(0, now + 0.4);
     osc.connect(band).connect(env).connect(this.master);
     osc.start(now);
