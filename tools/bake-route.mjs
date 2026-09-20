@@ -17,6 +17,9 @@
  *   node tools/bake-route.mjs tools/specs/<name>.json --osm-route <lat,lon> <lat,lon>
  *   node tools/bake-route.mjs tools/specs/<name>.json --osm-file tools/osm/<name>.osm.json
  *
+ * Add --save-osm <path> to a live import to commit the road it fetched, so the
+ * route can be re-baked, or cut into sections, without the network.
+ *
  * Unlike src/sim/**, this file may use Math.sin and friends freely: its output
  * is committed data, so it is baked once on one machine and every player then
  * reads identical numbers. The determinism rules exist to stop *runtime*
@@ -174,6 +177,19 @@ async function fetchOsmWay(wayId) {
   }));
 }
 
+/** Pit lanes, service roads into the paddock, and anything else tagged as one. */
+function isPitLane(tags) {
+  if (!tags) return false;
+  if (tags.raceway === 'pitlane' || tags.pitlane === 'yes') return true;
+  return /boxengasse|pit ?lane/i.test(tags.name ?? '');
+}
+
+/** Road types the importer will drive down, unless a spec says otherwise. */
+const DRIVABLE_KINDS = [
+  'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+  'unclassified', 'residential', 'living_street', 'road', 'track', 'service',
+];
+
 /** Metres between two lat/lon points, near enough at route scale. */
 function metresBetween(a, b) {
   const R = 6378137;
@@ -194,7 +210,8 @@ function metresBetween(a, b) {
  * One-way tags are deliberately ignored. What is being imported is the road's
  * shape, and a touge run is often driven in the direction the map forbids.
  */
-async function fetchOsmRoute(start, end) {
+async function fetchOsmRoute(start, end, kinds, avoidPattern) {
+  const avoid = avoidPattern ? new RegExp(avoidPattern, 'i') : null;
   // ~450m of padding, so a road that wanders outside the straight line between
   // the two points is still in the box.
   const pad = 0.004;
@@ -202,10 +219,14 @@ async function fetchOsmRoute(start, end) {
   const north = Math.max(start.lat, end.lat) + pad;
   const west = Math.min(start.lon, end.lon) - pad;
   const east = Math.max(start.lon, end.lon) + pad;
-  const kinds = 'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|service';
+  // Race circuits are tagged highway=raceway, not as roads, so they have to be
+  // asked for explicitly. A spec can narrow this list: on a circuit that
+  // crosses public roads, the shortest path between two corners is often a
+  // shortcut through the car park rather than the lap.
+  const wanted = kinds ?? DRIVABLE_KINDS;
   const query =
     '[out:json][timeout:60];' +
-    'way["highway"~"^(' + kinds + ')(_link)?$"](' + south + ',' + west + ',' + north + ',' + east + ');' +
+    'way["highway"~"^(' + wanted.join('|') + ')(_link)?$"](' + south + ',' + west + ',' + north + ',' + east + ');' +
     '(._;>;);out body;';
 
   const res = await overpass(query);
@@ -229,6 +250,11 @@ async function fetchOsmRoute(start, end) {
     edges.get(a).push({ to: b, cost, way });
   };
   for (const way of ways) {
+    if (!wanted.includes(way.tags?.highway)) continue;
+    // A pit lane is a shortcut, not part of the lap, and the shortest path
+    // will take it every time if it is left in the graph.
+    if (isPitLane(way.tags)) continue;
+    if (avoid && avoid.test(way.tags?.name ?? '')) continue;
     for (let i = 1; i < way.nodes.length; i++) {
       const a = way.nodes[i - 1];
       const b = way.nodes[i];
@@ -768,15 +794,38 @@ async function bakeFromOsm(wayId, spec) {
  * The spec supplies what OSM cannot: the name, the width when the tags are
  * silent, the grip, and how much of the road to use.
  */
-async function bakeFromOsmRoute(start, end, spec, cacheFile) {
+async function bakeFromOsmRoute(start, end, spec, cacheFile, saveTo) {
   const ds = spec.sampleSpacing ?? 2;
   // A committed Overpass result, so a route can be re-baked -- or cut into
   // sections -- without hitting the network again and without the road
   // silently changing under it between bakes.
-  const road = cacheFile ? readOsmCache(cacheFile) : await fetchOsmRoute(start, end);
+  const road = cacheFile ? readOsmCache(cacheFile) : await fetchOsmRoute(start, end, spec.roadKinds, spec.avoid);
   console.log('  osm            ' + road.points.length + ' nodes, ' + road.roadMetres.toFixed(0) + 'm of road');
   console.log('  snapped        start ' + road.snapped.start.toFixed(0) + 'm, end ' + road.snapped.end.toFixed(0) + 'm from the given points');
   if (road.names.length > 0) console.log('  road names     ' + road.names.join(', '));
+  if (saveTo && !cacheFile) {
+    mkdirSync(dirname(resolve(saveTo)), { recursive: true });
+    writeFileSync(
+      resolve(saveTo),
+      JSON.stringify(
+        {
+          source: 'Road data from OpenStreetMap contributors, licensed ODbL (opendatacommons.org/licenses/odbl).',
+          road: { name: road.names.join(', '), lanes: 2, metres: Math.round(road.roadMetres) },
+          query: {
+            start: [start.lat, start.lon],
+            end: [end.lat, end.lon],
+            snappedMetres: [Math.round(road.snapped.start), Math.round(road.snapped.end)],
+            fetched: new Date().toISOString().slice(0, 10),
+            roadKinds: spec.roadKinds ?? null,
+          },
+          points: road.points.map((p) => [Number(p.lat.toFixed(7)), Number(p.lon.toFixed(7))]),
+        },
+        null,
+        0,
+      ),
+    );
+    console.log('  saved          ' + saveTo);
+  }
 
   let points = resamplePolyline(projectToMetres(road.points), ds);
   points = smoothPolyline(points, spec.smoothing ?? 6);
@@ -864,6 +913,7 @@ async function main() {
   const osmIndex = args.indexOf('--osm');
   const routeIndex = args.indexOf('--osm-route');
   const fileIndex = args.indexOf('--osm-file');
+  const saveIndex = args.indexOf('--save-osm');
   const outIndex = args.indexOf('--out');
   const specPath = resolve(args[0]);
   const spec = JSON.parse(readFileSync(specPath, 'utf8'));
@@ -878,7 +928,13 @@ async function main() {
     fileIndex >= 0
       ? await bakeFromOsmRoute(null, null, spec, args[fileIndex + 1])
       : routeIndex >= 0
-      ? await bakeFromOsmRoute(latLon(args[routeIndex + 1]), latLon(args[routeIndex + 2]), spec)
+      ? await bakeFromOsmRoute(
+          latLon(args[routeIndex + 1]),
+          latLon(args[routeIndex + 2]),
+          spec,
+          null,
+          saveIndex >= 0 ? args[saveIndex + 1] : null,
+        )
       : osmIndex >= 0
         ? await bakeFromOsm(args[osmIndex + 1], spec)
         : bakeFromSpec(spec);

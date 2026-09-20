@@ -35,6 +35,14 @@ export const ROUTES: RouteEntry[] = [
     blurb: 'Fast opener, three hairpins, esses in the middle. 1.5km down.',
   },
   {
+    id: 'quiddelbacher',
+    name: 'QUIDDELBACHER HÖHE',
+    location: 'Nürburg, Eifel',
+    file: 'routes/quiddelbacher.json',
+    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 2.4km.',
+    attribution: OSM_CREDIT,
+  },
+  {
     id: 'haruna-lower',
     name: 'HARUNA LOWER',
     location: 'Mount Haruna, Gunma',

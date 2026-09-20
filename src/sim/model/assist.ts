@@ -11,8 +11,12 @@ const PREDICT_SECONDS = 0.45;
 const KEEPING_EDGE = 0.55;
 /** rad/s. How fast road keeping can bend the path at full strength. */
 const MAX_KEEPING_RATE = 2.2;
-/** Below this, the thumb is resting, not steering. */
-const STEERING_THRESHOLD = 0.08;
+/**
+ * Below this, the thumb is resting rather than steering. Deliberately tiny:
+ * a player easing off mid-corner is still driving, and at 0.08 the help cut
+ * out exactly when someone unwound the steering early and ran wide.
+ */
+const STEERING_THRESHOLD = 0.03;
 
 /**
  * The fastest the car may be going right now and still make every corner in
