@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "location": "Mount Haruna, Gunma",
   "sampleSpacing": 2,
   "grip": 1,
@@ -7,7 +7,7 @@
   "id": "haruna-lower",
   "name": "HARUNA LOWER",
   "seed": 20260923,
-  "trimStart": 4360,
-  "maxLength": 2478,
+  "trimStart": 5222,
+  "maxLength": 2680,
   "_note": "Section of the real Mount Haruna pass, imported from OpenStreetMap. The run starts at the top of the mountain, so the first section is the upper one. Re-bake with: node tools/bake-route.mjs tools/specs/haruna-lower.json --osm-file tools/osm/haruna-downhill.osm.json --out public/routes/haruna-lower.json"
 }

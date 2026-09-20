@@ -35,11 +35,19 @@ export const ROUTES: RouteEntry[] = [
     blurb: 'Fast opener, three hairpins, esses in the middle. 1.5km down.',
   },
   {
+    id: 'estoril',
+    name: 'ESTORIL',
+    location: 'Estoril, Portugal',
+    file: 'routes/estoril.json',
+    blurb: 'Recta Interior round to the main straight. 7 corners, 2.3km.',
+    attribution: OSM_CREDIT,
+  },
+  {
     id: 'nurburg',
     name: 'NURBURG',
     location: 'Nürburg, Eifel',
     file: 'routes/nurburg.json',
-    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 2.4km.',
+    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 2.7km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -47,7 +55,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA UPPER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-upper.json',
-    blurb: 'Off the top of the mountain. 7 hairpins, 2.2km.',
+    blurb: 'Off the top of the mountain. 6 hairpins, 2.5km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -55,7 +63,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA MIDDLE',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-middle.json',
-    blurb: 'The middle third, corner after corner. 8 hairpins, 2.1km.',
+    blurb: 'The middle third, corner after corner. 7 hairpins, 2.7km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -63,7 +71,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA LOWER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-lower.json',
-    blurb: 'The run to the bottom, and the tightest of it. 13 hairpins, 2.5km.',
+    blurb: 'The run to the bottom, and the tightest of it. 9 hairpins, 2.7km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -71,7 +79,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA FULL PASS',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-downhill.json',
-    blurb: 'All three sections in one run. 28 hairpins, 6.8km.',
+    blurb: 'All three sections in one run. 22 hairpins, 7.9km.',
     attribution: OSM_CREDIT,
   },
 ];

@@ -237,6 +237,22 @@ way to tell a third of the way in from nearly home. The pace notes were compress
 one line each to pay for the space, and Time Attack's "distance left" cell became a
 wall-hit count, since the bar now says the same thing better.
 
+A route can name the sections it must drive through (`via` in the spec). The shortest
+path between two points on a circuit is rarely the lap -- at Estoril it cuts across the
+infield -- so each named section is driven end to end, in whichever direction makes the
+chain shortest. Aiming at a node in the middle of a section instead, which was the first
+attempt, made the path drive in and reverse out: a one-metre hairpin, and a route that
+crossed itself.
+
+Importing Estoril also turned up a bug in the resampler that had been quietly wrong for
+every imported route. It restarted each segment's walk at `carry` rather than
+`ds - carry`, dropping one sample per mapped node: routes came out about two metres
+short per node (600m over Estoril's 300), and because the sim trusts `sampleSpacing`,
+their corners read tighter than the real ones -- which is why hairpins kept needing to
+be eased. Fixed, every imported route now matches its road's length to within a metre,
+nothing needs easing, and all three Haruna sections were re-cut for the corrected
+geometry.
+
 Race circuits import too, with two extra rules: `highway=raceway` is not a road type
 and has to be asked for (`roadKinds` in the spec), and pit lanes are dropped from the
 graph, because the shortest path between two corners will take the pit lane every time.

@@ -210,7 +210,7 @@ function metresBetween(a, b) {
  * One-way tags are deliberately ignored. What is being imported is the road's
  * shape, and a touge run is often driven in the direction the map forbids.
  */
-async function fetchOsmRoute(start, end, kinds, avoidPattern) {
+async function fetchOsmRoute(start, end, kinds, avoidPattern, via) {
   const avoid = avoidPattern ? new RegExp(avoidPattern, 'i') : null;
   // ~450m of padding, so a road that wanders outside the straight line between
   // the two points is still in the box.
@@ -282,50 +282,58 @@ async function fetchOsmRoute(start, end, kinds, avoidPattern) {
   const to = nearest(end);
   if (from.id === null || to.id === null) throw new Error('Could not snap those points to a road');
 
-  // --- Dijkstra: the shortest way round by road ---
-  const dist = new Map([[from.id, 0]]);
-  const prev = new Map();
-  const queue = new Set([from.id]);
-  const done = new Set();
-  while (queue.size > 0) {
-    let current = null;
-    let best = Infinity;
-    for (const id of queue) {
-      const d = dist.get(id) ?? Infinity;
-      if (d < best) {
-        best = d;
-        current = id;
-      }
-    }
-    queue.delete(current);
-    done.add(current);
-    if (current === to.id) break;
-    for (const edge of edges.get(current) ?? []) {
-      if (done.has(edge.to)) continue;
-      const d = best + edge.cost;
-      if (d < (dist.get(edge.to) ?? Infinity)) {
-        dist.set(edge.to, d);
-        prev.set(edge.to, { from: current, way: edge.way });
-        queue.add(edge.to);
-      }
-    }
-  }
-  if (!dist.has(to.id)) throw new Error('No connected road between those points');
-
-  const path = [to.id];
+  // --- Waypoints ---
+  // The shortest path between two points on a circuit is rarely the lap: at
+  // Estoril it cuts straight across the infield. Naming the sections to drive
+  // through turns one search into a chain of them.
+  //
+  // Each named section is driven end to end, in whichever direction makes the
+  // chain shortest. Aiming at a node in the middle instead -- the obvious
+  // thing -- made the path drive in and reverse out, which put a 1-metre
+  // hairpin in the route and had it crossing itself.
+  const path = [from.id];
   const wayTags = [];
-  for (let id = to.id; prev.has(id); ) {
-    const step = prev.get(id);
-    wayTags.push(step.way.tags ?? {});
-    id = step.from;
-    path.push(id);
+  let metres = 0;
+  let at = from.id;
+
+  const hop = (target) => {
+    const leg = shortestPath(edges, at, target);
+    if (!leg) throw new Error('No connected road from waypoint to ' + target);
+    path.push(...leg.path.slice(1));
+    wayTags.push(...leg.tags);
+    metres += leg.metres;
+    at = target;
+  };
+
+  for (const name of via ?? []) {
+    const section = namedWay(ways, used, name);
+    if (!section) throw new Error('No way named "' + name + '" in that area');
+
+    // Drive it whichever way round is shorter to reach.
+    const forward = shortestPath(edges, at, section[0]);
+    const backward = shortestPath(edges, at, section[section.length - 1]);
+    const useForward =
+      forward && (!backward || forward.metres <= backward.metres);
+    if (!forward && !backward) throw new Error('Cannot reach the section named "' + name + '"');
+    const ordered = useForward ? section : [...section].reverse();
+
+    const before = metres;
+    hop(ordered[0]);
+    const approach = metres - before;
+    for (let i = 1; i < ordered.length; i++) {
+      metres += metresBetween(nodes.get(ordered[i - 1]), nodes.get(ordered[i]));
+      path.push(ordered[i]);
+      wayTags.push({ name });
+    }
+    at = ordered[ordered.length - 1];
+    console.log(`  via            ${name}: ${Math.round(approach)}m to reach, ${Math.round(metres - before - approach)}m through`);
   }
-  path.reverse();
+  hop(to.id);
 
   return {
     points: path.map((id) => nodes.get(id)),
     snapped: { start: from.dist, end: to.dist },
-    roadMetres: dist.get(to.id),
+    roadMetres: metres,
     tags: wayTags,
     names: [...new Set(wayTags.map((t) => t.name || t.ref).filter(Boolean))],
   };
@@ -342,6 +350,73 @@ function readOsmCache(file) {
     tags: [{ lanes: String(data.road?.lanes ?? ''), width: data.road?.width }],
     names: data.road?.name ? [data.road.name] : [],
   };
+}
+
+/** Strip accents and case, so "Parabolica" matches "Parabólica". */
+function plain(text) {
+  return String(text ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/** The node list of the longest way carrying this name, or null. */
+function namedWay(ways, used, name) {
+  const wanted = plain(name);
+  let best = null;
+  for (const way of ways) {
+    if (plain(way.tags?.name) !== wanted) continue;
+    const usable = way.nodes.filter((id) => used.has(id));
+    if (usable.length < 2) continue;
+    if (best === null || usable.length > best.length) best = usable;
+  }
+  return best;
+}
+
+/** Shortest path between two nodes: the node list, the ways used, and its length. */
+function shortestPath(edges, fromId, toId) {
+  const dist = new Map([[fromId, 0]]);
+  const prev = new Map();
+  const queue = new Set([fromId]);
+  const done = new Set();
+  while (queue.size > 0) {
+    let current = null;
+    let best = Infinity;
+    for (const id of queue) {
+      const d = dist.get(id) ?? Infinity;
+      if (d < best) {
+        best = d;
+        current = id;
+      }
+    }
+    queue.delete(current);
+    done.add(current);
+    if (current === toId) break;
+    for (const edge of edges.get(current) ?? []) {
+      if (done.has(edge.to)) continue;
+      const d = best + edge.cost;
+      if (d < (dist.get(edge.to) ?? Infinity)) {
+        dist.set(edge.to, d);
+        prev.set(edge.to, { from: current, way: edge.way });
+        queue.add(edge.to);
+      }
+    }
+  }
+  if (!dist.has(toId)) return null;
+
+  const path = [toId];
+  const tags = [];
+  for (let id = toId; prev.has(id); ) {
+    const step = prev.get(id);
+    tags.push(step.way.tags ?? {});
+    id = step.from;
+    path.push(id);
+  }
+  path.reverse();
+  // Tags came off the search backwards; report them in driving order.
+  tags.reverse();
+  return { path, tags, metres: dist.get(toId) };
 }
 
 /** Project lat/lon to local metres about the first point. */
@@ -425,7 +500,17 @@ function widthFromTags(tags) {
   return widths[Math.floor(widths.length / 2)];
 }
 
-/** Resample an arbitrary polyline to fixed arc-length intervals. */
+/**
+ * Resample an arbitrary polyline to fixed arc-length intervals.
+ *
+ * `carry` is how far along we already are towards the next sample when a
+ * segment ends. The first version restarted the walk at `carry` into the next
+ * segment instead of `ds - carry`, which quietly dropped one sample at every
+ * node: an imported road came out about two metres short per mapped node --
+ * 600m over Estoril's 300 nodes -- and since the sim trusts sampleSpacing, its
+ * corners read tighter than the real ones. The route baked then was not the
+ * road that was fetched.
+ */
 function resamplePolyline(points, ds) {
   const out = [{ x: points[0].x, y: points[0].y }];
   let carry = 0;
@@ -436,13 +521,13 @@ function resamplePolyline(points, ds) {
     const by = points[i].y;
     const segLen = Math.hypot(bx - ax, by - ay);
     if (segLen === 0) continue;
-    let t = carry;
-    while (t + ds <= segLen) {
-      t += ds;
-      out.push({ x: ax + ((bx - ax) * t) / segLen, y: ay + ((by - ay) * t) / segLen });
+    let along = 0;
+    while (carry + (segLen - along) >= ds) {
+      along += ds - carry;
+      carry = 0;
+      out.push({ x: ax + ((bx - ax) * along) / segLen, y: ay + ((by - ay) * along) / segLen });
     }
-    carry = t + ds - segLen;
-    carry = ds - (segLen - t);
+    carry += segLen - along;
   }
   return out;
 }
@@ -799,7 +884,7 @@ async function bakeFromOsmRoute(start, end, spec, cacheFile, saveTo) {
   // A committed Overpass result, so a route can be re-baked -- or cut into
   // sections -- without hitting the network again and without the road
   // silently changing under it between bakes.
-  const road = cacheFile ? readOsmCache(cacheFile) : await fetchOsmRoute(start, end, spec.roadKinds, spec.avoid);
+  const road = cacheFile ? readOsmCache(cacheFile) : await fetchOsmRoute(start, end, spec.roadKinds, spec.avoid, spec.via);
   console.log('  osm            ' + road.points.length + ' nodes, ' + road.roadMetres.toFixed(0) + 'm of road');
   console.log('  snapped        start ' + road.snapped.start.toFixed(0) + 'm, end ' + road.snapped.end.toFixed(0) + 'm from the given points');
   if (road.names.length > 0) console.log('  road names     ' + road.names.join(', '));
