@@ -1,0 +1,16 @@
+{
+  "id": "nurburg",
+  "version": 1,
+  "name": "NURBURG",
+  "location": "Nürburg, Eifel",
+  "seed": 20260924,
+  "sampleSpacing": 2,
+  "width": 10,
+  "grip": 1,
+  "smoothing": 6,
+  "roadKinds": [
+    "raceway"
+  ],
+  "_note": "The north loop from Tiergarten to Quiddelbacher Höhe, imported from OpenStreetMap. Restricted to raceway ways (the shortest path over public roads would cut the corner) and pit lanes are excluded. Wider than a public road, because it is: 10m, and wider again through the T13 chicane. Re-bake with: node tools/bake-route.mjs tools/specs/nurburg.json --osm-file tools/osm/nurburg.osm.json --out public/routes/nurburg.json",
+  "hairpinWidening": 2.2
+}

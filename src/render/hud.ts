@@ -24,6 +24,8 @@ export interface HudElements {
   speedValue: HTMLElement;
   angleValue: HTMLElement;
   pace: HTMLElement;
+  progressFill: HTMLElement;
+  progressLabel: HTMLElement;
   flash: HTMLElement;
   /** "+2,340" when a drift ends and its points are banked. */
   bankPop: HTMLElement;
@@ -55,6 +57,15 @@ export class Hud {
   update(state: SimState, route: RouteData, config: SimConfig): void {
     const el = this.el;
     const mode = config.mode;
+
+    // How far through the route, and how much is left. On a 7km pass the
+    // difference between "nearly there" and "a third of the way" is the whole
+    // shape of a run, and from a top-down view with the road fogged out a few
+    // hundred metres ahead there is no other way to tell.
+    const remaining = Math.max(0, route.length - state.distance);
+    el.progressFill.style.width = `${Math.min(100, Math.max(0, (state.distance / route.length) * 100)).toFixed(1)}%`;
+    el.progressLabel.textContent =
+      remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}km` : `${Math.round(remaining / 10) * 10}m`;
     if (config.controls === 'throttle') {
       el.gauge.update(state.driftAngle, state.throttle, state.driftDir !== 0 || state.spinTicks > 0, config.drift);
     }
@@ -103,8 +114,9 @@ export class Hud {
         state.penaltyTicks > 0 ? `+${(state.penaltyTicks / TICK_RATE).toFixed(0)}s` : '--';
       el.scoreLabel.textContent = 'Time';
       el.scoreValue.textContent = formatTime(seconds);
-      el.driftLabel.textContent = 'Left';
-      el.driftValue.textContent = `${Math.max(0, Math.round((route.length - state.distance) / 10) * 10)}m`;
+      // Distance left moved to the progress bar; this cell shows what it cost.
+      el.driftLabel.textContent = 'Hits';
+      el.driftValue.textContent = String(state.wallHits);
       if (state.hitThisTick) this.flash();
     }
 

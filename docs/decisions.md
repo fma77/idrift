@@ -231,6 +231,12 @@ route can be re-baked without the network and the source geometry stays reviewab
 The course map now shrinks and thins out clip markers on long routes: at 7km there are
 hundreds, and at map scale they drew more red than road.
 
+A progress bar runs along the top of the HUD: a filled line plus the distance left. On
+a 7km pass, with the road fogged out a few hundred metres ahead, there was otherwise no
+way to tell a third of the way in from nearly home. The pace notes were compressed to
+one line each to pay for the space, and Time Attack's "distance left" cell became a
+wall-hit count, since the bar now says the same thing better.
+
 Race circuits import too, with two extra rules: `highway=raceway` is not a road type
 and has to be asked for (`roadKinds` in the spec), and pit lanes are dropped from the
 graph, because the shortest path between two corners will take the pit lane every time.

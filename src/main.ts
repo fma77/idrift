@@ -108,6 +108,8 @@ const hud = new Hud({
   speedValue: $('hud-speed'),
   angleValue: $('hud-angle'),
   pace: $('pace'),
+  progressFill: $('progress-fill'),
+  progressLabel: $('progress-label'),
   flash: $('hud-flash'),
   bankPop: $('bank-pop'),
   gauge: new DriftGauge($('drift-gauge')),
