@@ -9,6 +9,9 @@ import type { RouteData } from '../sim/types.ts';
  * content.
  */
 
+/** Required by the ODbL for anything built from OpenStreetMap data. */
+const OSM_CREDIT = 'Road data from OpenStreetMap contributors (ODbL)';
+
 export interface RouteEntry {
   id: string;
   name: string;
@@ -32,26 +35,36 @@ export const ROUTES: RouteEntry[] = [
     blurb: 'Fast opener, three hairpins, esses in the middle. 1.5km down.',
   },
   {
-    id: 'kirisame-ridge',
-    name: 'KIRISAME RIDGE',
-    location: 'Kirisame Ridge, East Col',
-    file: 'routes/kirisame-ridge.json',
-    blurb: 'Long radii, linked esses, one hairpin that bites. 1.75km.',
+    id: 'haruna-lower',
+    name: 'HARUNA LOWER',
+    location: 'Mount Haruna, Gunma',
+    file: 'routes/haruna-lower.json',
+    blurb: 'The bottom third of the real pass. 7 hairpins, 2.2km.',
+    attribution: OSM_CREDIT,
   },
   {
-    id: 'shiomi-docks',
-    name: 'SHIOMI DOCKS',
-    location: 'Shiomi Docks, Berth 9',
-    file: 'routes/shiomi-docks.json',
-    blurb: 'Wide, slippery and tight. Built for angle, not speed. 1km.',
+    id: 'haruna-middle',
+    name: 'HARUNA MIDDLE',
+    location: 'Mount Haruna, Gunma',
+    file: 'routes/haruna-middle.json',
+    blurb: 'The middle third, corner after corner. 8 hairpins, 2.1km.',
+    attribution: OSM_CREDIT,
+  },
+  {
+    id: 'haruna-upper',
+    name: 'HARUNA UPPER',
+    location: 'Mount Haruna, Gunma',
+    file: 'routes/haruna-upper.json',
+    blurb: 'The top third, and the tightest of it. 13 hairpins, 2.5km.',
+    attribution: OSM_CREDIT,
   },
   {
     id: 'haruna-downhill',
-    name: 'HARUNA DOWNHILL',
+    name: 'HARUNA FULL PASS',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-downhill.json',
-    blurb: 'The real pass, imported from the map. 29 hairpins, 6.9km.',
-    attribution: 'Road data from OpenStreetMap contributors (ODbL)',
+    blurb: 'All three sections in one run. 28 hairpins, 6.8km.',
+    attribution: OSM_CREDIT,
   },
 ];
 

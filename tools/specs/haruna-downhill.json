@@ -1,11 +1,11 @@
 {
   "id": "haruna-downhill",
   "version": 1,
-  "name": "HARUNA DOWNHILL",
+  "name": "HARUNA FULL PASS",
   "location": "Mount Haruna, Gunma",
   "seed": 20260920,
   "sampleSpacing": 2,
   "grip": 1,
   "smoothing": 6,
-  "_note": "The real Mount Haruna pass road, imported from OpenStreetMap. Re-bake with: node tools/bake-route.mjs tools/specs/haruna-downhill.json --osm-route 36.4830048,138.8965335 36.4992659,138.9162934 --out public/routes/haruna-downhill.json"
+  "_note": "The complete Mount Haruna pass, imported from OpenStreetMap; the three section routes are cuts of this same road. Re-bake with: node tools/bake-route.mjs tools/specs/haruna-downhill.json --osm-file tools/osm/haruna-downhill.osm.json --out public/routes/haruna-downhill.json"
 }

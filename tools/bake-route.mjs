@@ -15,6 +15,7 @@
  *   node tools/bake-route.mjs tools/specs/<name>.json
  *   node tools/bake-route.mjs --osm <overpass-way-id> --out public/routes/<id>.json
  *   node tools/bake-route.mjs tools/specs/<name>.json --osm-route <lat,lon> <lat,lon>
+ *   node tools/bake-route.mjs tools/specs/<name>.json --osm-file tools/osm/<name>.osm.json
  *
  * Unlike src/sim/**, this file may use Math.sin and friends freely: its output
  * is committed data, so it is baked once on one machine and every player then
@@ -301,6 +302,19 @@ async function fetchOsmRoute(start, end) {
     roadMetres: dist.get(to.id),
     tags: wayTags,
     names: [...new Set(wayTags.map((t) => t.name || t.ref).filter(Boolean))],
+  };
+}
+
+/** Load a committed Overpass result in place of a live query. */
+function readOsmCache(file) {
+  const data = JSON.parse(readFileSync(resolve(file), 'utf8'));
+  if (!Array.isArray(data.points) || data.points.length < 2) throw new Error('Bad OSM cache: ' + file);
+  return {
+    points: data.points.map(([lat, lon]) => ({ lat, lon })),
+    snapped: { start: data.query?.snappedMetres?.[0] ?? 0, end: data.query?.snappedMetres?.[1] ?? 0 },
+    roadMetres: data.road?.metres ?? 0,
+    tags: [{ lanes: String(data.road?.lanes ?? ''), width: data.road?.width }],
+    names: data.road?.name ? [data.road.name] : [],
   };
 }
 
@@ -754,9 +768,12 @@ async function bakeFromOsm(wayId, spec) {
  * The spec supplies what OSM cannot: the name, the width when the tags are
  * silent, the grip, and how much of the road to use.
  */
-async function bakeFromOsmRoute(start, end, spec) {
+async function bakeFromOsmRoute(start, end, spec, cacheFile) {
   const ds = spec.sampleSpacing ?? 2;
-  const road = await fetchOsmRoute(start, end);
+  // A committed Overpass result, so a route can be re-baked -- or cut into
+  // sections -- without hitting the network again and without the road
+  // silently changing under it between bakes.
+  const road = cacheFile ? readOsmCache(cacheFile) : await fetchOsmRoute(start, end);
   console.log('  osm            ' + road.points.length + ' nodes, ' + road.roadMetres.toFixed(0) + 'm of road');
   console.log('  snapped        start ' + road.snapped.start.toFixed(0) + 'm, end ' + road.snapped.end.toFixed(0) + 'm from the given points');
   if (road.names.length > 0) console.log('  road names     ' + road.names.join(', '));
@@ -846,6 +863,7 @@ async function main() {
 
   const osmIndex = args.indexOf('--osm');
   const routeIndex = args.indexOf('--osm-route');
+  const fileIndex = args.indexOf('--osm-file');
   const outIndex = args.indexOf('--out');
   const specPath = resolve(args[0]);
   const spec = JSON.parse(readFileSync(specPath, 'utf8'));
@@ -857,7 +875,9 @@ async function main() {
   };
 
   const route =
-    routeIndex >= 0
+    fileIndex >= 0
+      ? await bakeFromOsmRoute(null, null, spec, args[fileIndex + 1])
+      : routeIndex >= 0
       ? await bakeFromOsmRoute(latLon(args[routeIndex + 1]), latLon(args[routeIndex + 2]), spec)
       : osmIndex >= 0
         ? await bakeFromOsm(args[osmIndex + 1], spec)

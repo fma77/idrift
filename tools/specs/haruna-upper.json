@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "location": "Mount Haruna, Gunma",
+  "sampleSpacing": 2,
+  "grip": 1,
+  "smoothing": 6,
+  "_note": "Section of the real Mount Haruna pass, imported from OpenStreetMap. Re-bake with: node tools/bake-route.mjs tools/specs/<this file> --osm-file tools/osm/haruna-downhill.osm.json --out public/routes/<id>.json",
+  "id": "haruna-upper",
+  "name": "HARUNA UPPER",
+  "seed": 20260923,
+  "trimStart": 4360,
+  "maxLength": 2478
+}

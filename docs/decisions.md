@@ -231,6 +231,13 @@ route can be re-baked without the network and the source geometry stays reviewab
 The course map now shrinks and thins out clip markers on long routes: at 7km there are
 hundreds, and at map scale they drew more red than road.
 
+The pass also ships cut into three sections of roughly 2.2km -- lower, middle and upper
+-- alongside the full 6.8km run, all four baked from the same committed Overpass result
+with `--osm-file`, so they cannot drift apart. Cuts are placed at the straightest point
+within 200m of each third, rather than at the exact third, so no section starts or ends
+mid-hairpin. The two invented routes beyond the first were removed: the direction of the
+game is real roads, and keeping hand-drawn ones around only splits the leaderboards.
+
 
 ### Engine sound is synthesised, pulse by pulse
 
