@@ -203,6 +203,35 @@ paper-2.
 
 ## Additions not in the brief
 
+### Routes can be imported from OpenStreetMap
+
+`tools/bake-route.mjs --osm-route <lat,lon> <lat,lon>` builds a route from a real road
+between two points: it pulls every road in the box from Overpass, walks the shortest
+path through them (ignoring one-way tags -- it is the shape being imported), projects
+to metres, resamples, and hands the centreline to the same baker the hand-written specs
+use. HARUNA DOWNHILL is the first: the real Mount Haruna pass, 6.9km and 29 hairpins.
+
+Three things a mapped road needs before it is drivable:
+
+- **Smoothing.** OSM geometry is traced by hand from imagery, so a straight is never
+  straight to the metre, and the raw noise reads to the corner detector as dozens of
+  kinks.
+- **Easing the pinched corners.** Resampling a hairpin that has five nodes in it can
+  make it tighter than it is; Haruna came out with a 6-metre-radius turn no car can
+  drive. `relaxTightCorners` averages only the samples under the minimum radius and
+  leaves the rest of the road as mapped.
+- **Widening hairpins.** OSM records one width for a whole way, but hairpins are built
+  wider than the road leading to them. Half-width gains up to 1.6m as the radius falls
+  below 30m.
+
+Imported routes carry an `attribution` string, shown on the route screen. The ODbL
+requires it, and the cached Overpass result is committed under `tools/osm/` so the
+route can be re-baked without the network and the source geometry stays reviewable.
+
+The course map now shrinks and thins out clip markers on long routes: at 7km there are
+hundreds, and at map scale they drew more red than road.
+
+
 ### Engine sound is synthesised, pulse by pulse
 
 Four engines, one per car: a high-revving NA four, a two-rotor rotary, a turbo straight

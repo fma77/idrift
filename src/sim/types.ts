@@ -198,6 +198,8 @@ export interface RouteData {
   /** Sanity bounds for server-side score rejection. */
   theoreticalMinTime: number;
   theoreticalMaxPoints: number;
+  /** Credit for third-party source data. Never read by the sim. */
+  attribution?: string;
   /** Rendering only. Never read by the sim. */
   decoration?: string;
   poster?: string;

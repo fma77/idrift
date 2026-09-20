@@ -519,7 +519,11 @@ function humanDriver() {
   };
 }
 
-function drive(track, car, mode, driver, maxSeconds = 240) {
+// Long routes need a long allowance: the imported Mount Haruna pass is nearly
+// 7km, which is minutes of driving rather than the 90 seconds of the others.
+const allowance = (track) => Math.max(240, track.length / 5);
+
+function drive(track, car, mode, driver, maxSeconds = allowance(track)) {
   const state = createSimState(track, car);
   const config = configFor(mode);
   let steer = 0;
@@ -671,7 +675,7 @@ function throttleDriver(kind) {
   };
 }
 
-function driveThrottle(track, car, kind, maxSeconds = 200) {
+function driveThrottle(track, car, kind, maxSeconds = allowance(track)) {
   const state = createSimState(track, car);
   const config = configFor('driftRun', 'throttle');
   const driver = throttleDriver(kind);

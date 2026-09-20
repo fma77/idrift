@@ -19,6 +19,8 @@ export interface RouteEntry {
   poster?: string;
   /** Short flavour line for the route card. */
   blurb: string;
+  /** Credit line for routes built from third-party data. Shown on the route screen. */
+  attribution?: string;
 }
 
 export const ROUTES: RouteEntry[] = [
@@ -42,6 +44,14 @@ export const ROUTES: RouteEntry[] = [
     location: 'Shiomi Docks, Berth 9',
     file: 'routes/shiomi-docks.json',
     blurb: 'Wide, slippery and tight. Built for angle, not speed. 1km.',
+  },
+  {
+    id: 'haruna-downhill',
+    name: 'HARUNA DOWNHILL',
+    location: 'Mount Haruna, Gunma',
+    file: 'routes/haruna-downhill.json',
+    blurb: 'The real pass, imported from the map. 29 hairpins, 6.9km.',
+    attribution: 'Road data from OpenStreetMap contributors (ODbL)',
   },
 ];
 

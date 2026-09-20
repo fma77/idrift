@@ -224,6 +224,11 @@ async function openIntro(entry: RouteEntry): Promise<void> {
   currentRoute = await loadRoute(entry);
   $('intro-name').textContent = entry.name;
   $('intro-location').textContent = entry.location;
+  // Routes built from someone else's data say whose. Required by the ODbL for
+  // the OpenStreetMap ones, and only fair for anything else.
+  const credit = currentRoute.attribution ?? entry.attribution ?? '';
+  $('intro-credit').textContent = credit;
+  $('intro-credit').hidden = credit === '';
 
   const route = currentRoute;
   $('intro-stats').replaceChildren(
@@ -437,9 +442,22 @@ function drawMinimap(route: RouteData): void {
   // the one rule the design system is most insistent about. The clip points
   // carry the same information a player actually needs from a course map:
   // where the apexes are and how they are strung together.
+  //
+  // On a long route there are hundreds of them, and at map scale they merge
+  // into a red snake thicker than the road -- the imported 7km pass drew more
+  // red than ink. So they shrink, and any that would overlap the last one
+  // drawn are skipped: the shape of the route has to stay readable.
   ctx.fillStyle = '#e8402a';
+  const size = route.clipPoints.length > 40 ? 3 : 5;
+  let lastX = -100;
+  let lastY = -100;
   for (const clip of route.clipPoints) {
-    ctx.fillRect(px(clip.index) - 2.5, py(clip.index) - 2.5, 5, 5);
+    const cx = px(clip.index);
+    const cy = py(clip.index);
+    if (Math.hypot(cx - lastX, cy - lastY) < size * 2) continue;
+    ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+    lastX = cx;
+    lastY = cy;
   }
 
   // Start and finish.
