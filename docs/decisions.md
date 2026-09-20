@@ -203,6 +203,20 @@ paper-2.
 
 ## Additions not in the brief
 
+### The logo is one piece of art, cut two ways
+
+Filipe's logo -- brush "iDrift", red sun, car, smoke -- is the app icon, the title mark
+and the favicon, but not the same crop of it. At 16 or 32 pixels the lettering turns to
+grey mush, so the browser tab gets a crop of the car against the sun, which still reads
+as something at that size, and the full artwork is used anywhere it is shown at 96px or
+more. `tools/make-icons.mjs` generates the lot from `art/idrift-logo.png`, which lives
+outside `public/` so the 2MB original is not shipped to players. Paletted PNGs and a
+WebP for the title mark: the whole game is ~30KB of JavaScript, and an unoptimised logo
+would have been twenty times the download.
+
+A web manifest comes with them, so adding the game to a phone's home screen gives a
+proper icon and name and it opens without browser chrome.
+
 ### Routes can be imported from OpenStreetMap
 
 `tools/bake-route.mjs --osm-route <lat,lon> <lat,lon>` builds a route from a real road

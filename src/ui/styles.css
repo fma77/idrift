@@ -7,6 +7,33 @@
  * shadows except the app icon.
  */
 
+/*
+ * The title mark is the logo artwork rather than type. The <h1> keeps the name
+ * for screen readers and for anywhere the image does not load.
+ */
+.title-logo {
+  margin: 8px 0 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+.title-logo img {
+  width: min(72vw, 320px);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Centred with it, so the mark reads as a title rather than a stray card. */
+#screen-title .screen-inner > div:nth-child(2) {
+  text-align: center;
+}
+
+#screen-title .caption {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 :root {
   --paper: #f4f1ea;
   --paper-2: #e0dbd0;
