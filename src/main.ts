@@ -85,11 +85,12 @@ const settings: Settings = loadSettings();
 applySoundOverrides();
 let currentEntry: RouteEntry = ROUTES[0];
 let currentRoute: RouteData | null = null;
-let currentMode: SimMode = 'timeAttack';
+// Drift Run is the game's main mode: it is listed first and chosen by default.
+let currentMode: SimMode = 'driftRun';
 let session: GameSession | null = null;
 let lastOutcome: RunOutcome | null = null;
 /** Which board the route screen is showing. */
-let boardMode: SimMode = 'timeAttack';
+let boardMode: SimMode = 'driftRun';
 /** Row id of the score just posted, so it can be highlighted on the board. */
 let myLastRowId: string | null = null;
 
