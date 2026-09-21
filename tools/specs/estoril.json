@@ -1,6 +1,6 @@
 {
   "id": "estoril",
-  "version": 1,
+  "version": 2,
   "name": "ESTORIL",
   "location": "Estoril, Portugal",
   "seed": 20260925,
@@ -18,5 +18,6 @@
     "Esses",
     "Parabólica Ayrton Senna"
   ],
-  "_note": "From Recta Interior round to Recta da Meta, via the named sections. Without the via list the shortest path cuts straight across the infield instead of driving the lap. The finish point given was 11m from the pit lane and 86m from the main straight, so it snapped to the wrong section and doubled back; it is now a point 310m down Recta da Meta. Re-bake with: node tools/bake-route.mjs tools/specs/estoril.json --osm-route 38.750469,-9.393901 38.751244,-9.391810 --out public/routes/estoril.json"
+  "_note": "From Recta Interior round to Recta da Meta, via the named sections. Without the via list the shortest path cuts straight across the infield instead of driving the lap. The finish point given was 11m from the pit lane and 86m from the main straight, so it snapped to the wrong section and doubled back; it is now a point 310m down Recta da Meta. Re-bake with: node tools/bake-route.mjs tools/specs/estoril.json --osm-route 38.750469,-9.393901 38.751244,-9.391810 --out public/routes/estoril.json",
+  "scale": 0.6
 }

@@ -1,7 +1,11 @@
 import type { PosterArt } from '../data/posters.ts';
 
 /**
- * The course, start, finish and compass, drawn over a painted poster.
+ * Start, finish, direction arrows and compass, drawn over a painted poster.
+ *
+ * The course itself is not drawn: the paintings are loose with the layout, and
+ * a traced line that disagrees with the painted road looks wrong from any
+ * distance. Arrows on the stretches that do match say which way round it goes.
  *
  * SVG in the painting's own pixels, laid over the <img>, so it scales with the
  * picture and the text is set in the game's fonts rather than baked into it.
@@ -19,13 +23,11 @@ export function drawPosterOverlay(svg: SVGSVGElement, art: PosterArt): void {
   // painting get the same weight of line on the same phone.
   const u = art.width / 1468;
   const pts = art.trace;
-  const d = smoothPath(pts);
   const start = frameAt(pts, 0);
   const finish = frameAt(pts, pts.length - 1);
 
   svg.innerHTML = `
-    <path d="${d}" fill="none" stroke="${INK}" stroke-width="${17 * u}" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
-    <path d="${d}" fill="none" stroke="${RED}" stroke-width="${9 * u}" stroke-linecap="round" stroke-linejoin="round"/>
+    ${art.arrows.map((i) => arrow(frameAt(pts, i), u)).join('')}
     ${startLine(start, u)}
     ${chequer(finish, u)}
     ${tag('START', start, art.startSide, u)}
@@ -55,21 +57,15 @@ function frameAt(pts: [number, number][], i: number): Frame {
   return { x: pts[i][0], y: pts[i][1], tx, ty, nx: ty, ny: -tx, deg: (Math.atan2(ty, tx) * 180) / Math.PI };
 }
 
-/** Catmull-Rom through the traced points, as cubic Béziers. */
-function smoothPath(pts: [number, number][]): string {
-  let d = `M${pts[0][0]},${pts[0][1]}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(pts.length - 1, i + 2)];
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d += ` C${r(c1x)},${r(c1y)} ${r(c2x)},${r(c2y)} ${p2[0]},${p2[1]}`;
-  }
-  return d;
+/** A red arrow along the road, pointing the way the route runs. */
+function arrow(f: Frame, u: number): string {
+  const l = 34 * u;
+  const w = 16 * u;
+  const shaft = 7 * u;
+  return `<g transform="translate(${r(f.x)},${r(f.y)}) rotate(${r(f.deg)})">
+    <polygon points="${r(-l)},${r(-shaft)} ${r(l * 0.2)},${r(-shaft)} ${r(l * 0.2)},${r(-w)} ${r(l)},0 ${r(l * 0.2)},${r(w)} ${r(l * 0.2)},${r(shaft)} ${r(-l)},${r(shaft)}"
+      fill="${RED}" stroke="${INK}" stroke-width="${4 * u}" stroke-linejoin="round"/>
+  </g>`;
 }
 
 function r(v: number): string {

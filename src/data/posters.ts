@@ -14,8 +14,13 @@ export interface PosterArt {
   /** Size of the original painting. The trace is in these pixels. */
   width: number;
   height: number;
-  /** Centreline of the route on the painting, start to finish. */
+  /**
+   * The route on the painting, start to finish. Only its ends and the arrow
+   * points are drawn, so it needs to be right there and nowhere else.
+   */
   trace: [number, number][];
+  /** Trace points to put a direction arrow on. */
+  arrows: number[];
   /** Where north points on the painting, degrees clockwise from straight up. */
   north: number;
   /** Which side of the road the START and FINISH tags go: 1 left of travel, -1 right. */
@@ -30,6 +35,7 @@ export const ESTORIL_POSTER: PosterArt = {
   north: -2,
   startSide: 1,
   finishSide: 1,
+  arrows: [3, 24, 46],
   trace: [
     [645, 900], [685, 840], [740, 760], [795, 685], [840, 620], [885, 565], [930, 520],
     [962, 470], [978, 420], [968, 385], [940, 360], [905, 352], [865, 365], [820, 397],

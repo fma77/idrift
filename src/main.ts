@@ -389,8 +389,6 @@ function showPoster(route: RouteData): void {
   if (art && poster) {
     $<HTMLImageElement>('poster-img').src = poster.src;
     drawPosterOverlay($('poster-overlay') as unknown as SVGSVGElement, art);
-    $('poster-name').textContent = currentEntry.name;
-    $('poster-meta').textContent = `${(route.length / 1000).toFixed(1)} KM · ${route.corners.length} CORNERS`;
     frame.hidden = false;
     canvas.hidden = true;
     return;

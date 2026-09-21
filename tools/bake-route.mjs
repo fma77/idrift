@@ -912,7 +912,11 @@ async function bakeFromOsmRoute(start, end, spec, cacheFile, saveTo) {
     console.log('  saved          ' + saveTo);
   }
 
-  let points = resamplePolyline(projectToMetres(road.points), ds);
+  // Game scale: real roads shrunk so a straight takes the time it feels like it
+  // should at arcade speed. Road width is set separately and is not scaled.
+  const scale = spec.scale ?? 1;
+  const projected = projectToMetres(road.points).map((p) => ({ x: p.x * scale, y: p.y * scale }));
+  let points = resamplePolyline(projected, ds);
   points = smoothPolyline(points, spec.smoothing ?? 6);
 
   // Trimming, in metres off each end, for cutting a run out of a longer road.
