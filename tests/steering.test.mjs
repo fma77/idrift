@@ -113,14 +113,22 @@ test('the throttle builds while held and falls away when let go', () => {
   assert.equal(input.raw.throttle, 0, 'and closed');
 });
 
-test('a drift tap is held until the game records it, then cleared', () => {
-  // Taps are events, not held keys. If one landed between two input samples
-  // and was cleared by the next frame, the sim would never see it.
+test('a quick drift tap survives until recorded; a held press stays down', () => {
+  // A press shorter than one input sample must still reach the sim, or a
+  // quick tap between two samples would be lost.
   const input = new InputController();
   input.pressDrift();
-  input.update(1 / 60);
+  input.releaseDrift();
   input.update(1 / 60);
   assert.equal(input.raw.initiate, true, 'a tap survives frames until it is recorded');
+  input.consumeInitiate();
+  assert.equal(input.raw.initiate, false, 'and then it is gone');
+
+  // Held: the length of the press is the size of the flick, so it stays down.
+  input.pressDrift();
+  input.consumeInitiate();
+  assert.equal(input.raw.initiate, true, 'a held press stays down across samples');
+  input.releaseDrift();
   input.consumeInitiate();
   assert.equal(input.raw.initiate, false);
 });

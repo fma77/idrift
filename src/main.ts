@@ -124,8 +124,10 @@ thumb.setSensitivity(settings.steerSensitivity);
 /** Drift Run's throttle controls: tap the left half to drift, hold the right. */
 const pedals = new PedalTouch($('pedal-surface'), {
   onThrottle: (held) => input.setTouchThrottle(held),
-  onDrift: () => input.pressDrift(),
+  onDrift: (held) => (held ? input.pressDrift() : input.releaseDrift()),
 });
+
+hud.setDriftPad(pedals.driftZone);
 
 /** Which controls the current run uses. */
 let currentControls: Controls = 'steer';
@@ -691,8 +693,8 @@ async function startRun(mode: SimMode): Promise<void> {
   $('countdown-hint').textContent =
     currentControls === 'throttle'
       ? keys
-        ? `Hold ${key('throttle')} for throttle. Tap ${key('drift')} before a corner to drift, then balance the angle with the throttle. Too much and you spin.`
-        : 'Hold the right side for throttle. Tap the left side before a corner to drift, then balance the angle with the throttle. Too much and you spin.'
+        ? `Hold ${key('throttle')} for throttle. Press ${key('drift')} before a corner to drift: a tap is a soft kick, a short press a full one, too long and you spin. Then balance the angle with the throttle.`
+        : 'Hold the right side for throttle. Press the left side before a corner to drift: a tap is a soft kick, a short press a full one, too long and you spin. Then balance the angle with the throttle.'
       : keys
         ? `${key('left')} ${key('right')} to steer. The car drives itself.`
         : 'Touch anywhere and slide to steer. The car drives itself.';

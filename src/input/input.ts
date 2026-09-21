@@ -17,7 +17,7 @@ export interface RawInput {
   steer: number;
   /** 0..1. Builds while the throttle is held and falls away when it is not. */
   throttle: number;
-  /** A drift tap waiting to be recorded. Latched until the game consumes it. */
+  /** The drift button, held. A press shorter than a sample is latched until recorded. */
   initiate: boolean;
 }
 
@@ -53,6 +53,8 @@ const STEER_RELEASE = 0.1;
 
 export class InputController {
   readonly raw: RawInput = { steer: 0, throttle: 0, initiate: false };
+  /** Whether the drift button is physically down right now. */
+  private driftDown = false;
 
   private keymap: Keymap = DEFAULT_KEYMAP;
   /** Physical keys currently held, by KeyboardEvent.code. */
@@ -88,14 +90,20 @@ export class InputController {
     this.touchThrottle = held;
   }
 
-  /** The drift button was tapped. Stays set until the game records it. */
+  /** Drift button down. How long it stays down is the size of the flick. */
   pressDrift(): void {
+    this.driftDown = true;
     this.raw.initiate = true;
   }
 
-  /** Called by the game once the tap has gone into a recorded input sample. */
+  /** Drift button up. A press so quick it fell between samples still counts once. */
+  releaseDrift(): void {
+    this.driftDown = false;
+  }
+
+  /** Called by the game once a sample has been recorded. */
   consumeInitiate(): void {
-    this.raw.initiate = false;
+    this.raw.initiate = this.driftDown;
   }
 
   enable(): void {
@@ -122,6 +130,7 @@ export class InputController {
     this.raw.steer = 0;
     this.raw.throttle = 0;
     this.raw.initiate = false;
+    this.driftDown = false;
   }
 
   /**
@@ -183,6 +192,7 @@ export class InputController {
     if (!this.isBound(e.code)) return;
     e.preventDefault();
     this.press(e.code, false);
+    if (this.keymap.drift.includes(e.code)) this.releaseDrift();
   }
 }
 

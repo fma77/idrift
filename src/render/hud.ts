@@ -1,6 +1,11 @@
 import { TICK_RATE } from '../sim/version.ts';
 import type { RouteData, SimConfig, SimState } from '../sim/types.ts';
 import type { DriftGauge } from './driftGauge.ts';
+import { holdPhase, HOLD_OVER } from '../sim/model/throttleDrift.ts';
+
+/** Seconds the hold meter spans: past HOLD_OVER, with room to see it overshoot. */
+const HOLD_SCALE = HOLD_OVER * 1.6;
+const HOLD_WORDS = { soft: 'SOFT', full: 'FULL', over: 'TOO LONG' } as const;
 
 /**
  * HUD, in DOM rather than on the canvas.
@@ -42,6 +47,10 @@ export class Hud {
   private lastScore = 0;
   private lastBanked = 0;
   private lastPaceKey = '';
+  /** The touch drift pad, filled while the button is held. */
+  private driftPad: HTMLElement | null = null;
+  private holdWasOn = false;
+  private holdTimer = 0;
   private lastZone = -1;
   private lastCleared = 0;
   private zoneTimer = 0;
@@ -50,6 +59,54 @@ export class Hud {
 
   constructor(el: HudElements) {
     this.el = el;
+  }
+
+  setDriftPad(pad: HTMLElement): void {
+    this.driftPad = pad;
+  }
+
+  /**
+   * How long the drift button is being held, and what that gives: the pad
+   * fills and changes colour -- soft, full, too long -- and on release shows
+   * the press it got, so the player can learn the timing. Read from the sim,
+   * so it is the hold the car actually felt.
+   */
+  private updateHold(state: SimState): void {
+    const on = state.handbrakeOn;
+    const seconds = state.handbrakeTicks / TICK_RATE;
+    if (!on && !this.holdWasOn) return;
+    const phase = holdPhase(seconds);
+    const fill = Math.min(1, seconds / HOLD_SCALE);
+    const text = on ? `${seconds.toFixed(2)}s` : `${HOLD_WORDS[phase]} · ${seconds.toFixed(2)}s`;
+
+    for (const target of [this.driftPad, this.el.gauge.holdEl]) {
+      if (!target) continue;
+      target.dataset.hold = phase;
+      const bar = target.querySelector('.pedal-meter__fill, .gauge__hold-fill') as HTMLElement | null;
+      if (bar) bar.style.width = `${(fill * 100).toFixed(1)}%`;
+    }
+    const hint = this.driftPad?.querySelector('.pedal-zone__hint');
+    if (hint) hint.textContent = text;
+    this.el.gauge.holdText(text);
+
+    if (!on && this.holdWasOn) {
+      // Let go: keep the result up for a moment, then clear it.
+      window.clearTimeout(this.holdTimer);
+      this.holdTimer = window.setTimeout(() => {
+        for (const target of [this.driftPad, this.el.gauge.holdEl]) {
+          if (!target) continue;
+          delete target.dataset.hold;
+          const bar = target.querySelector('.pedal-meter__fill, .gauge__hold-fill') as HTMLElement | null;
+          if (bar) bar.style.width = '0%';
+        }
+        const h = this.driftPad?.querySelector('.pedal-zone__hint');
+        if (h) h.textContent = 'Tap · hold';
+        this.el.gauge.holdText('');
+      }, 1300);
+    } else if (on) {
+      window.clearTimeout(this.holdTimer);
+    }
+    this.holdWasOn = on;
   }
 
   /**
@@ -72,6 +129,7 @@ export class Hud {
     el.progressLabel.textContent =
       remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}km` : `${Math.round(remaining / 10) * 10}m`;
     if (config.controls === 'throttle') {
+      this.updateHold(state);
       el.gauge.update(state.driftAngle, state.throttle, state.driftDir !== 0 || state.spinTicks > 0, config.drift);
     }
 

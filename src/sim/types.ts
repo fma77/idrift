@@ -16,7 +16,10 @@ export interface SimInput {
   steer: number;
   /** 0..1. Throttle controls only. */
   throttle: number;
-  /** True on the sample where the drift button was tapped. Throttle controls only. */
+  /**
+   * True while the drift button is held. Throttle controls only. How long it
+   * is held matters: see HOLD_FULL in throttleDrift.ts.
+   */
   initiate: boolean;
 }
 
@@ -319,6 +322,10 @@ export interface SimState {
   spinTicks: number;
   /** Whether the drift button was down last tick, so one tap acts once. */
   initiateHeld: boolean;
+  /** Ticks the drift button has been held since it started the current flick. */
+  handbrakeTicks: number;
+  /** True from that press until the button is let go. */
+  handbrakeOn: boolean;
 
   // --- Derived, cached for renderer/audio/scoring; never an integration input ---
   /** 0..1. How much drive the car is using: 0 while it brakes for a corner, pulsing in a slide. */

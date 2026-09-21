@@ -8,22 +8,27 @@
  */
 export interface PedalCallbacks {
   onThrottle: (held: boolean) => void;
-  onDrift: () => void;
+  onDrift: (held: boolean) => void;
 }
 
 export class PedalTouch {
   private readonly surface: HTMLElement;
-  private readonly driftZone: HTMLElement;
+  /** The drift half's label; the HUD fills it while the button is held. */
+  readonly driftZone: HTMLElement;
   private readonly throttleZone: HTMLElement;
   private readonly callbacks: PedalCallbacks;
-  /** Fingers currently holding the throttle side. */
+  /** Fingers currently holding the throttle side, and the drift side. */
   private throttleFingers: number[] = [];
-  private flashTimer = 0;
+  private driftFingers: number[] = [];
 
   constructor(surface: HTMLElement, callbacks: PedalCallbacks) {
     this.surface = surface;
     this.callbacks = callbacks;
-    this.driftZone = zone('pedal-zone pedal-zone--drift', 'DRIFT', 'Tap');
+    this.driftZone = zone('pedal-zone pedal-zone--drift', 'DRIFT', 'Tap · hold');
+    const meter = document.createElement('span');
+    meter.className = 'pedal-meter';
+    meter.innerHTML = '<span class="pedal-meter__fill"></span>';
+    this.driftZone.appendChild(meter);
     this.throttleZone = zone('pedal-zone pedal-zone--throttle', 'GAS', 'Hold');
     surface.append(this.driftZone, this.throttleZone);
 
@@ -37,8 +42,11 @@ export class PedalTouch {
 
   releaseAll(): void {
     this.throttleFingers = [];
+    this.driftFingers = [];
     this.throttleZone.dataset.active = 'false';
+    this.driftZone.dataset.active = 'false';
     this.callbacks.onThrottle(false);
+    this.callbacks.onDrift(false);
   }
 
   private onDown(e: PointerEvent): void {
@@ -51,10 +59,9 @@ export class PedalTouch {
     }
     const rect = this.surface.getBoundingClientRect();
     if (e.clientX - rect.left < rect.width / 2) {
-      this.callbacks.onDrift();
+      if (!this.driftFingers.includes(e.pointerId)) this.driftFingers.push(e.pointerId);
       this.driftZone.dataset.active = 'true';
-      clearTimeout(this.flashTimer);
-      this.flashTimer = window.setTimeout(() => (this.driftZone.dataset.active = 'false'), 140);
+      this.callbacks.onDrift(true);
       return;
     }
     if (!this.throttleFingers.includes(e.pointerId)) this.throttleFingers.push(e.pointerId);
@@ -63,6 +70,15 @@ export class PedalTouch {
   }
 
   private onUp(e: PointerEvent): void {
+    const d = this.driftFingers.indexOf(e.pointerId);
+    if (d >= 0) {
+      this.driftFingers.splice(d, 1);
+      if (this.driftFingers.length === 0) {
+        this.driftZone.dataset.active = 'false';
+        this.callbacks.onDrift(false);
+      }
+      return;
+    }
     const i = this.throttleFingers.indexOf(e.pointerId);
     if (i < 0) return;
     this.throttleFingers.splice(i, 1);

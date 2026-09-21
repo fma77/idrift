@@ -41,6 +41,8 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
     flickTicks: 0,
     spinTicks: 0,
     initiateHeld: false,
+    handbrakeTicks: 0,
+    handbrakeOn: false,
     throttle: 0,
     roadKept: false,
     steerAngle: 0,
@@ -183,6 +185,8 @@ export function hashSimState(state: SimState): number {
   h = hashFloat(h, state.driftAngle);
   h = hashInt(h, state.flickTicks);
   h = hashInt(h, state.spinTicks);
+  h = hashInt(h, state.handbrakeTicks);
+  h = hashInt(h, state.handbrakeOn ? 1 : 0);
   h = hashFloat(h, state.drift.banked);
   h = hashFloat(h, state.drift.pending);
   h = hashInt(h, state.raceTicks);

@@ -7,11 +7,17 @@ import type { AssistParams, CarParams, RouteData, SimConfig, SimInput, SimState 
 /**
  * Drift Run with throttle controls: the game steers, the player drives.
  *
- * The player holds a throttle and taps a drift button. Until they tap, the car
- * goes round corners on grip, steered by the game along the road. A tap flicks
- * the car sideways into the corner ahead -- a small swing the other way first,
- * then into it, the way a driver sets up a Scandinavian flick. From then on the
- * throttle sets the angle:
+ * The player holds a throttle and presses a drift button. Until they do, the
+ * car goes round corners on grip, steered by the game along the road. A press
+ * flicks the car sideways into the corner ahead -- a small swing the other way
+ * first, then into it, the way a driver sets up a Scandinavian flick.
+ *
+ * The button is a handbrake, and how long it is held is the size of the kick:
+ * a quick tap gives a soft entry that the throttle has to build on, about a
+ * quarter of a second gives the full flick, and holding on past that keeps the
+ * tail swinging and scrubs speed until the car spins.
+ *
+ * From then on the throttle sets the angle:
  *
  *   more throttle -> more angle, less -> the car straightens;
  *   past the limit angle the slide feeds itself and runs away to a spin.
@@ -27,6 +33,23 @@ import type { AssistParams, CarParams, RouteData, SimConfig, SimInput, SimState 
  */
 
 const GRAVITY = 9.80665;
+
+/** Seconds of holding the drift button for a full flick. */
+export const HOLD_FULL = 0.25;
+/** Seconds held past which the handbrake is swinging the tail towards a spin. */
+export const HOLD_OVER = 0.4;
+/** The share of a full flick a quick tap gives. */
+const SOFT_FLICK = 0.45;
+/** rad/s the handbrake adds to the angle while held past a full flick. */
+const HANDBRAKE_RATE = 2.6;
+/** m/s^2 the handbrake scrubs while held past a full flick. */
+const HANDBRAKE_DECEL = 5;
+
+/** How a press of the given length reads: for the HUD, which colours it. */
+export type HoldPhase = 'soft' | 'full' | 'over';
+export function holdPhase(seconds: number): HoldPhase {
+  return seconds < HOLD_FULL * 0.6 ? 'soft' : seconds < HOLD_OVER ? 'full' : 'over';
+}
 /** m/s. Below this a tap does nothing: there is not enough speed to throw sideways. */
 const MIN_INITIATE_SPEED = 8;
 /**
@@ -84,6 +107,7 @@ export function stepThrottleControls(
   state.initiateHeld = input.initiate;
 
   if (state.spinTicks > 0) {
+    state.handbrakeOn = false;
     stepSpin(state, route, config, surfaceGrip, dt);
     return;
   }
@@ -105,7 +129,15 @@ export function stepThrottleControls(
       }
       state.driftDir = sign;
       state.flickTicks = Math.max(1, Math.round(config.drift.flickTime / dt));
+      state.handbrakeTicks = 0;
+      state.handbrakeOn = true;
     }
+  }
+
+  // The press that started this flick: counted until it is let go.
+  if (state.handbrakeOn) {
+    if (input.initiate && state.driftDir !== 0) state.handbrakeTicks++;
+    else state.handbrakeOn = false;
   }
 
   if (state.driftDir === 0) {
@@ -143,12 +175,16 @@ function stepDrift(
 
   // --- Angle ---
   let angle = state.driftAngle;
+  const held = state.handbrakeTicks * dt;
+  // The flick's size follows the press: a tap is a soft entry, a full press is
+  // the whole flick. While the button is down it keeps growing towards full.
+  const flickAngle = d.flickAngle * (SOFT_FLICK + (1 - SOFT_FLICK) * clamp(held / HOLD_FULL, 0, 1));
   if (state.flickTicks > 0) {
     const total = Math.max(1, Math.round(d.flickTime / dt));
     const elapsed = total - state.flickTicks;
     // Away from the corner for the first part, then into it. Never pulls an
     // angle that is already bigger back down.
-    const target = elapsed < total * 0.3 ? -FLICK_SWING : d.flickAngle;
+    const target = elapsed < total * 0.3 ? -FLICK_SWING : flickAngle;
     if (elapsed < total * 0.3 || angle < target) angle = moveToward(angle, target, FLICK_RATE * dt);
     state.flickTicks--;
   } else if (onStraight(state, route)) {
@@ -173,7 +209,12 @@ function stepDrift(
     }
   }
 
+  // Held on past a full flick, the handbrake keeps the tail swinging.
+  const overHeld = state.handbrakeOn && held > HOLD_FULL;
+  if (overHeld) angle += HANDBRAKE_RATE * dt;
+
   if (angle > d.spinAngle) {
+    state.handbrakeOn = false;
     state.driftAngle = angle;
     state.spinTicks = Math.round(SPIN_SECONDS / dt);
     stepSpin(state, route, config, surfaceGrip, dt);
@@ -210,6 +251,7 @@ function stepDrift(
   v += h.acceleration * (1 - v / h.topSpeed) * throttle * dt;
   let decel = d.angleDrag * clamp(angle / HALF_PI, 0, 1) + (1 - throttle) * ENGINE_BRAKE;
   decel += Math.min(SHORTFALL_BRAKING, shortfall * v * SHORTFALL_GAIN);
+  if (overHeld) decel += HANDBRAKE_DECEL;
   // Corner speed is judged at the drift grip, with no allowance over it: a
   // drift carried in too fast runs wide, and the tail finds the wall.
   const assist = gripAssist(config);
@@ -307,6 +349,7 @@ function gripAssist(config: SimConfig): AssistParams {
 }
 
 export function endDrift(state: SimState): void {
+  state.handbrakeOn = false;
   state.driftDir = 0;
   state.driftAngle = 0;
   state.flickTicks = 0;

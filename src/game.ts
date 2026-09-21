@@ -163,7 +163,9 @@ export class GameSession {
       // Steering runs record a pinned throttle; the sim ignores it there anyway.
       const throttle = this.config.controls === 'throttle' ? raw.throttle : 1;
       this.heldSample = quantiseInput(raw.steer, throttle, raw.initiate);
-      // A tap is an event, not a held key: it goes into exactly one sample.
+      // The drift button is held, but a press shorter than one sample must
+      // still reach the sim: it is latched down until recorded, then follows
+      // the button.
       this.input.consumeInitiate();
       this.recorder.push(this.heldSample);
     }

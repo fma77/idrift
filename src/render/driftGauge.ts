@@ -36,6 +36,9 @@ export class DriftGauge {
   private readonly throttleBar: HTMLElement;
   private readonly readout: HTMLElement;
   private limitKey = '';
+  /** The drift-button hold bar, filled and coloured by the HUD. */
+  readonly holdEl: HTMLElement;
+  private readonly holdLabel: HTMLElement;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -48,12 +51,21 @@ export class DriftGauge {
         <rect class="gauge__hub" x="${CX - 5}" y="${CY - 5}" width="10" height="10" />
       </svg>
       <div class="gauge__readout"><span class="gauge__angle">0</span>°</div>
-      <div class="gauge__throttle"><div class="gauge__throttle-fill"></div></div>`;
+      <div class="gauge__throttle"><div class="gauge__throttle-fill"></div></div>
+      <div class="gauge__hold"><div class="gauge__hold-fill"></div></div>
+      <div class="gauge__hold-label"></div>`;
+    this.holdEl = root.querySelector('.gauge__hold') as HTMLElement;
+    this.holdLabel = root.querySelector('.gauge__hold-label') as HTMLElement;
     this.sweet = root.querySelector('.gauge__sweet') as SVGPathElement;
     this.spin = root.querySelector('.gauge__spin') as SVGPathElement;
     this.needle = root.querySelector('.gauge__needle') as SVGLineElement;
     this.throttleBar = root.querySelector('.gauge__throttle-fill') as HTMLElement;
     this.readout = root.querySelector('.gauge__angle') as HTMLElement;
+  }
+
+  holdText(text: string): void {
+    this.holdLabel.textContent = text;
+    this.holdLabel.dataset.hold = this.holdEl.dataset.hold ?? '';
   }
 
   update(angle: number, throttle: number, drifting: boolean, params: DriftControlParams): void {
