@@ -10,6 +10,9 @@
  * sharp at any size and a typo is a one-line fix rather than a re-export.
  *
  * The originals are 1.5-3.5MB each; these ship at about a tenth of that.
+ *
+ * Also the country flags on the route cards: 2MB paintings shown at 44px, so
+ * they ship at 96px, a few KB each.
  */
 import sharp from 'sharp';
 import { mkdirSync, statSync } from 'node:fs';
@@ -36,4 +39,17 @@ for (const [source, id] of POSTERS) {
   const { width, height } = await sharp(input).metadata();
   await sharp(input).resize({ width: WIDTH, kernel: 'lanczos3' }).webp({ quality: 78, effort: 6 }).toFile(out);
   console.log(`${id}-poster.webp  ${width}x${height} source, ${(statSync(out).size / 1024).toFixed(0)}KB`);
+}
+
+const FLAGS = [
+  ['Japan.png', 'jp'],
+  ['Portugal.png', 'pt'],
+  ['Germany.png', 'de'],
+];
+const FLAG_OUT = resolve(root, 'public/art/flags');
+mkdirSync(FLAG_OUT, { recursive: true });
+for (const [source, code] of FLAGS) {
+  const out = resolve(FLAG_OUT, `${code}.webp`);
+  await sharp(resolve(root, 'art', source)).resize(96, 96, { kernel: 'lanczos3' }).webp({ quality: 82 }).toFile(out);
+  console.log(`flags/${code}.webp  ${(statSync(out).size / 1024).toFixed(1)}KB`);
 }
