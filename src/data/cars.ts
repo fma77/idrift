@@ -20,7 +20,7 @@ export const CARS: CarParams[] = [
     carClass: 'C',
     // Light and eager: quick to rotate, lets go early, forgiving in a slide.
     handling: {
-      topSpeed: 32,
+      topSpeed: 42,
       acceleration: 8,
       turnRate: 2.2,
       turnResponse: 7,
@@ -46,7 +46,7 @@ export const CARS: CarParams[] = [
     carClass: 'B',
     // Faster, a touch lazier to turn in, holds a slide at a wider angle.
     handling: {
-      topSpeed: 36,
+      topSpeed: 47,
       acceleration: 9,
       turnRate: 2.0,
       turnResponse: 6,
@@ -76,7 +76,7 @@ export const CARS: CarParams[] = [
     // Heavy and fast: grips hard and turns in slowly, but once it goes it
     // carries its speed through the slide.
     handling: {
-      topSpeed: 39,
+      topSpeed: 54,
       acceleration: 10,
       turnRate: 1.85,
       turnResponse: 5,
@@ -103,7 +103,7 @@ export const CARS: CarParams[] = [
     // Four-wheel-drive flat four: the most grip in the roster and the most
     // stable in a slide, at the cost of a lazier turn-in.
     handling: {
-      topSpeed: 37,
+      topSpeed: 50,
       acceleration: 10,
       turnRate: 1.95,
       turnResponse: 5.5,

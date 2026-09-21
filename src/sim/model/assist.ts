@@ -3,8 +3,13 @@ import { WALL_MARGIN } from './progress.ts';
 import type { AssistParams, RouteData, SimState } from '../types.ts';
 
 const GRAVITY = 9.80665;
-/** Metres. The furthest the car looks ahead for a corner to brake for. */
-const MAX_LOOKAHEAD = 160;
+/**
+ * Metres. The furthest the car looks ahead for a corner to brake for. Braking
+ * from 195km/h to a hairpin takes most of it, and when the cars were slower
+ * 160m was enough; raising their top speeds without raising this had the fast
+ * ones arriving at Harunas hairpins still braking.
+ */
+const MAX_LOOKAHEAD = 340;
 /** Seconds. How far ahead road keeping predicts where the car will be. */
 const PREDICT_SECONDS = 0.45;
 /** Fraction of the half width past which road keeping starts to act. */

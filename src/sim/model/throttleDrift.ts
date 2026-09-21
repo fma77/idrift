@@ -53,8 +53,11 @@ const HEADING_GAIN = 5;
 const LINE_GAIN = 1.2;
 /** In a drift the line matters more than the heading: hold it firmly. */
 const DRIFT_LINE_GAIN = 3.5;
+/** m/s^2 of extra braking when the line needs more grip than the car has, and its ceiling. */
+const SHORTFALL_GAIN = 1.4;
+const SHORTFALL_BRAKING = 14;
 /** Fraction of the sideways grip a drift is allowed to use for speed; the rest is for the line. */
-const DRIFT_SPEED_MARGIN = 0.85;
+const DRIFT_SPEED_MARGIN = 0.78;
 /** Metres ahead a corner has to be for the car to start setting up on its outside. */
 const SETUP_REACH = 45;
 /** Radius under which a bend counts as a corner to flick into. */
@@ -195,11 +198,18 @@ function stepDrift(
   let travel = travelHeading(state);
   travel = wrapAngle(travel + clamp(want, -maxTurn, maxTurn) * dt);
 
+  // The line is asking for more grip than there is: the corner is tighter than
+  // this speed can hold. Scrub, which is what a driver does -- otherwise the
+  // car simply washes out to the wall, and the faster cars did exactly that on
+  // Haruna's tightest hairpins.
+  const shortfall = Math.max(0, Math.abs(want) - maxTurn);
+
   // --- Speed ---
   // The throttle drives, the angle scrubs, a closed throttle engine-brakes,
   // and the game brakes if the corner ahead needs it.
   v += h.acceleration * (1 - v / h.topSpeed) * throttle * dt;
   let decel = d.angleDrag * clamp(angle / HALF_PI, 0, 1) + (1 - throttle) * ENGINE_BRAKE;
+  decel += Math.min(SHORTFALL_BRAKING, shortfall * v * SHORTFALL_GAIN);
   // Corner speed is judged at the drift grip, with no allowance over it: a
   // drift carried in too fast runs wide, and the tail finds the wall.
   const assist = gripAssist(config);

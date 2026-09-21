@@ -297,6 +297,10 @@ body {
   margin-top: 4px;
 }
 
+.row[hidden] {
+  display: none;
+}
+
 .row {
   display: flex;
   justify-content: space-between;

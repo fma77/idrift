@@ -331,6 +331,20 @@ suspends and resumes instead.
   is deterministic, so a bot run can be stored as a ghost replay. It is *not* the
   deferred Drift Duels chase controller (§7.3), which remains unbuilt.
 
+### Scale and speed on real circuits
+
+Estoril felt like driving a toy: the camera widened to 62m across at speed, so
+on a phone the car was about 26 pixels long, and top speeds of 115-140 km/h made
+a 900m straight drag. The camera now tops out at 46m across and, instead of
+zooming out further, sits ahead of the car (26% of the view, scaled in with
+speed) so there is still time to see a corner coming. Top speeds are 150-195
+km/h. To keep the faster cars off the walls on Haruna, corner braking looks up
+to 340m ahead, the drift line keeps a wider margin (0.78 of the limit), and the
+drift phase brakes when the line asks for more turn than the car can give.
+SIM_VERSION 9: the handling changed, so old times are not comparable.
+
+Tuning mode is parked. Its Settings row only appears with #tune on the URL.
+
 ## Bugs worth remembering
 
 Four were caught by the headless harness and would have been miserable to find by eye:

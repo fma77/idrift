@@ -28,10 +28,20 @@ export interface CameraSettings {
  * zoom in, raise SPEED_WIDENING to open the view up faster as the car builds
  * speed.
  */
-const METRES_AT_REST = 26;
+const METRES_AT_REST = 24;
 /** Extra metres of view per m/s of speed, for lookahead. */
-const SPEED_WIDENING = 0.85;
-const MAX_METRES_ACROSS = 62;
+const SPEED_WIDENING = 0.55;
+const MAX_METRES_ACROSS = 46;
+/**
+ * How far ahead of the car the camera sits, as a fraction of the view width.
+ *
+ * The camera used to sit exactly on the car and buy its lookahead by zooming
+ * out: at 140km/h it showed 62 metres across, which on a phone makes the car
+ * 26 pixels long -- a miniature, sliding around a wide grey field, with no
+ * sense of speed at all. Pushing the camera ahead of the car buys the same
+ * view of the road at a much closer zoom.
+ */
+const LOOKAHEAD_FRACTION = 0.26;
 
 export class Camera {
   x = 0;
@@ -75,8 +85,6 @@ export class Camera {
     viewWidth: number,
     viewHeight: number,
   ): void {
-    this.x = state.x;
-    this.y = state.y;
 
     const targetAngle = settings.fixedNorth
       ? HALF_PI
@@ -100,6 +108,13 @@ export class Camera {
       MAX_METRES_ACROSS,
     );
     this.metresAcross = lerp(this.metresAcross, target, 1 - Math.exp(-2.5 * dtSeconds));
+
+    // Sit ahead of the car, along the way it is travelling, so the road it is
+    // about to reach is on screen rather than the road it has just left.
+    const ahead = this.metresAcross * LOOKAHEAD_FRACTION * clamp(state.speed / 12, 0, 1);
+    this.x = state.x + cos(this.angle) * ahead;
+    this.y = state.y + sin(this.angle) * ahead;
+
     this.applyZoom(viewWidth, viewHeight);
   }
 

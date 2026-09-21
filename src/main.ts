@@ -66,10 +66,9 @@ const canvas = $<HTMLCanvasElement>('canvas');
 /**
  * Tuning mode: handling sliders over a paused run, applied live.
  *
- * Switched on from Settings. #tune or ?tune on the URL also switches it on, but
- * a URL alone proved unreliable on a phone -- a tab already open on an older
- * build never notices the hash change, and some apps strip the fragment from a
- * shared link -- so the setting is the way in and the URL is a shortcut to it.
+ * Hidden for now: #tune or ?tune on the URL switches it on and shows its
+ * toggle in Settings. Everything behind it is kept for when handling needs
+ * adjusting again.
  */
 let tuneMode = false;
 
@@ -1003,10 +1002,14 @@ function closeTuning(): void {
 }
 
 $('btn-tune').addEventListener('click', openTuning);
-setTuneMode(settings.tuneMode || isTuneMode());
+// Tuning is parked: its Settings row only appears when #tune or ?tune is on
+// the URL, and a setting left on from before does not bring it back.
+setTuneMode(isTuneMode());
+$('tune-row').hidden = !tuneMode;
 window.addEventListener('hashchange', () => {
   if (isTuneMode() && !tuneMode && !isRunActive()) {
     setTuneMode(true);
+    $('tune-row').hidden = false;
     syncTuneToggle();
   }
 });
