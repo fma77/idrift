@@ -920,9 +920,11 @@ async function bakeFromOsmRoute(start, end, spec, cacheFile, saveTo) {
   points = smoothPolyline(points, spec.smoothing ?? 6);
 
   // Trimming, in metres off each end, for cutting a run out of a longer road.
-  const skipStart = Math.round((spec.trimStart ?? 0) / ds);
-  const skipEnd = Math.round((spec.trimEnd ?? 0) / ds);
-  const maxSamples = spec.maxLength ? Math.round(spec.maxLength / ds) : Infinity;
+  // Given in real metres, so a section keeps its start and end when the
+  // road is shrunk to game scale.
+  const skipStart = Math.round(((spec.trimStart ?? 0) * scale) / ds);
+  const skipEnd = Math.round(((spec.trimEnd ?? 0) * scale) / ds);
+  const maxSamples = spec.maxLength ? Math.round((spec.maxLength * scale) / ds) : Infinity;
   points = points.slice(skipStart, Math.min(points.length - skipEnd, skipStart + maxSamples));
   if (spec.reverse) points.reverse();
   if (points.length < 20) throw new Error('Too little road left after trimming');

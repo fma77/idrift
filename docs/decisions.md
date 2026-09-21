@@ -352,7 +352,11 @@ traced on the painting by hand (src/data/posters.ts), and the start, finish,
 compass, name and length are drawn over it as SVG and HTML in the game's fonts
 rather than baked into the image. tools/make-posters.mjs only resizes.
 
-Nurburg is the first route drawn in the posters' style instead of ink and
+Real roads are baked at 60% scale (spec `scale`; trims stay in real metres), which
+made straights take about as long as they feel they should. Akari, being
+invented, is unscaled.
+
+Estoril, Nurburg and all of Haruna are drawn in the posters' style; Nurburg was the first instead of ink and
 paper (src/render/world.ts, themes.ts). To keep phones fast, the grass is two
 repeating textures painted once per route and filled in world space, and the
 trees are eight pre-painted stamps placed once and bucketed on a 32m grid, so a

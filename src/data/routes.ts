@@ -40,7 +40,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'ESTORIL',
     location: 'Estoril, Portugal',
     file: 'routes/estoril.json',
-    blurb: 'Recta Interior round to the main straight. 7 corners, 2.3km.',
+    blurb: 'Recta Interior round to the main straight. 7 corners, 1.4km.',
     poster: ESTORIL_POSTER,
     attribution: OSM_CREDIT,
   },
@@ -49,7 +49,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'NURBURG',
     location: 'Nürburg, Eifel',
     file: 'routes/nurburg.json',
-    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 2.7km.',
+    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 1.6km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -57,7 +57,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA UPPER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-upper.json',
-    blurb: 'Off the top of the mountain. 6 hairpins, 2.5km.',
+    blurb: 'Off the top of the mountain. 7 hairpins, 1.5km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -65,7 +65,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA MIDDLE',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-middle.json',
-    blurb: 'The middle third, corner after corner. 7 hairpins, 2.7km.',
+    blurb: 'The middle third, corner after corner. 12 hairpins, 1.6km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -73,7 +73,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA LOWER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-lower.json',
-    blurb: 'The run to the bottom, and the tightest of it. 9 hairpins, 2.7km.',
+    blurb: 'The run to the bottom, and the tightest of it. 12 hairpins, 1.6km.',
     attribution: OSM_CREDIT,
   },
   {
@@ -81,7 +81,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA FULL PASS',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-downhill.json',
-    blurb: 'All three sections in one run. 22 hairpins, 7.9km.',
+    blurb: 'All three sections in one run. 31 hairpins, 4.7km.',
     attribution: OSM_CREDIT,
   },
 ];

@@ -341,6 +341,7 @@ export class Renderer {
     band(theme.vergeWidth, theme.verge);
     band(0.3, theme.outline);
     band(0, theme.tarmac);
+    if (theme.kerbs) this.drawKerbs(ctx, route, from, to);
 
     // Edge lines, just inside the tarmac.
     ctx.lineWidth = 0.16;
@@ -385,6 +386,34 @@ export class Renderer {
         }
       }
       ctx.restore();
+    }
+  }
+
+  /**
+   * Red and white kerbs along both edges wherever the road bends harder than a
+   * 70m radius, in 2m blocks -- two paths a frame, one per colour.
+   */
+  private drawKerbs(ctx: CanvasRenderingContext2D, route: RouteData, from: number, to: number): void {
+    const s = route.samples;
+    const bend = 1 / 70;
+    ctx.lineWidth = 0.9;
+    for (const [colour, parity] of [[RED, 0], [PAPER, 1]] as const) {
+      ctx.strokeStyle = colour;
+      ctx.beginPath();
+      for (let i = Math.max(from, 1); i < to; i++) {
+        if (i % 2 !== parity || Math.abs(s.curvature[i]) < bend) continue;
+        for (const side of [1, -1]) {
+          // On the inside of a corner tighter than the kerb's own offset, the
+          // strip would fold over itself; leave that side bare.
+          const inside = side * s.curvature[i] > 0;
+          if (inside && 1 / Math.abs(s.curvature[i]) < s.halfWidth[i] + 1.5) continue;
+          const w0 = (s.halfWidth[i] + 0.3 + 0.45) * side;
+          const w1 = (s.halfWidth[i + 1] + 0.3 + 0.45) * side;
+          ctx.moveTo(s.x[i] - sin(s.heading[i]) * w0, s.y[i] + cos(s.heading[i]) * w0);
+          ctx.lineTo(s.x[i + 1] - sin(s.heading[i + 1]) * w1, s.y[i + 1] + cos(s.heading[i + 1]) * w1);
+        }
+      }
+      ctx.stroke();
     }
   }
 

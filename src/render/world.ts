@@ -113,7 +113,7 @@ export class WorldArt {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           for (const i of road.get(cellKey(cx + dx, cy + dy)) ?? []) {
-            const min = s.halfWidth[i] + this.theme.vergeWidth + r;
+            const min = s.halfWidth[i] + this.theme.vergeWidth + this.theme.treeClearance + r;
             const ex = x - s.x[i];
             const ey = y - s.y[i];
             if (ex * ex + ey * ey < min * min) return false;
@@ -132,7 +132,8 @@ export class WorldArt {
       const ny = Math.cos(h);
       for (const side of [1, -1]) {
         for (let k = 0; k < 4; k++) {
-          const lateral = s.halfWidth[i] + this.theme.vergeWidth + 1.5 + Math.pow(rand(), 1.4) * 55;
+          const lateral =
+            s.halfWidth[i] + this.theme.vergeWidth + this.theme.treeClearance + 1.5 + Math.pow(rand(), 1.4) * 55;
           const along = (rand() - 0.5) * 4;
           const x = s.x[i] + nx * lateral * side + Math.cos(h) * along;
           const y = s.y[i] + ny * lateral * side + Math.sin(h) * along;
