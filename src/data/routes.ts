@@ -30,11 +30,6 @@ export interface RouteEntry {
   file: string;
   /** Painted course poster. Falls back to a drawn minimap when absent. */
   poster?: PosterArt;
-  /**
-   * The scale the real road is driven at (tools/specs/*.json "scale"). Only for
-   * showing distances in real metres; the sim never sees it.
-   */
-  realScale?: number;
   /** Shown as a flag on the route card. */
   country: Country;
   /**
@@ -53,11 +48,10 @@ export const ROUTES: RouteEntry[] = [
     name: 'AKARI DOWNHILL',
     location: 'Akari Pass, North Face',
     file: 'routes/akari-downhill.json',
-    blurb: 'Fast opener, three hairpins, esses in the middle. 1.5km down.',
+    blurb: 'Fast opener, three hairpins, esses in the middle. 2.5km down.',
   },
   {
     id: 'estoril',
-    realScale: 0.6,
     country: 'pt',
     name: 'ESTORIL',
     location: 'Estoril, Portugal',
@@ -68,7 +62,6 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'nurburg',
-    realScale: 0.6,
     country: 'de',
     name: 'NURBURG',
     location: 'Nürburg, Eifel',
@@ -79,7 +72,6 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-upper',
-    realScale: 0.6,
     country: 'jp',
     name: 'HARUNA UPPER',
     location: 'Mount Haruna, Gunma',
@@ -90,7 +82,6 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-middle',
-    realScale: 0.6,
     country: 'jp',
     name: 'HARUNA MIDDLE',
     location: 'Mount Haruna, Gunma',
@@ -101,7 +92,6 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-lower',
-    realScale: 0.6,
     country: 'jp',
     name: 'HARUNA LOWER',
     location: 'Mount Haruna, Gunma',
@@ -112,7 +102,6 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-downhill',
-    realScale: 0.6,
     country: 'jp',
     name: 'HARUNA FULL PASS',
     location: 'Mount Haruna, Gunma',

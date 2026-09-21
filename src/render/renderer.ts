@@ -4,6 +4,7 @@ import { Camera, type CameraSettings } from './camera.ts';
 import { getSprite } from './sprites.ts';
 import { drawDecoration, type DecorationData } from './decoration.ts';
 import { TyreSmoke } from './smoke.ts';
+import { DirtSpray } from './dirt.ts';
 import { WorldArt } from './world.ts';
 import { themeFor, type WorldTheme } from './themes.ts';
 
@@ -24,6 +25,8 @@ const INK_2 = '#2b2b2b';
 const PAPER = '#f4f1ea';
 const RULE = 'rgba(244,241,234,0.22)';
 const RED = '#e8402a';
+/** Dirt on the ink world: dun earth and a darker clod. */
+const INK_DIRT: [string, string] = ['#8a7a60', '#5b5347'];
 
 /** Metres of route drawn ahead of the car before the fog closes in. */
 const REVEAL_AHEAD = 150;
@@ -57,6 +60,7 @@ export class Renderer {
   private skidLeft: SkidPoint[] = [];
   private skidRight: SkidPoint[] = [];
   private readonly smoke = new TyreSmoke();
+  private readonly dirt = new DirtSpray();
 
   /**
    * Route scenery. Held on the renderer, not on the route, so there is no field
@@ -144,6 +148,7 @@ export class Renderer {
     this.skidLeft.length = 0;
     this.skidRight.length = 0;
     this.smoke.clear();
+    this.dirt.clear();
   }
 
   resetCamera(state: SimState): void {
@@ -207,6 +212,10 @@ export class Renderer {
     if (this.world) this.world.drawTrees(ctx, this.camera.x, this.camera.y, reach);
     this.drawScoringMarks(ctx, route, state, px);
     if (settings.showSkidMarks) this.drawSkids(ctx, px);
+    // Dirt off the verge, under the car and its smoke.
+    this.dirt.update(view, car, dtSeconds);
+    this.dirt.draw(ctx, theme ? theme.dirt : INK_DIRT);
+
     // Smoke under the car, so the car is never lost in its own cloud.
     if (settings.showSmoke) {
       this.smoke.update(view, car, dtSeconds);

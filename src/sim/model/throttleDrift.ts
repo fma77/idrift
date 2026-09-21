@@ -34,6 +34,11 @@ import type { AssistParams, CarParams, RouteData, SimConfig, SimInput, SimState 
 
 const GRAVITY = 9.80665;
 
+/** m/s^2 of acceleration the drift scrub was tuned for; weaker cars scrub less. */
+const REFERENCE_ACCEL = 8;
+/** m/s. Below this a drift cannot be held and ends. */
+const MIN_DRIFT_SPEED = 5;
+
 /** Seconds of holding the drift button for a full flick. */
 export const HOLD_FULL = 0.25;
 /** Seconds held past which the handbrake is swinging the tail towards a spin. */
@@ -198,8 +203,11 @@ function stepDrift(
     // Balance: throttle holds an angle in proportion to itself, so a steady
     // throttle gives a steady angle -- until the limit, past which the slide
     // feeds itself.
-    const balance = d.angleRate * (throttle - angle / d.holdAngle);
-    const runaway = d.runaway * Math.max(0, angle - d.limitAngle);
+    // Each car takes to it differently: all-wheel drive holds less angle for
+    // the same throttle, a rear-engined car runs away faster past the limit.
+    const feel = car.driftFeel;
+    const balance = d.angleRate * (feel?.rate ?? 1) * (throttle - angle / (d.holdAngle * (feel?.hold ?? 1)));
+    const runaway = d.runaway * (feel?.runaway ?? 1) * Math.max(0, angle - d.limitAngle);
     angle += (balance + runaway) * dt;
     // The road has turned the other way and the player has not tapped to
     // switch sides: the drift unwinds instead of carrying the tail into the
@@ -249,7 +257,12 @@ function stepDrift(
   // The throttle drives, the angle scrubs, a closed throttle engine-brakes,
   // and the game brakes if the corner ahead needs it.
   v += h.acceleration * (1 - v / h.topSpeed) * throttle * dt;
-  let decel = d.angleDrag * clamp(angle / HALF_PI, 0, 1) + (1 - throttle) * ENGINE_BRAKE;
+  // What a slide scrubs is in proportion to the car's power: a light car with
+  // a small engine loses less, and carries its momentum. At full strength a
+  // big angle outpulled the weakest engine and slowed it to a standstill
+  // mid-drift.
+  const power = clamp(h.acceleration / REFERENCE_ACCEL, 0.4, 1.4);
+  let decel = (d.angleDrag * clamp(angle / HALF_PI, 0, 1) + (1 - throttle) * ENGINE_BRAKE) * power;
   decel += Math.min(SHORTFALL_BRAKING, shortfall * v * SHORTFALL_GAIN);
   if (overHeld) decel += HANDBRAKE_DECEL;
   // Corner speed is judged at the drift grip, with no allowance over it: a
@@ -267,7 +280,10 @@ function stepDrift(
   state.throttle = throttle;
   state.sliding = true;
 
-  if (state.flickTicks === 0 && angle < END_ANGLE) endDrift(state);
+  // A drift is over when the car straightens -- or when it has been scrubbed
+  // down to a crawl, where a slide cannot be held and the grip driving takes
+  // over again.
+  if (state.flickTicks === 0 && (angle < END_ANGLE || v < MIN_DRIFT_SPEED)) endDrift(state);
 }
 
 /** No corner under the car and none within EXIT_REACH ahead. */

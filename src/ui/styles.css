@@ -851,3 +851,47 @@ input[type='range']::-moz-range-thumb {
 .btn--go:active {
   background: var(--red-press);
 }
+
+/* --- Garage: what each car is like ---------------------------------------- */
+
+.car-card__tagline {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.car-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 10px;
+}
+
+.car-stats__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.car-stats__pips {
+  display: flex;
+  gap: 3px;
+}
+
+.car-stats__pip {
+  width: 14px;
+  height: 6px;
+  background: rgba(20, 20, 20, 0.14);
+}
+
+.car-stats__pip--on {
+  background: var(--ink);
+}
+
+.car-card--selected .car-stats__pip--on {
+  background: var(--red);
+}

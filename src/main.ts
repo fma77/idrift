@@ -14,6 +14,7 @@ import { EngineAudio } from './audio/engine.ts';
 import { applySoundOverrides, PROFILES } from './audio/profiles.ts';
 import { SoundLab } from './ui/soundLab.ts';
 import { CARS, carById } from './data/cars.ts';
+import { realKmh } from './data/scale.ts';
 import { configFor } from './data/assist.ts';
 import { ROUTES, loadRoute, type RouteEntry } from './data/routes.ts';
 import { loadSettings, saveSettings, type Settings } from './storage/settings.ts';
@@ -544,9 +545,17 @@ function buildCarList(): void {
       const meta = document.createElement('div');
       meta.className = 'card__meta';
       meta.textContent =
-        `${PROFILES[car.engine].label} · top ${Math.round(car.handling.topSpeed * 3.6)} km/h` +
+        `${PROFILES[car.engine].label} · top ${Math.round(realKmh(car.handling.topSpeed))} km/h` +
+        (car.zeroTo100 ? ` · 0-100 in ${car.zeroTo100}s` : '') +
         (tuneMode && isTuned(car) ? ' · tuned' : '');
       left.append(name, meta);
+      if (car.tagline) {
+        const line = document.createElement('div');
+        line.className = 'car-card__tagline';
+        line.textContent = car.tagline;
+        left.appendChild(line);
+      }
+      if (car.stats) left.appendChild(carStats(car.stats));
       body.append(left);
       // The selected car is already marked by its border; its card offers the
       // next step instead. Tapping it again goes to the routes -- or, when the
@@ -580,6 +589,35 @@ function buildCarList(): void {
       return button;
     }),
   );
+}
+
+/** The car's character, as six rows of 1-5 pips. */
+function carStats(stats: NonNullable<(typeof CARS)[number]['stats']>): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'car-stats';
+  const rows: [string, number][] = [
+    ['Acceleration', stats.accel],
+    ['Top speed', stats.topSpeed],
+    ['Grip', stats.grip],
+    ['Drift', stats.drift],
+    ['Agility', stats.agility],
+    ['Stability', stats.stability],
+  ];
+  for (const [label, value] of rows) {
+    const name = document.createElement('span');
+    name.className = 'car-stats__label';
+    name.textContent = label;
+    const pips = document.createElement('span');
+    pips.className = 'car-stats__pips';
+    pips.setAttribute('aria-label', `${value} of 5`);
+    for (let i = 1; i <= 5; i++) {
+      const pip = document.createElement('span');
+      pip.className = i <= value ? 'car-stats__pip car-stats__pip--on' : 'car-stats__pip';
+      pips.appendChild(pip);
+    }
+    el.append(name, pips);
+  }
+  return el;
 }
 
 /**
@@ -753,7 +791,6 @@ async function startRun(mode: SimMode): Promise<void> {
 
   const car = carById(settings.carId);
   currentControls = mode === 'driftRun' ? settings.driftControls : 'steer';
-  hud.setRealScale(currentEntry.realScale ?? 1);
   gameEl.dataset.controls = currentControls;
   gameEl.dataset.mode = currentMode;
   const renderSettings: RenderSettings = {

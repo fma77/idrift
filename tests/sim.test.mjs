@@ -19,6 +19,7 @@ import {
 import { sin, cos, atan2, atan, PI } from '../src/sim/math/trig.ts';
 import { createRng, nextUint32 } from '../src/sim/math/prng.ts';
 import { CARS, carById } from '../src/data/cars.ts';
+import { realKmh } from '../src/data/scale.ts';
 import { driveBot, DEFAULT_BOT } from '../src/bot/autopilot.ts';
 import { configFor, DRIFT_CONTROL } from '../src/data/assist.ts';
 import { cornerSpeedLimit, roadKeepingTurn } from '../src/sim/model/assist.ts';
@@ -429,8 +430,9 @@ test('the car drives itself, up to its top speed and no further', () => {
   const track = openRoute();
   for (const car of CARS) {
     const state = createSimState(track, car);
-    hold(state, car, track, 0, 4);
-    assert.ok(state.speed > 15, `${car.name} only reached ${state.speed.toFixed(1)} m/s unaided in 4s`);
+    // As quick as the real car: 100km/h (shown) in its own 0-100 time.
+    hold(state, car, track, 0, car.zeroTo100 + 0.3);
+    assert.ok(realKmh(state.speed) > 98, `${car.name} only reached ${realKmh(state.speed).toFixed(0)} km/h in ${car.zeroTo100}s`);
     hold(state, car, track, 0, 40);
     assert.ok(
       state.speed <= car.handling.topSpeed + 1e-6,
@@ -575,7 +577,9 @@ test('Time Attack is quicker and Drift Run is more sideways', () => {
   const ta = drive(route, car, 'timeAttack', humanDriver());
   const dr = drive(route, car, 'driftRun', humanDriver());
   assert.ok(ta.state.raceTicks < dr.state.raceTicks, 'the same driver should be faster in Time Attack');
-  assert.ok(dr.slideFraction > ta.slideFraction + 0.1, `slide time: drift ${dr.slideFraction.toFixed(2)}, time attack ${ta.slideFraction.toFixed(2)}`);
+  // A clear margin, not a large one: with the real cars' gentler acceleration
+  // there is less speed to slide with in either mode (0.29 against 0.20).
+  assert.ok(dr.slideFraction > ta.slideFraction + 0.07, `slide time: drift ${dr.slideFraction.toFixed(2)}, time attack ${ta.slideFraction.toFixed(2)}`);
 });
 
 test('the car brakes by itself for a corner it can see coming', () => {
@@ -793,7 +797,8 @@ test('throttle controls: a steady throttle holds a steady angle below the limit'
   state.driftAngle = 0.4;
   const throttle = 0.6;
   for (let t = 0; t < TICK_RATE * 4; t++) stepSim(state, { steer: 0, throttle, initiate: false }, car, track, config);
-  const expected = throttle * d.holdAngle;
+  // Scaled by how this car takes to a drift.
+  const expected = throttle * d.holdAngle * (car.driftFeel?.hold ?? 1);
   assert.ok(Math.abs(state.driftAngle - expected) < 0.02, `held ${state.driftAngle.toFixed(3)} rad, expected ${expected.toFixed(3)}`);
 });
 

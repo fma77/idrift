@@ -7,6 +7,8 @@ import {
   isAtFinish,
   isAgainstWall,
   surfaceGripAt,
+  updateWheelsOff,
+  offRoadDrag,
   safeResetPose,
 } from './model/progress.ts';
 import { stepDriftScore, WALL_PENALTY_TICKS } from './model/score.ts';
@@ -52,6 +54,8 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
     distance: 0,
     lateralOffset: 0,
     offTrack: false,
+    wheelsOffMask: 0,
+    wheelsOff: 0,
     finished: false,
     raceTicks: 0,
     penaltyTicks: 0,
@@ -108,10 +112,24 @@ export function stepSim(
 
   state.hitThisTick = false;
 
-  const grip = surfaceGripAt(state, route);
+  // Off-road grip and drag are for the player steering: in Drift Run with
+  // throttle controls the game steers, and its drift line puts the tail right
+  // at the edge on purpose. The wheels-off count is kept either way, for the dirt.
+  const steered = config.controls !== 'throttle';
+  const grip = surfaceGripAt(state, route, steered);
   if (config.controls === 'throttle') stepThrottleControls(state, car, input, config, route, grip, DT);
   else stepVehicle(state, car, input, config.assist, route, grip, DT);
   updateProgress(state, route);
+  updateWheelsOff(state, car, route);
+
+  // --- Off the tarmac: the more wheels in the dirt, the harder it drags ---
+  const drag = steered ? offRoadDrag(state.wheelsOff, state.speed) : 0;
+  if (drag > 0 && state.speed > 0.01) {
+    const scale = Math.max(0, 1 - (drag * DT) / state.speed);
+    state.vx *= scale;
+    state.vy *= scale;
+    state.speed *= scale;
+  }
 
   // --- Wall contact: penalty and a reset, never a restart ---
   // With throttle controls the tail counts too: at a big angle on a narrow road

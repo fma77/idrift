@@ -123,9 +123,9 @@ export interface CarParams {
   name: string;
   carClass: CarClass;
   handling: HandlingParams;
-  /** Metres, centre to front axle. Rendering only: where the front wheels are drawn. */
+  /** Metres, centre to front axle. Where the front wheels are: drawing, and the wheels-off test. */
   cgToFront: number;
-  /** Metres, centre to rear axle. Rendering and skid marks. */
+  /** Metres, centre to rear axle. Drawing, skid marks, and the wheels-off test. */
   cgToRear: number;
   /** Metres, for rendering. */
   bodyLength: number;
@@ -139,6 +139,27 @@ export interface CarParams {
   /** Garage hero image. A drawn placeholder stands in until it exists. */
   hero?: string;
   tint?: string;
+  /**
+   * How the car takes to a throttle-controls drift, as multipliers on the
+   * mode's settings: hold (angle a given throttle holds -- all-wheel drive
+   * holds less), runaway (how fast a slide past the limit gets away -- a
+   * nervous rear end, more) and rate (how quickly the angle answers).
+   */
+  driftFeel?: { hold: number; runaway: number; rate: number };
+  /** Garage only: the car's character, 1-5 each, and a line about it. */
+  stats?: CarStats;
+  tagline?: string;
+  /** Garage only: seconds from 0 to 100km/h, as shown. */
+  zeroTo100?: number;
+}
+
+export interface CarStats {
+  accel: number;
+  topSpeed: number;
+  grip: number;
+  drift: number;
+  agility: number;
+  stability: number;
 }
 
 /** One centreline sample. Stored as parallel arrays on the route for locality. */
@@ -354,6 +375,12 @@ export interface SimState {
   /** Signed lateral offset from the centreline, metres. Positive = left. */
   lateralOffset: number;
   offTrack: boolean;
+  /**
+   * Which wheels are off the tarmac, as bits (1 front-left, 2 front-right,
+   * 4 rear-left, 8 rear-right), and how many. Derived from the pose each tick.
+   */
+  wheelsOffMask: number;
+  wheelsOff: number;
   finished: boolean;
 
   // --- Scoring ---

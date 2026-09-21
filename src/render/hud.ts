@@ -1,6 +1,7 @@
 import { TICK_RATE } from '../sim/version.ts';
 import type { RouteData, SimConfig, SimState } from '../sim/types.ts';
 import type { DriftGauge } from './driftGauge.ts';
+import { realKmh, WORLD_SCALE } from '../data/scale.ts';
 import { holdPhase, HOLD_OVER } from '../sim/model/throttleDrift.ts';
 
 /** Seconds the hold meter spans: past HOLD_OVER, with room to see it overshoot. */
@@ -49,8 +50,7 @@ export class Hud {
   private lastScore = 0;
   private lastBanked = 0;
   private lastPaceKey = '';
-  /** Game metres to real metres, for the distance left: real roads are driven at 60%. */
-  private realFactor = 1;
+
   /** The touch drift pad, filled while the button is held. */
   private driftPad: HTMLElement | null = null;
   private holdWasOn = false;
@@ -67,11 +67,6 @@ export class Hud {
 
   constructor(el: HudElements) {
     this.el = el;
-  }
-
-  /** The scale this route is driven at, so distances read as on the real road. */
-  setRealScale(scale: number): void {
-    this.realFactor = scale > 0 ? 1 / scale : 1;
   }
 
   setDriftPad(pad: HTMLElement): void {
@@ -137,7 +132,7 @@ export class Hud {
     // difference between "nearly there" and "a third of the way" is the whole
     // shape of a run, and from a top-down view with the road fogged out a few
     // hundred metres ahead there is no other way to tell.
-    const remaining = Math.max(0, route.length - state.distance) * this.realFactor;
+    const remaining = Math.max(0, route.length - state.distance) / WORLD_SCALE;
     el.progressFill.style.width = `${Math.min(100, Math.max(0, (state.distance / route.length) * 100)).toFixed(1)}%`;
     el.progressLabel.textContent =
       remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}km` : `${Math.round(remaining / 10) * 10}m`;
@@ -146,7 +141,7 @@ export class Hud {
       el.gauge.update(state.driftAngle, state.throttle, state.driftDir !== 0 || state.spinTicks > 0, config.drift);
     }
 
-    el.speedValue.textContent = String(Math.round(state.speed * 3.6));
+    el.speedValue.textContent = String(Math.round(realKmh(state.speed)));
     // Drift angle in place of the old gear readout: with no gearbox left, the
     // angle is the number that says whether a slide is working.
     el.angleValue.textContent = String(Math.round(Math.min(Math.abs(state.slipAngle), Math.PI / 2) * 57.29578));

@@ -30,6 +30,8 @@ export interface WorldTheme {
   haze: [number, number, number];
   guardrail: string;
   post: string;
+  /** Dirt thrown up off the road: earth, and torn grass. */
+  dirt: [string, string];
   /** Open ground between the shoulder and the first trees, metres. A circuit's run-off. */
   treeClearance: number;
   /** Red and white kerbs on the corners, as on a circuit. */
@@ -56,6 +58,7 @@ export const NURBURG_THEME: WorldTheme = {
   haze: [226, 236, 214],
   guardrail: '#d8dad6',
   post: '#f4f1ea',
+  dirt: ['#6b4a2b', '#4f8a2c'],
   treeClearance: 0,
   kerbs: false,
 };
@@ -80,6 +83,7 @@ export const ESTORIL_THEME: WorldTheme = {
   haze: [236, 238, 222],
   guardrail: '#e6e6e0',
   post: '#f4f1ea',
+  dirt: ['#cbb487', '#8fca58'],
   treeClearance: 12,
   kerbs: true,
 };
@@ -104,6 +108,7 @@ export const HARUNA_THEME: WorldTheme = {
   haze: [224, 234, 216],
   guardrail: '#dcdcd6',
   post: '#f4f1ea',
+  dirt: ['#5b4128', '#4a9236'],
   treeClearance: 0,
   kerbs: false,
 };
