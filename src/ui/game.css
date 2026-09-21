@@ -659,6 +659,13 @@
   max-width: 320px;
 }
 
+/* On the dark overlay a transparent secondary button all but disappears. */
+.overlay .btn--secondary {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink);
+}
+
 /* --- Landscape: HUD to the corners, centre clear ------------------------- */
 
 @media (orientation: landscape) and (max-height: 560px) {
@@ -1219,4 +1226,11 @@
 
 .pedal-meter--spacer {
   visibility: hidden;
+}
+
+.overlay__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: min(320px, 100%);
 }
