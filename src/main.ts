@@ -753,6 +753,7 @@ async function startRun(mode: SimMode): Promise<void> {
 
   const car = carById(settings.carId);
   currentControls = mode === 'driftRun' ? settings.driftControls : 'steer';
+  hud.setRealScale(currentEntry.realScale ?? 1);
   gameEl.dataset.controls = currentControls;
   gameEl.dataset.mode = currentMode;
   const renderSettings: RenderSettings = {
