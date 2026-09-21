@@ -432,22 +432,42 @@ export class Renderer {
     ctx.lineWidth = px * 2;
     ctx.strokeStyle = RED;
 
+    // Zone start and end: a thin dashed red-and-white line across the road,
+    // like a timing line, and the zone's number just past the start. Kept
+    // light -- it marks a threshold, not a wall. The first version was a short
+    // red post at each edge, which on the painted worlds nobody could see.
     for (let z = 0; z < route.driftZones.length; z++) {
       const zone = route.driftZones[z];
       for (const index of [zone.entryIndex, zone.exitIndex]) {
         if (index < from || index > to || index < 0 || index >= s.x.length) continue;
         const h = s.heading[index];
         const w = s.halfWidth[index];
-        // Gate posts: short marks at each edge rather than a line across the
-        // road, so the zone reads as a threshold and not as a wall.
-        for (const side of [1, -1]) {
-          const bx = s.x[index] - sin(h) * w * side;
-          const by = s.y[index] + cos(h) * w * side;
-          ctx.beginPath();
-          ctx.moveTo(bx, by);
-          ctx.lineTo(bx - sin(h) * 1.6 * side, by + cos(h) * 1.6 * side);
-          ctx.stroke();
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.translate(s.x[index], s.y[index]);
+        ctx.rotate(h);
+        const dash = 0.9;
+        const count = Math.max(4, Math.round((w * 2) / dash));
+        const step = (w * 2) / count;
+        for (let i = 0; i < count; i++) {
+          ctx.fillStyle = i % 2 === 0 ? RED : PAPER;
+          ctx.fillRect(-0.15, -w + i * step, 0.3, step);
         }
+        if (index === zone.entryIndex) {
+          // The number reads upright to a car driving through: the same turn
+          // and flip as a sprite, since the world transform is mirrored.
+          ctx.translate(1.6, w * 0.55);
+          ctx.rotate(-Math.PI / 2);
+          // Set at 26px and scaled to 1.3m: some browsers round tiny font sizes.
+          ctx.scale(0.05, -0.05);
+          ctx.globalAlpha = 0.6;
+          ctx.fillStyle = PAPER;
+          ctx.font = "26px Bungee, 'Arial Black', sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(z + 1), 0, 0);
+        }
+        ctx.restore();
       }
     }
 
