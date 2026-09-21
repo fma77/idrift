@@ -1,5 +1,12 @@
 import type { RouteData } from '../sim/types.ts';
-import { ESTORIL_POSTER, type PosterArt } from './posters.ts';
+import {
+  ESTORIL_POSTER,
+  HARUNA_UPPER_POSTER,
+  HARUNA_MIDDLE_POSTER,
+  HARUNA_LOWER_POSTER,
+  HARUNA_FULL_POSTER,
+  type PosterArt,
+} from './posters.ts';
 
 /**
  * Route registry.
@@ -58,6 +65,7 @@ export const ROUTES: RouteEntry[] = [
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-upper.json',
     blurb: 'Off the top of the mountain. 7 hairpins, 1.5km.',
+    poster: HARUNA_UPPER_POSTER,
     attribution: OSM_CREDIT,
   },
   {
@@ -66,6 +74,7 @@ export const ROUTES: RouteEntry[] = [
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-middle.json',
     blurb: 'The middle third, corner after corner. 12 hairpins, 1.6km.',
+    poster: HARUNA_MIDDLE_POSTER,
     attribution: OSM_CREDIT,
   },
   {
@@ -74,6 +83,7 @@ export const ROUTES: RouteEntry[] = [
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-lower.json',
     blurb: 'The run to the bottom, and the tightest of it. 12 hairpins, 1.6km.',
+    poster: HARUNA_LOWER_POSTER,
     attribution: OSM_CREDIT,
   },
   {
@@ -82,6 +92,7 @@ export const ROUTES: RouteEntry[] = [
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-downhill.json',
     blurb: 'All three sections in one run. 31 hairpins, 4.7km.',
+    poster: HARUNA_FULL_POSTER,
     attribution: OSM_CREDIT,
   },
 ];

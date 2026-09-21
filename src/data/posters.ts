@@ -48,3 +48,48 @@ export const ESTORIL_POSTER: PosterArt = {
     [990, 565], [955, 630], [925, 715], [895, 800], [872, 870],
   ],
 };
+
+/**
+ * The whole Haruna pass on its painting, top of the mountain (bottom left) to
+ * the town (right). The painting follows the real road closely, so each
+ * section is a slice of this one trace, cut where the real sections split.
+ */
+const HARUNA_TRACE: [number, number][] = [
+  [440, 1018], [470, 985], [506, 950], [537, 894], [556, 850], [587, 800], [575, 762],
+  [544, 719], [541, 688], [553, 674], [566, 700], [594, 738], [612, 769], [625, 783],
+  [632, 766], [612, 719], [606, 675], [631, 638], [653, 616], [666, 625], [687, 625],
+  [725, 586],
+  // 22: upper ends, middle starts.
+  [745, 577],
+  [775, 561], [812, 546], [825, 530], [816, 514], [787, 505], [750, 510], [706, 517],
+  [662, 527], [639, 530], [642, 502], [681, 486], [744, 480], [806, 474], [856, 479],
+  [884, 489], [870, 468], [850, 455], [831, 430], [806, 420], [787, 405], [772, 380],
+  [772, 343],
+  // 45: middle ends, lower starts.
+  [777, 330],
+  [781, 318], [793, 293], [806, 268], [831, 249], [860, 228], [840, 208], [820, 212],
+  [870, 212], [940, 228], [960, 250], [945, 290], [965, 305], [990, 300], [1030, 340],
+  [1050, 320], [1070, 290], [1090, 310], [1100, 330], [1140, 290],
+];
+const HARUNA_SPLIT_UPPER = 22;
+const HARUNA_SPLIT_LOWER = 45;
+
+function haruna(from: number, to: number, arrows: number[]): PosterArt {
+  // From the foot of the painting there is only room for a label up-slope.
+  const startSide = from === 0 ? 1 : -1;
+  return {
+    src: 'art/routes/haruna-poster.webp',
+    width: 1439,
+    height: 1093,
+    north: 0,
+    startSide,
+    finishSide: -1,
+    arrows: arrows.map((i) => i - from),
+    trace: HARUNA_TRACE.slice(from, to + 1),
+  };
+}
+
+export const HARUNA_UPPER_POSTER = haruna(0, HARUNA_SPLIT_UPPER, [2, 16]);
+export const HARUNA_MIDDLE_POSTER = haruna(HARUNA_SPLIT_UPPER, HARUNA_SPLIT_LOWER, [33, 41]);
+export const HARUNA_LOWER_POSTER = haruna(HARUNA_SPLIT_LOWER, HARUNA_TRACE.length - 1, [48, 56]);
+export const HARUNA_FULL_POSTER = haruna(0, HARUNA_TRACE.length - 1, [2, 34, 56]);
