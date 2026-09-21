@@ -558,3 +558,83 @@ input[type='range']::-moz-range-thumb {
   object-fit: cover;
   border: 2px solid var(--ink);
 }
+
+/* --- Garage: car cards with a hero image ---------------------------------- */
+
+.car-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--paper-2);
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.car-card--selected {
+  border-color: var(--red);
+}
+
+.car-card__body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 14px 16px;
+}
+
+/* 16:9, the shape the hero art should be supplied in. */
+.car-hero {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.car-hero img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.car-hero--placeholder {
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 10px, rgba(20, 20, 20, 0.07) 10px 12px),
+    var(--paper-2);
+  border-bottom: 2px solid var(--ink);
+}
+
+/* The top-down drawing, turned to lie across the panel, nose right. */
+.car-hero img.car-hero__sprite {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: auto;
+  height: 150%;
+  object-fit: contain;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.car-hero__shape {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56%;
+  height: 26%;
+  transform: translate(-50%, -50%);
+  background: var(--car-tint);
+  border: 3px solid var(--ink);
+}
+
+.car-hero__label {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-muted);
+}

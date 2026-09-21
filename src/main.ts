@@ -458,8 +458,11 @@ function buildCarList(): void {
   $('car-list').replaceChildren(
     ...CARS.map((car) => {
       const button = document.createElement('button');
-      button.className = 'card';
+      button.className = 'car-card';
+      if (car.id === settings.carId) button.classList.add('car-card--selected');
 
+      const body = document.createElement('div');
+      body.className = 'car-card__body';
       const left = document.createElement('div');
       const name = document.createElement('div');
       name.className = 'card__name';
@@ -470,15 +473,10 @@ function buildCarList(): void {
         `${PROFILES[car.engine].label} · top ${Math.round(car.handling.topSpeed * 3.6)} km/h` +
         (tuneMode && isTuned(car) ? ' · tuned' : '');
       left.append(name, meta);
+      body.append(left);
+      if (car.id === settings.carId) body.appendChild(chip('SELECTED', 'chip--red'));
 
-      const right = document.createElement('div');
-      right.style.display = 'flex';
-      right.style.gap = '8px';
-      right.style.alignItems = 'center';
-      if (car.id === settings.carId) right.appendChild(chip('SELECTED', 'chip--red'));
-      right.appendChild(chip(car.carClass, 'chip'));
-
-      button.append(left, right);
+      button.append(carHero(car), body);
       button.addEventListener('click', () => {
         settings.carId = car.id;
         saveSettings(settings);
@@ -487,6 +485,41 @@ function buildCarList(): void {
       return button;
     }),
   );
+}
+
+/**
+ * A car's hero image, or a placeholder in its place: the top-down drawing (if
+ * there is one) laid on its side over a hatched panel, in the car's colour.
+ */
+function carHero(car: (typeof CARS)[number]): HTMLElement {
+  const hero = document.createElement('div');
+  hero.className = 'car-hero';
+  if (car.hero) {
+    const img = document.createElement('img');
+    img.src = car.hero;
+    img.alt = car.name;
+    img.decoding = 'async';
+    hero.appendChild(img);
+    return hero;
+  }
+  hero.classList.add('car-hero--placeholder');
+  hero.style.setProperty('--car-tint', car.tint ?? '#e8402a');
+  if (car.sprite) {
+    const img = document.createElement('img');
+    img.className = 'car-hero__sprite';
+    img.src = car.sprite.path;
+    img.alt = '';
+    hero.appendChild(img);
+  } else {
+    const shape = document.createElement('div');
+    shape.className = 'car-hero__shape';
+    hero.appendChild(shape);
+  }
+  const label = document.createElement('div');
+  label.className = 'mono car-hero__label';
+  label.textContent = 'HERO ART TO COME';
+  hero.appendChild(label);
+  return hero;
 }
 
 // --- Settings ---------------------------------------------------------------

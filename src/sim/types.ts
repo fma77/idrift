@@ -113,7 +113,7 @@ export interface HandlingParams {
  *   turbo6: turbocharged straight six
  *   boxer4: turbocharged flat four
  */
-export type EngineKind = 'na4' | 'rotary' | 'turbo6' | 'boxer4';
+export type EngineKind = 'na4' | 'rotary' | 'turbo6' | 'boxer4' | 'flat6tt' | 'turbo4';
 
 export interface CarParams {
   id: string;
@@ -133,6 +133,8 @@ export interface CarParams {
   engine: EngineKind;
   /** Rendering only; never read by the sim step. */
   sprite?: { path: string; pixelsPerMetre: number };
+  /** Garage hero image. A drawn placeholder stands in until it exists. */
+  hero?: string;
   tint?: string;
 }
 

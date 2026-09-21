@@ -9,14 +9,14 @@ import type { CarParams } from '../sim/types.ts';
  * (turnRate, turnResponse), how easily the rear lets go (grip, breakAngle),
  * and how a slide holds once it has (the two slide frictions).
  *
- * Names are fictional JDM pastiche. No real manufacturer, model, or chassis
- * code appears anywhere in this file, deliberately.
+ * Names are the nicknames the cars are known by, chosen by the owner of the
+ * game. Ids are stable and never shown, so renaming a car keeps its bests.
  */
 
 export const CARS: CarParams[] = [
   {
     id: 'kaido-zen-r',
-    name: 'KAIDO ZEN-R',
+    name: 'HACHIROKU',
     carClass: 'C',
     // Light and eager: quick to rotate, lets go early, forgiving in a slide.
     handling: {
@@ -43,7 +43,7 @@ export const CARS: CarParams[] = [
   },
   {
     id: 'onibi-silhouette',
-    name: 'ONIBI SILHOUETTE',
+    name: 'ROTARY',
     carClass: 'B',
     // Faster, a touch lazier to turn in, holds a slide at a wider angle.
     handling: {
@@ -72,7 +72,7 @@ export const CARS: CarParams[] = [
   },
   {
     id: 'tengu-gt-x',
-    name: 'TENGU GT-X',
+    name: 'GODZILLA',
     carClass: 'A',
     // Heavy and fast: grips hard and turns in slowly, but once it goes it
     // carries its speed through the slide.
@@ -99,7 +99,7 @@ export const CARS: CarParams[] = [
   },
   {
     id: 'kaze-b4',
-    name: 'KAZE B4',
+    name: 'SCOOBY',
     carClass: 'B',
     // Four-wheel-drive flat four: the most grip in the roster and the most
     // stable in a slide, at the cost of a lazier turn-in.
@@ -123,6 +123,62 @@ export const CARS: CarParams[] = [
     maxWheelAngle: 0.56,
     engine: 'boxer4',
     tint: '#cdc7bb',
+  },
+  {
+    id: 'yellowbird',
+    name: 'YELLOWBIRD',
+    carClass: 'A',
+    // Twin-turbo flat six hung out behind the rear axle: huge traction and
+    // pace, a quick nose, and a tail that lets go sharply and swings wide once
+    // it does -- the slide frictions are the lowest in the roster.
+    handling: {
+      topSpeed: 55,
+      acceleration: 11,
+      turnRate: 2.05,
+      turnResponse: 6.5,
+      turnInSpeed: 8,
+      grip: 1.15,
+      slideFrictionLow: 0.45,
+      slideFrictionHigh: 1.35,
+      breakAngle: 0.12,
+      regripAngle: 0.05,
+      selfAlign: 1.7,
+    },
+    // Weight over the rear: the centre of mass sits well back.
+    cgToFront: 1.35,
+    cgToRear: 1.1,
+    bodyLength: 4.3,
+    bodyWidth: 1.84,
+    maxWheelAngle: 0.55,
+    engine: 'flat6tt',
+    tint: '#f2c230',
+  },
+  {
+    id: 'silvia',
+    name: 'SILVIA',
+    carClass: 'B',
+    // The drift-school car: light, balanced, rear-drive turbo four. Turns in
+    // eagerly, holds an angle happily and gives it back without a fight.
+    handling: {
+      topSpeed: 48,
+      acceleration: 9.5,
+      turnRate: 2.15,
+      turnResponse: 7,
+      turnInSpeed: 7.5,
+      grip: 1.08,
+      slideFrictionLow: 0.5,
+      slideFrictionHigh: 1.5,
+      breakAngle: 0.12,
+      regripAngle: 0.05,
+      selfAlign: 2.1,
+    },
+    cgToFront: 1.2,
+    cgToRear: 1.35,
+    bodyLength: 4.52,
+    bodyWidth: 1.7,
+    maxWheelAngle: 0.62,
+    engine: 'turbo4',
+    tint: '#3a6ea5',
   },
 ];
 

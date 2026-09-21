@@ -551,6 +551,10 @@ export class Renderer {
     const sprite = getSprite(car.sprite?.path);
 
     if (sprite) {
+      // Wheels first, under the body: the drawing's tyres are fixed, so these
+      // are what turn -- their corners show past the body when the car steers.
+      drawWheels(ctx, car, view.steerAngle);
+
       // Supplied art faces "up"; the car's local +x is forward, so rotate the
       // image a quarter turn to line the two conventions up.
       ctx.rotate(-Math.PI / 2);

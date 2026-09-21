@@ -1,7 +1,7 @@
 import type { EngineKind } from '../sim/types.ts';
 
 /**
- * The four engines, as numbers.
+ * The engines, as numbers.
  *
  * Each engine is two sets of numbers. The mechanical side (EngineSpec) says how
  * the revs behave: idle, redline, gears, how fast it revs, whether it has a
@@ -222,9 +222,82 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       gain: 1,
     },
   },
+  flat6tt: {
+    kind: 'flat6tt',
+    label: 'Twin-turbo flat six',
+    spec: {
+      idleRpm: 900,
+      redlineRpm: 7500,
+      limiterRpm: 7900,
+      gears: 6,
+      revRise: 12500,
+      revFall: 8500,
+      spool: 2.8,
+      boostThreshold: 0.3,
+    },
+    // Even-firing like the straight six, but harder and more metallic: a
+    // higher, rasping pulse body and more induction noise. Two small turbos
+    // spool quickly, so the whistle arrives early and the flutter is lighter.
+    voice: {
+      firesPerRev: 3,
+      pattern: [1, 1, 1, 1, 1, 1],
+      levels: [1, 0.95, 0.98, 0.94, 1, 0.95],
+      resonance: 360,
+      resonanceTrack: 0.8,
+      pulseDecay: 0.005,
+      rasp: 0.42,
+      jitter: 0.07,
+      lope: 0,
+      lopeHz: 3,
+      intake: 0.4,
+      whistle: 0.55,
+      whistleHz: 6200,
+      flutter: 0.55,
+      flutterHz: 20,
+      pops: 0.4,
+      drive: 2.6,
+      gain: 0.95,
+    },
+  },
+  turbo4: {
+    kind: 'turbo4',
+    label: 'Turbo inline four',
+    spec: {
+      idleRpm: 850,
+      redlineRpm: 7200,
+      limiterRpm: 7600,
+      gears: 6,
+      revRise: 12000,
+      revFall: 8500,
+      spool: 2,
+      boostThreshold: 0.38,
+    },
+    // An even four with a turbo muffling its rasp: deeper than the NA four,
+    // with a strong whistle and a busy flutter on every lift.
+    voice: {
+      firesPerRev: 2,
+      pattern: [1, 1, 1, 1],
+      levels: [1, 0.95, 0.98, 0.93],
+      resonance: 320,
+      resonanceTrack: 0.7,
+      pulseDecay: 0.0055,
+      rasp: 0.32,
+      jitter: 0.1,
+      lope: 0,
+      lopeHz: 3,
+      intake: 0.25,
+      whistle: 0.75,
+      whistleHz: 5200,
+      flutter: 0.9,
+      flutterHz: 19,
+      pops: 0.4,
+      drive: 2.5,
+      gain: 0.95,
+    },
+  },
 };
 
-export const ENGINE_KINDS: EngineKind[] = ['na4', 'rotary', 'turbo6', 'boxer4'];
+export const ENGINE_KINDS: EngineKind[] = ['na4', 'rotary', 'turbo6', 'boxer4', 'flat6tt', 'turbo4'];
 
 /** The voice numbers the sound lab exposes as sliders. */
 export interface VoiceSpec {
@@ -261,6 +334,8 @@ const SHIPPED: Record<EngineKind, VoiceParams> = {
   rotary: { ...PROFILES.rotary.voice },
   turbo6: { ...PROFILES.turbo6.voice },
   boxer4: { ...PROFILES.boxer4.voice },
+  flat6tt: { ...PROFILES.flat6tt.voice },
+  turbo4: { ...PROFILES.turbo4.voice },
 };
 
 type Overrides = Partial<Record<EngineKind, Partial<Record<keyof VoiceParams, number>>>>;
