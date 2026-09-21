@@ -57,6 +57,7 @@
 }
 
 .progress__track {
+  position: relative;
   flex: 1;
   height: 3px;
   background: var(--ink-2);
@@ -1133,9 +1134,25 @@
   color: #fff;
 }
 
-.zone-box .hud__value {
-  font-size: 24px;
+.zone-box__counts {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--display);
+  font-size: 20px;
   line-height: 1;
+  color: var(--paper);
+}
+
+.zone-box__tick {
+  font-size: 13px;
+  color: #6fd14f;
+}
+
+.zone-box__cross {
+  margin-left: 6px;
+  font-size: 13px;
+  color: var(--red);
 }
 
 /* --- Drift button hold: soft, full, too long ----------------------------- */
@@ -1232,4 +1249,54 @@
 /* A press is feedback the player needs now, drifting yet or not. */
 .drift-gauge:has(.gauge__hold[data-hold]) {
   opacity: 1;
+}
+
+.zone-box[data-state='cleared'] .zone-box__counts {
+  color: var(--ink);
+}
+
+/* Missed flashes red: the red cross would vanish into it. */
+.zone-box[data-state='missed'] .zone-box__cross {
+  color: #fff;
+}
+
+/* --- Zone marks on the progress bar --------------------------------------- */
+
+.progress__zones {
+  position: absolute;
+  inset: -4px 0;
+  pointer-events: none;
+}
+
+#game:not([data-mode='driftRun']) .progress__zones {
+  display: none;
+}
+
+.zone-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 4px;
+  box-sizing: border-box;
+  border: 1.5px solid rgba(244, 241, 234, 0.55);
+  background: var(--ink);
+}
+
+.zone-mark[data-state='in'] {
+  border-color: var(--red);
+  background: var(--ink);
+}
+
+.zone-mark[data-state='cleared'] {
+  border-color: #6fd14f;
+  background: #6fd14f;
+}
+
+.zone-mark[data-state='missed'] {
+  border-color: var(--red);
+  background: var(--red);
+}
+
+.pedal-meter--spacer {
+  visibility: hidden;
 }

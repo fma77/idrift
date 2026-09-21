@@ -30,6 +30,11 @@ export class PedalTouch {
     meter.innerHTML = '<span class="pedal-meter__fill"></span>';
     this.driftZone.appendChild(meter);
     this.throttleZone = zone('pedal-zone pedal-zone--throttle', 'GAS', 'Hold');
+    // An empty meter on the gas side too, so the two pads are the same height
+    // and sit level.
+    const spacer = document.createElement('span');
+    spacer.className = 'pedal-meter pedal-meter--spacer';
+    this.throttleZone.appendChild(spacer);
     surface.append(this.driftZone, this.throttleZone);
 
     surface.addEventListener('pointerdown', (e) => this.onDown(e));

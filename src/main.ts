@@ -111,6 +111,7 @@ const hud = new Hud({
   flash: $('hud-flash'),
   bankPop: $('bank-pop'),
   zoneChip: $('zone-chip'),
+  zoneMarks: $('zone-marks'),
   gauge: new DriftGauge($('drift-gauge')),
 });
 

@@ -289,7 +289,10 @@
           </div>
 
           <div class="progress">
-            <div class="progress__track"><div class="progress__fill" id="progress-fill"></div></div>
+            <div class="progress__track">
+              <div class="progress__fill" id="progress-fill"></div>
+              <div class="progress__zones" id="zone-marks"></div>
+            </div>
             <span class="progress__label" id="progress-label">0m</span>
           </div>
 
@@ -307,8 +310,11 @@
             </div>
             <!-- Drift Run: zones cleared so far, and whether the car is in one now. -->
             <div class="hud__speed zone-box" id="zone-chip" aria-live="polite">
-              <span class="hud__value" id="zone-value">0/0</span>
-              <span class="hud__unit" id="zone-label">zones</span>
+              <span class="zone-box__counts">
+                <span class="zone-box__tick">✓</span><span class="zone-box__cleared">0</span>
+                <span class="zone-box__cross">✗</span><span class="zone-box__missed">0</span>
+              </span>
+              <span class="hud__unit">zones</span>
             </div>
             <div class="keyhints">
               <span class="keyhint keyhint--steer"><span class="keyhint__key" id="hint-left">←</span><span class="keyhint__key" id="hint-right">→</span> STEER</span>

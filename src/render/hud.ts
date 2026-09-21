@@ -34,8 +34,10 @@ export interface HudElements {
   flash: HTMLElement;
   /** "+2,340" when a drift ends and its points are banked. */
   bankPop: HTMLElement;
-  /** Zones cleared so far, labelled with what is happening: in a zone, cleared, missed. */
+  /** Zones cleared and missed so far, and how many are left. */
   zoneChip: HTMLElement;
+  /** Holds one mark per drift zone, laid over the progress bar. */
+  zoneMarks: HTMLElement;
   /** Shown in Drift Run with throttle controls only. */
   gauge: DriftGauge;
 }
@@ -54,6 +56,10 @@ export class Hud {
   private lastZone = -1;
   private lastCleared = 0;
   private zoneTimer = 0;
+  private lastTick = 0;
+  private zoneRoute: RouteData | null = null;
+  /** What became of each zone this run. */
+  private zoneResults: ('ahead' | 'in' | 'cleared' | 'missed')[] = [];
 
   private readonly el: HudElements;
 
@@ -189,40 +195,86 @@ export class Hud {
 
   /**
    * Drift zones, live. Scoring only counts inside them, so the player needs to
-   * know when they are in one and, on the way out, whether it counted: a zone
-   * is cleared by banking any points inside it.
+   * know when they are in one, whether the last one counted, and how the run
+   * stands overall -- a bare "6/11" could be a perfect run so far or three
+   * misses. So there are two views:
+   *
+   * - A mark on the progress bar for every zone, where it is on the route:
+   *   hollow ahead, red outline while in it, then filled green (cleared) or red
+   *   (missed). The whole run's record at a glance, and what is left.
+   * - The zone box: cleared and missed so far, and how many are left, with a
+   *   flash of the result on the way out of each one.
+   *
+   * A zone is cleared by banking any points inside it.
    */
   private updateZone(state: SimState, route: RouteData): void {
     const chip = this.el.zoneChip;
     const d = state.drift;
-    // A new run: the counters went backwards.
-    if (d.zonesCleared < this.lastCleared) {
-      this.lastCleared = 0;
-      this.lastZone = -1;
-      chip.dataset.state = '';
-    }
+    const total = route.driftZones.length;
 
-    (chip.firstElementChild as HTMLElement).textContent = `${d.zonesCleared}/${route.driftZones.length}`;
-    const label = chip.lastElementChild as HTMLElement;
+    // A new run, or a different route: start the record again.
+    if (state.tick < this.lastTick || route !== this.zoneRoute) {
+      this.zoneRoute = route;
+      this.lastZone = -1;
+      this.lastCleared = 0;
+      this.zoneResults = new Array(total).fill('ahead');
+      window.clearTimeout(this.zoneTimer);
+      chip.dataset.state = '';
+      this.buildZoneMarks(route);
+    }
+    this.lastTick = state.tick;
 
     const zone = d.inZone ? d.activeZone : -1;
     if (zone !== this.lastZone) {
       window.clearTimeout(this.zoneTimer);
-      if (zone >= 0) {
-        chip.dataset.state = 'in';
-        label.textContent = 'in zone';
-      } else if (this.lastZone >= 0) {
+      if (this.lastZone >= 0) {
         const cleared = d.zonesCleared > this.lastCleared;
+        this.zoneResults[this.lastZone] = cleared ? 'cleared' : 'missed';
         chip.dataset.state = cleared ? 'cleared' : 'missed';
-        label.textContent = cleared ? 'cleared' : 'missed';
         this.zoneTimer = window.setTimeout(() => {
-          chip.dataset.state = '';
-          label.textContent = 'zones';
+          if (chip.dataset.state !== 'in') chip.dataset.state = '';
         }, 1400);
       }
+      if (zone >= 0) {
+        this.zoneResults[zone] = 'in';
+        chip.dataset.state = 'in';
+      }
       this.lastZone = zone;
+      this.paintZoneMarks();
     }
     this.lastCleared = d.zonesCleared;
+
+    const passed = this.zoneResults.filter((r) => r === 'cleared' || r === 'missed').length;
+    const missed = this.zoneResults.filter((r) => r === 'missed').length;
+    const left = total - passed;
+    (chip.querySelector('.zone-box__cleared') as HTMLElement).textContent = String(d.zonesCleared);
+    (chip.querySelector('.zone-box__missed') as HTMLElement).textContent = String(missed);
+    const label = chip.querySelector('.hud__unit') as HTMLElement;
+    const state_ = chip.dataset.state;
+    label.textContent =
+      state_ === 'in' ? 'in zone' : state_ === 'cleared' ? 'cleared!' : state_ === 'missed' ? 'missed' : `${left} left`;
+  }
+
+  /** One mark per zone on the progress bar, placed and sized as on the route. */
+  private buildZoneMarks(route: RouteData): void {
+    const host = this.el.zoneMarks;
+    const spacing = route.sampleSpacing;
+    host.replaceChildren(
+      ...route.driftZones.map((z) => {
+        const mark = document.createElement('span');
+        mark.className = 'zone-mark';
+        const from = (z.entryIndex * spacing) / route.length;
+        const to = (z.exitIndex * spacing) / route.length;
+        mark.style.left = `${(from * 100).toFixed(2)}%`;
+        mark.style.width = `${(Math.max(0.012, to - from) * 100).toFixed(2)}%`;
+        return mark;
+      }),
+    );
+  }
+
+  private paintZoneMarks(): void {
+    const marks = this.el.zoneMarks.children;
+    for (let i = 0; i < marks.length; i++) (marks[i] as HTMLElement).dataset.state = this.zoneResults[i] ?? 'ahead';
   }
 
   /** Combo break / wall contact: a 2-frame red flash, per the design system. */
