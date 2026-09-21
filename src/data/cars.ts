@@ -71,6 +71,7 @@ export const CARS: CarParams[] = [
     // find.
     tint: '#f4f1ea',
     sprite: { path: 'art/cars/onibi-silhouette.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/onibi-silhouette-hero.webp',
   },
   {
     id: 'tengu-gt-x',
@@ -99,6 +100,7 @@ export const CARS: CarParams[] = [
     engine: 'turbo6',
     tint: '#e0dbd0',
     sprite: { path: 'art/cars/tengu-gt-x.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/tengu-gt-x-hero.webp',
   },
   {
     id: 'kaze-b4',
@@ -127,6 +129,7 @@ export const CARS: CarParams[] = [
     engine: 'boxer4',
     tint: '#cdc7bb',
     sprite: { path: 'art/cars/kaze-b4.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/kaze-b4-hero.webp',
   },
   {
     id: 'yellowbird',
@@ -157,6 +160,7 @@ export const CARS: CarParams[] = [
     engine: 'flat6tt',
     tint: '#f2c230',
     sprite: { path: 'art/cars/yellowbird.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/yellowbird-hero.webp',
   },
   {
     id: 'silvia',
@@ -185,6 +189,7 @@ export const CARS: CarParams[] = [
     engine: 'turbo4',
     tint: '#3a6ea5',
     sprite: { path: 'art/cars/silvia.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/silvia-hero.webp',
   },
 ];
 

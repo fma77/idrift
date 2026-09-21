@@ -591,14 +591,18 @@ input[type='range']::-moz-range-thumb {
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: var(--ink);
+  background: var(--paper-2);
+  border-bottom: 2px solid var(--ink);
 }
 
+/* Hero art is transparent: the car sits on the card, with a margin so none touches the edge. */
 .car-hero img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  box-sizing: border-box;
+  padding: 4% 5%;
+  object-fit: contain;
 }
 
 .car-hero--placeholder {

@@ -507,6 +507,7 @@ function carHero(car: (typeof CARS)[number]): HTMLElement {
     img.src = car.hero;
     img.alt = car.name;
     img.decoding = 'async';
+    img.loading = 'lazy';
     hero.appendChild(img);
     return hero;
   }
