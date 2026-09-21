@@ -261,6 +261,19 @@ body {
   gap: var(--s-2);
 }
 
+/* Two choices side by side, e.g. the drive modes on a route. */
+.btn-row--split {
+  flex-direction: row;
+}
+
+.btn-row--split > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 12px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
 /* --- Cards, rows, chips -------------------------------------------------- */
 
 .card {
@@ -453,8 +466,9 @@ input[type='range']::-moz-range-thumb {
 }
 
 .board__tab[aria-selected='true'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
 }
 
 .board__row {

@@ -232,19 +232,6 @@ async function openIntro(entry: RouteEntry): Promise<void> {
   $('intro-credit').hidden = credit === '';
 
   const route = currentRoute;
-  $('intro-stats').replaceChildren(
-    statRow('Length', `${(route.length / 1000).toFixed(2)} km`),
-    statRow('Corners', String(route.corners.length)),
-    statRow('Drift zones', String(route.driftZones.length)),
-    statRow('Car', carById(settings.carId).name),
-  );
-
-  const hairpins = route.corners.filter((c) => c.severity >= 5).length;
-  $('intro-chips').replaceChildren(
-    chip(`${hairpins} HAIRPIN${hairpins === 1 ? '' : 'S'}`, 'chip--outline'),
-    chip(carById(settings.carId).carClass + '-CLASS', 'chip'),
-    ...(isCompleted(entry.id) ? [] : [chip('NEW', 'chip--red')]),
-  );
 
   showPoster(route);
   void refreshBoard();
