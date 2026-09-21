@@ -86,8 +86,15 @@
             place the player can see the corner sequence as a shape.
           -->
           <div id="intro-poster" style="background: var(--paper-2); padding: 16px">
-            <img id="poster-img" alt="" style="width: 100%; display: block" hidden />
-            <canvas id="minimap" style="width: 100%; display: block"></canvas>
+            <div class="poster" id="poster-art" hidden>
+              <img id="poster-img" alt="" />
+              <svg class="poster__overlay" id="poster-overlay" aria-hidden="true"></svg>
+              <div class="poster__plate">
+                <div class="display poster__name" id="poster-name"></div>
+                <div class="mono poster__meta" id="poster-meta"></div>
+              </div>
+            </div>
+            <canvas id="minimap"></canvas>
           </div>
 
           <div id="intro-stats"></div>

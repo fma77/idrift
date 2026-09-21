@@ -1,4 +1,5 @@
 import type { RouteData } from '../sim/types.ts';
+import { ESTORIL_POSTER, type PosterArt } from './posters.ts';
 
 /**
  * Route registry.
@@ -18,8 +19,8 @@ export interface RouteEntry {
   location: string;
   /** Path to the baked, immutable route JSON. */
   file: string;
-  /** Stylised course poster. Falls back to a drawn minimap when absent. */
-  poster?: string;
+  /** Painted course poster. Falls back to a drawn minimap when absent. */
+  poster?: PosterArt;
   /** Short flavour line for the route card. */
   blurb: string;
   /** Credit line for routes built from third-party data. Shown on the route screen. */
@@ -40,6 +41,7 @@ export const ROUTES: RouteEntry[] = [
     location: 'Estoril, Portugal',
     file: 'routes/estoril.json',
     blurb: 'Recta Interior round to the main straight. 7 corners, 2.3km.',
+    poster: ESTORIL_POSTER,
     attribution: OSM_CREDIT,
   },
   {

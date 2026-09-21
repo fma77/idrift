@@ -4,6 +4,8 @@ import { Camera, type CameraSettings } from './camera.ts';
 import { getSprite } from './sprites.ts';
 import { drawDecoration, type DecorationData } from './decoration.ts';
 import { TyreSmoke } from './smoke.ts';
+import { WorldArt } from './world.ts';
+import { themeFor, type WorldTheme } from './themes.ts';
 
 /**
  * World renderer.
@@ -61,6 +63,11 @@ export class Renderer {
    * anywhere in sim-visible data that could carry it into the simulation.
    */
   private decoration: DecorationData | null = null;
+
+  /** Painted world for routes that have a theme; null draws the ink look. */
+  private theme: WorldTheme | null = null;
+  private world: WorldArt | null = null;
+  private worldRoute = '';
 
   // Declared as a plain field rather than a constructor parameter property:
   // Node's type-stripping loader rejects parameter properties outright, and
@@ -122,6 +129,17 @@ export class Renderer {
     this.decoration = decoration;
   }
 
+  /**
+   * Paint the route's world ahead of time. Takes a few tens of milliseconds,
+   * so it is called when the route screen opens rather than on the first frame.
+   */
+  prepareWorld(route: RouteData): void {
+    if (this.worldRoute === route.id) return;
+    this.worldRoute = route.id;
+    this.theme = themeFor(route.id);
+    this.world = this.theme ? new WorldArt(route, this.theme, this.ctx) : null;
+  }
+
   clearTrails(): void {
     this.skidLeft.length = 0;
     this.skidRight.length = 0;
@@ -150,6 +168,8 @@ export class Renderer {
     dtSeconds: number,
   ): void {
     const view = interpolate(prev, state, alpha);
+    this.prepareWorld(route);
+    const theme = this.theme;
 
     this.camera.follow(view, settings, dtSeconds, this.width, this.height);
 
@@ -163,8 +183,13 @@ export class Renderer {
     // The camera transform scales metres to pixels, so every line width below
     // is expressed in metres and divided by scale to stay pixel-constant.
     const px = 1 / this.camera.scale;
+    // Metres from the camera's focus to the farthest screen corner.
+    const reach = Math.hypot(this.width / 2, this.height * 0.62) * px + 2;
 
-    // Scenery first: it sits under the road surface and the racing line.
+    if (this.world) this.world.drawGround(ctx, this.camera.x, this.camera.y, reach);
+
+    // Scenery first: it sits under the road surface and the racing line. A
+    // painted world grows its own trees, so the route's ink discs are skipped.
     if (this.decoration) {
       const spacing = route.sampleSpacing;
       drawDecoration(
@@ -173,10 +198,13 @@ export class Renderer {
         state.sampleIndex - Math.round(REVEAL_BEHIND / spacing),
         state.sampleIndex + Math.round(REVEAL_AHEAD / spacing),
         px,
+        theme ? { skipTrees: true, palette: { guardrail: theme.guardrail, post: theme.post } } : undefined,
       );
     }
 
-    this.drawRoad(ctx, route, state, px);
+    if (theme) this.drawPaintedRoad(ctx, route, state, theme);
+    else this.drawRoad(ctx, route, state, px);
+    if (this.world) this.world.drawTrees(ctx, this.camera.x, this.camera.y, reach);
     this.drawScoringMarks(ctx, route, state, px);
     if (settings.showSkidMarks) this.drawSkids(ctx, px);
     // Smoke under the car, so the car is never lost in its own cloud.
@@ -184,11 +212,11 @@ export class Renderer {
       this.smoke.update(view, car, dtSeconds);
       this.smoke.draw(ctx, PAPER);
     }
-    this.drawCar(ctx, view, car, px);
+    this.drawCar(ctx, view, car, px, theme);
 
     ctx.restore();
 
-    this.drawFog(ctx);
+    this.drawFog(ctx, theme);
 
     if (settings.showSkidMarks) this.recordSkid(state, car);
   }
@@ -271,6 +299,92 @@ export class Renderer {
       ctx.moveTo(s.x[last] - sin(h) * w, s.y[last] + cos(h) * w);
       ctx.lineTo(s.x[last] + sin(h) * w, s.y[last] - cos(h) * w);
       ctx.stroke();
+    }
+  }
+
+  /**
+   * The road in a painted world: a pale shoulder, an ink rim, grey tarmac and
+   * painted lines, sized in metres so it reads like the posters at any zoom.
+   */
+  private drawPaintedRoad(
+    ctx: CanvasRenderingContext2D,
+    route: RouteData,
+    state: SimState,
+    theme: WorldTheme,
+  ): void {
+    const s = route.samples;
+    const last = s.x.length - 1;
+    const spacing = route.sampleSpacing;
+    const from = Math.max(0, state.sampleIndex - Math.round(REVEAL_BEHIND / spacing));
+    const to = Math.min(last, state.sampleIndex + Math.round(REVEAL_AHEAD / spacing));
+    if (to <= from) return;
+
+    const band = (extra: number, colour: string) => {
+      ctx.beginPath();
+      for (let i = from; i <= to; i++) {
+        const h = s.heading[i];
+        const w = s.halfWidth[i] + extra;
+        const x = s.x[i] - sin(h) * w;
+        const y = s.y[i] + cos(h) * w;
+        if (i === from) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      for (let i = to; i >= from; i--) {
+        const h = s.heading[i];
+        const w = s.halfWidth[i] + extra;
+        ctx.lineTo(s.x[i] + sin(h) * w, s.y[i] - cos(h) * w);
+      }
+      ctx.closePath();
+      ctx.fillStyle = colour;
+      ctx.fill();
+    };
+    band(theme.vergeWidth, theme.verge);
+    band(0.3, theme.outline);
+    band(0, theme.tarmac);
+
+    // Edge lines, just inside the tarmac.
+    ctx.lineWidth = 0.16;
+    ctx.strokeStyle = theme.edgeLine;
+    for (const side of [1, -1]) {
+      ctx.beginPath();
+      for (let i = from; i <= to; i++) {
+        const h = s.heading[i];
+        const w = (s.halfWidth[i] - 0.45) * side;
+        const x = s.x[i] - sin(h) * w;
+        const y = s.y[i] + cos(h) * w;
+        if (i === from) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Centre dashes, 3m on and 5m off.
+    ctx.lineWidth = 0.14;
+    ctx.strokeStyle = theme.centreLine;
+    ctx.beginPath();
+    for (let i = from - (from % 4); i <= to - 2; i += 4) {
+      if (i < from) continue;
+      ctx.moveTo(s.x[i], s.y[i]);
+      ctx.lineTo(s.x[i + 1], s.y[i + 1]);
+    }
+    ctx.stroke();
+
+    // Finish: a chequered band across the road.
+    if (to >= last - 1) {
+      const h = s.heading[last];
+      const w = s.halfWidth[last];
+      const cells = Math.max(4, Math.round(w));
+      const cell = (w * 2) / cells;
+      ctx.save();
+      ctx.translate(s.x[last], s.y[last]);
+      ctx.rotate(h);
+      for (let row = 0; row < 2; row++) {
+        for (let i = 0; i < cells; i++) {
+          ctx.fillStyle = (row + i) % 2 === 0 ? INK : PAPER;
+          ctx.fillRect(row * cell - cell, -w + i * cell, cell, cell);
+        }
+      }
+      ctx.restore();
     }
   }
 
@@ -385,14 +499,27 @@ export class Renderer {
     view: SimState,
     car: CarParams,
     px: number,
+    theme: WorldTheme | null,
   ): void {
+    const len = car.bodyLength;
+    const wid = car.bodyWidth;
+
+    // A soft shadow on the painted ground, so the car sits on the road rather
+    // than floating over it. The sun is fixed in the world, like the trees'.
+    if (theme) {
+      ctx.save();
+      ctx.translate(view.x + 0.35, view.y - 0.45);
+      ctx.rotate(view.heading);
+      ctx.fillStyle = theme.treeShadow;
+      ctx.fillRect(-len / 2 - 0.1, -wid / 2 - 0.1, len + 0.2, wid + 0.2);
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.rotate(view.heading);
 
     const sprite = getSprite(car.sprite?.path);
-    const len = car.bodyLength;
-    const wid = car.bodyWidth;
 
     if (sprite) {
       // Supplied art faces "up"; the car's local +x is forward, so rotate the
@@ -409,7 +536,8 @@ export class Renderer {
       ctx.fillStyle = INK;
       ctx.fillRect(len * 0.06, -wid / 2 + 0.1, len * 0.2, wid - 0.2);
 
-      ctx.strokeStyle = PAPER;
+      // Paper rim on the ink world; ink rim on a painted one, like the trees.
+      ctx.strokeStyle = theme ? theme.outline : PAPER;
       ctx.lineWidth = px * 2;
       ctx.strokeRect(-len / 2, -wid / 2, len, wid);
 
@@ -429,15 +557,18 @@ export class Renderer {
    * distance, and the whole point of the mechanic is that the road ahead fades
    * out of knowledge. It is confined to the gameplay surface; no menu uses one.
    */
-  private drawFog(ctx: CanvasRenderingContext2D): void {
+  private drawFog(ctx: CanvasRenderingContext2D, theme: WorldTheme | null): void {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const cx = this.width / 2;
     const cy = this.height * 0.62;
     const outer = Math.max(this.width, this.height) * 0.78;
     const gradient = ctx.createRadialGradient(cx, cy, outer * 0.34, cx, cy, outer);
-    gradient.addColorStop(0, 'rgba(20,20,20,0)');
-    gradient.addColorStop(0.62, 'rgba(20,20,20,0.55)');
-    gradient.addColorStop(1, 'rgba(20,20,20,1)');
+    // A painted world gets summer haze instead of the ink void.
+    const [r, g, b] = theme ? theme.haze : [20, 20, 20];
+    const edge = theme ? 0.92 : 1;
+    gradient.addColorStop(0, `rgba(${r},${g},${b},0)`);
+    gradient.addColorStop(0.62, `rgba(${r},${g},${b},${edge * 0.5})`);
+    gradient.addColorStop(1, `rgba(${r},${g},${b},${edge})`);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, this.width, this.height);
   }

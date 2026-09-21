@@ -345,6 +345,20 @@ SIM_VERSION 9: the handling changed, so old times are not comparable.
 
 Tuning mode is parked. Its Settings row only appears with #tune on the URL.
 
+### Posters and painted worlds
+
+Route posters are the user's paintings, trusted over the map: the course is
+traced on the painting by hand (src/data/posters.ts), and the start, finish,
+compass, name and length are drawn over it as SVG and HTML in the game's fonts
+rather than baked into the image. tools/make-posters.mjs only resizes.
+
+Nurburg is the first route drawn in the posters' style instead of ink and
+paper (src/render/world.ts, themes.ts). To keep phones fast, the grass is two
+repeating textures painted once per route and filled in world space, and the
+trees are eight pre-painted stamps placed once and bucketed on a 32m grid, so a
+frame is a few pattern fills plus one drawImage per visible tree. About 1.3ms a
+frame on a desktop. A route without a theme keeps the ink look.
+
 ## Bugs worth remembering
 
 Four were caught by the headless harness and would have been miserable to find by eye:

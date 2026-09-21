@@ -1006,3 +1006,56 @@
   padding-left: 8px;
   padding-right: 8px;
 }
+
+/* --- Route poster ----------------------------------------------------------- */
+
+.poster {
+  position: relative;
+  border: 2px solid var(--ink);
+}
+
+.poster[hidden] {
+  display: none;
+}
+
+.poster img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.poster__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.poster__plate {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 6px 10px 5px;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.poster__name {
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.poster__meta {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--red);
+}
+
+#minimap {
+  display: block;
+  width: 100%;
+}
+
+#minimap[hidden] {
+  display: none;
+}

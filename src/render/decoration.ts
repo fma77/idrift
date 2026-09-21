@@ -78,11 +78,14 @@ export function drawDecoration(
   fromIndex: number,
   toIndex: number,
   px: number,
+  options?: { skipTrees?: boolean; palette?: Record<string, string> },
 ): void {
   const objects = deco.objects;
+  const palette = options?.palette ? { ...deco.palette, ...options.palette } : deco.palette;
   for (let i = 0; i < objects.length; i++) {
     const o = objects[i];
     if (o.index < fromIndex || o.index > toIndex) continue;
+    if (options?.skipTrees && o.kind === 'tree') continue;
 
     const sprite = getSprite(o.sprite);
     if (sprite) {
@@ -103,19 +106,19 @@ export function drawDecoration(
       case 'tree': {
         // A filled disc reads as canopy from directly above, which is the only
         // angle this camera has.
-        ctx.fillStyle = deco.palette.tree ?? '#1f1f1f';
+        ctx.fillStyle = palette.tree ?? '#1f1f1f';
         ctx.beginPath();
         ctx.arc(o.x, o.y, 1.5 * o.scale, 0, 6.283185307179586);
         ctx.fill();
         break;
       }
       case 'post': {
-        ctx.fillStyle = deco.palette.post ?? '#3a3a3a';
+        ctx.fillStyle = palette.post ?? '#3a3a3a';
         ctx.fillRect(o.x - 0.22, o.y - 0.22, 0.44, 0.44);
         break;
       }
       case 'guardrail': {
-        ctx.strokeStyle = deco.palette.guardrail ?? '#5a564c';
+        ctx.strokeStyle = palette.guardrail ?? '#5a564c';
         ctx.lineWidth = px * 2.5;
         const dx = cos(o.rotation) * 3.2;
         const dy = sin(o.rotation) * 3.2;
@@ -131,7 +134,7 @@ export function drawDecoration(
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation);
-        ctx.fillStyle = deco.palette.marker ?? '#e8402a';
+        ctx.fillStyle = palette.marker ?? '#e8402a';
         const h = 0.5 + (o.severity ?? 1) * 0.16;
         ctx.fillRect(-0.18, -h / 2, 0.36, h);
         ctx.restore();

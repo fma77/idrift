@@ -29,6 +29,7 @@ import {
 } from './storage/bests.ts';
 import { loadDecoration } from './render/decoration.ts';
 import { getSprite, preload } from './render/sprites.ts';
+import { drawPosterOverlay } from './ui/poster.ts';
 import { fireMeme } from './ui/memes.ts';
 import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
@@ -253,7 +254,11 @@ async function openIntro(entry: RouteEntry): Promise<void> {
   // Scenery and car art load in the background. Neither blocks the drive
   // button, and neither is required for the route to be playable.
   void loadDecoration(route.decoration).then((deco) => renderer.setDecoration(deco));
-  void preload([carById(settings.carId).sprite?.path, entry.poster]);
+  renderer.prepareWorld(route);
+  void preload([carById(settings.carId).sprite?.path, entry.poster?.src]).then(() => {
+    // The poster arrives after the screen is up; swap it in if we are still here.
+    if (currentEntry === entry && !SCREENS.intro.hidden) showPoster(route);
+  });
 }
 
 // --- Leaderboard ------------------------------------------------------------
@@ -378,16 +383,20 @@ function chip(text: string, className: string): HTMLElement {
  * never disagree with the road even when the poster does.
  */
 function showPoster(route: RouteData): void {
-  const poster = getSprite(currentEntry.poster);
-  const img = $<HTMLImageElement>('poster-img');
+  const art = currentEntry.poster;
+  const poster = getSprite(art?.src);
+  const frame = $('poster-art');
   const canvas = $<HTMLCanvasElement>('minimap');
-  if (poster) {
-    img.src = poster.src;
-    img.hidden = false;
+  if (art && poster) {
+    $<HTMLImageElement>('poster-img').src = poster.src;
+    drawPosterOverlay($('poster-overlay') as unknown as SVGSVGElement, art);
+    $('poster-name').textContent = currentEntry.name;
+    $('poster-meta').textContent = `${(route.length / 1000).toFixed(1)} KM · ${route.corners.length} CORNERS`;
+    frame.hidden = false;
     canvas.hidden = true;
     return;
   }
-  img.hidden = true;
+  frame.hidden = true;
   canvas.hidden = false;
   drawMinimap(route);
 }
