@@ -35,8 +35,10 @@
   padding: max(var(--s-3), env(safe-area-inset-top)) max(var(--s-3), env(safe-area-inset-left))
     max(var(--s-3), env(safe-area-inset-bottom)) max(var(--s-3), env(safe-area-inset-right));
   display: grid;
-  /* Progress, then the pace notes and score, then the road, then the readouts. */
-  grid-template-rows: auto auto 1fr auto;
+  /* Score, progress, the next corners, then the road, then the readouts. */
+  grid-template-rows: auto auto auto 1fr auto;
+  /* One column that never grows past the screen, whatever a row holds. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s-2);
 }
 
@@ -575,8 +577,8 @@
  * cover them.
  */
 #game[data-input='touch'] .hud__bottom {
-  /* The middle row: progress and the pace strip are rows 1 and 2 now. */
-  grid-row: 3;
+  /* Straight under the pace strip: score, progress and pace are rows 1-3. */
+  grid-row: 4;
   align-self: start;
   align-items: flex-start;
 }
@@ -1049,48 +1051,89 @@
   background: none !important;
 }
 
-/* --- Drift zone chip ------------------------------------------------------ */
+/* --- Pace row: "NEXT" and the upcoming corners --------------------------- */
 
-.zone-chip {
-  position: absolute;
-  left: 50%;
-  top: 31%;
-  transform: translateX(-50%);
-  padding: 6px 12px;
-  font-family: var(--display);
-  font-size: 15px;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms linear;
+.pace-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
 }
 
-#game:not([data-mode='driftRun']) .zone-chip {
+.pace-row__label {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+/* No corners left to call: no label either. */
+.pace-row:has(.pace:empty) {
+  visibility: hidden;
+}
+
+/* On a phone the pause button sits top-left; the score panel starts after it. */
+#game[data-input='touch'] .hud__top {
+  padding-left: 60px;
+}
+
+#game[data-input='touch'] .hud__panel {
+  min-width: 0;
+  width: 100%;
+  gap: var(--s-2);
+  padding: 8px 12px;
+}
+
+/* --- Drift zones, in the readout row ------------------------------------- */
+
+.zone-box {
+  /* Number over label, so it fits between speed and gauge on a phone. */
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 2px solid transparent;
+  transition: background 120ms linear;
+}
+
+#game:not([data-mode='driftRun']) .zone-box {
   display: none;
 }
 
-.zone-chip[data-state='in'] {
-  opacity: 1;
-  background: var(--ink);
-  color: var(--paper);
-  border: 2px solid var(--red);
+.zone-box[data-state='in'] {
+  border-color: var(--red);
 }
 
-.zone-chip[data-state='cleared'] {
-  opacity: 1;
+.zone-box[data-state='in'] .hud__unit {
+  color: var(--red);
+}
+
+.zone-box[data-state='cleared'] {
   background: var(--paper);
+  border-color: var(--ink);
+}
+
+.zone-box[data-state='cleared'] .hud__value,
+.zone-box[data-state='cleared'] .hud__unit {
   color: var(--ink);
-  border: 2px solid var(--ink);
 }
 
-.zone-chip[data-state='cleared']::before {
-  content: '\2713  ';
-}
-
-.zone-chip[data-state='missed'] {
-  opacity: 1;
+.zone-box[data-state='missed'] {
   background: var(--red);
+  border-color: var(--red);
+}
+
+.zone-box[data-state='missed'] .hud__unit {
   color: #fff;
-  border: 2px solid var(--red);
+}
+
+.zone-box .hud__value {
+  font-size: 24px;
+  line-height: 1;
 }

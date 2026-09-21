@@ -29,7 +29,7 @@ export interface HudElements {
   flash: HTMLElement;
   /** "+2,340" when a drift ends and its points are banked. */
   bankPop: HTMLElement;
-  /** "DRIFT ZONE 3/7" inside a zone; "ZONE CLEARED" or "ZONE MISSED" leaving it. */
+  /** Zones cleared so far, labelled with what is happening: in a zone, cleared, missed. */
   zoneChip: HTMLElement;
   /** Shown in Drift Run with throttle controls only. */
   gauge: DriftGauge;
@@ -138,19 +138,29 @@ export class Hud {
     const chip = this.el.zoneChip;
     const d = state.drift;
     // A new run: the counters went backwards.
-    if (d.zonesCleared < this.lastCleared) this.lastCleared = 0;
+    if (d.zonesCleared < this.lastCleared) {
+      this.lastCleared = 0;
+      this.lastZone = -1;
+      chip.dataset.state = '';
+    }
+
+    (chip.firstElementChild as HTMLElement).textContent = `${d.zonesCleared}/${route.driftZones.length}`;
+    const label = chip.lastElementChild as HTMLElement;
 
     const zone = d.inZone ? d.activeZone : -1;
     if (zone !== this.lastZone) {
       window.clearTimeout(this.zoneTimer);
       if (zone >= 0) {
-        chip.textContent = `DRIFT ZONE ${zone + 1}/${route.driftZones.length}`;
         chip.dataset.state = 'in';
+        label.textContent = 'in zone';
       } else if (this.lastZone >= 0) {
         const cleared = d.zonesCleared > this.lastCleared;
-        chip.textContent = cleared ? 'ZONE CLEARED' : 'ZONE MISSED';
         chip.dataset.state = cleared ? 'cleared' : 'missed';
-        this.zoneTimer = window.setTimeout(() => (chip.dataset.state = ''), 1400);
+        label.textContent = cleared ? 'cleared' : 'missed';
+        this.zoneTimer = window.setTimeout(() => {
+          chip.dataset.state = '';
+          label.textContent = 'zones';
+        }, 1400);
       }
       this.lastZone = zone;
     }
