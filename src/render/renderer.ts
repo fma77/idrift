@@ -555,7 +555,11 @@ export class Renderer {
       // image a quarter turn to line the two conventions up.
       ctx.rotate(-Math.PI / 2);
       ctx.scale(1, -1);
-      ctx.drawImage(sprite, -wid / 2, -len / 2, wid, len);
+      // Sized by length and drawn at the art's own proportions: a drawing that
+      // includes the mirrors is wider than the body, and stretching it to
+      // bodyWidth would squash the car.
+      const drawnWidth = (len * sprite.naturalWidth) / sprite.naturalHeight;
+      ctx.drawImage(sprite, -drawnWidth / 2, -len / 2, drawnWidth, len);
     } else {
       // Placeholder: an oriented body with a windshield marker so the front is
       // unambiguous at a glance.

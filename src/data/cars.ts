@@ -39,6 +39,7 @@ export const CARS: CarParams[] = [
     maxWheelAngle: 0.6,
     engine: 'na4',
     tint: '#E8402A',
+    sprite: { path: 'art/cars/kaido-zen-r.webp', pixelsPerMetre: 76 },
   },
   {
     id: 'onibi-silhouette',

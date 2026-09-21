@@ -53,3 +53,17 @@ for (const [source, code] of FLAGS) {
   await sharp(resolve(root, 'art', source)).resize(96, 96, { kernel: 'lanczos3' }).webp({ quality: 82 }).toFile(out);
   console.log(`flags/${code}.webp  ${(statSync(out).size / 1024).toFixed(1)}KB`);
 }
+
+// Car sprites: top-down, nose up, transparent. Trimmed to the car so the
+// game can size it by length alone, and shipped at 320px long -- about twice
+// the most a phone ever shows one at.
+const CAR_SPRITES = [['Hachiroku.png', 'kaido-zen-r']];
+const CAR_OUT = resolve(root, 'public/art/cars');
+mkdirSync(CAR_OUT, { recursive: true });
+for (const [source, id] of CAR_SPRITES) {
+  const out = resolve(CAR_OUT, `${id}.webp`);
+  const trimmed = await sharp(resolve(root, 'art', source)).trim({ threshold: 10 }).toBuffer();
+  await sharp(trimmed).resize({ height: 320, kernel: 'lanczos3' }).webp({ quality: 86, alphaQuality: 100 }).toFile(out);
+  const { width, height } = await sharp(out).metadata();
+  console.log(`cars/${id}.webp  ${width}x${height}, ${(statSync(out).size / 1024).toFixed(1)}KB`);
+}
