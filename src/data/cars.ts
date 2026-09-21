@@ -5,8 +5,8 @@ import type { CarParams } from '../sim/types.ts';
  *
  * Every car is the same code running different numbers -- no per-car special
  * cases anywhere in the sim. Top speeds and 0-100 times are the real cars',
- * at the world's scale (src/data/scale.ts), and acceleration is fitted to the
- * 0-100 time. The rest comes from a 1-5 rating per trait -- grip, drift,
+ * at the world's scale and pace (src/data/scale.ts: 60% x 1.2), and
+ * acceleration is fitted to the 0-100 time. The rest comes from a 1-5 rating per trait -- grip, drift,
  * agility, stability -- mapped to the handling numbers the same way for every
  * car: how fast the nose swings (turnRate, turnResponse), how easily the rear
  * lets go (grip, breakAngle), how a slide holds (the two slide frictions),
@@ -25,8 +25,8 @@ export const CARS: CarParams[] = [
     // AE86. Very light, agile and predictable: easy to throw in and to hold,
     // slow to build speed. A momentum car.
     handling: {
-      topSpeed: 35.00,
-      acceleration: 3.48,
+      topSpeed: 42.00,
+      acceleration: 4.18,
       turnRate: 2.3,
       turnResponse: 7.5,
       turnInSpeed: 6.5,
@@ -59,8 +59,8 @@ export const CARS: CarParams[] = [
     // RX-7 FC. Balanced front-engined rear-drive with a turbo punch; holds long
     // slides and flicks between them quickly.
     handling: {
-      topSpeed: 39.17,
-      acceleration: 4.34,
+      topSpeed: 47.00,
+      acceleration: 5.21,
       turnRate: 2.15,
       turnResponse: 6.5,
       turnInSpeed: 7.5,
@@ -96,8 +96,8 @@ export const CARS: CarParams[] = [
     // R34 GT-R. Extremely fast and planted all-wheel drive; heavy, and slow to
     // change direction.
     handling: {
-      topSpeed: 48.33,
-      acceleration: 5.84,
+      topSpeed: 58.00,
+      acceleration: 7.01,
       turnRate: 1.85,
       turnResponse: 4.5,
       turnInSpeed: 9.5,
@@ -131,8 +131,8 @@ export const CARS: CarParams[] = [
     // launch in the game, short gearing that tops out early, and a car that
     // would rather grip than hang its tail out.
     handling: {
-      topSpeed: 34.17,
-      acceleration: 5.71,
+      topSpeed: 41.00,
+      acceleration: 6.85,
       turnRate: 2.15,
       turnResponse: 6.5,
       turnInSpeed: 7.5,
@@ -165,8 +165,8 @@ export const CARS: CarParams[] = [
     // RUF CTR. Light, rear-engined and brutally fast: powerful oversteer and a
     // nervous rear end.
     handling: {
-      topSpeed: 57.00,
-      acceleration: 4.93,
+      topSpeed: 68.40,
+      acceleration: 5.92,
       turnRate: 2,
       turnResponse: 5.5,
       turnInSpeed: 8.5,
@@ -200,8 +200,8 @@ export const CARS: CarParams[] = [
     // S15. Purpose-built drift car: balance, steering angle and oversteer that
     // does what it is told.
     handling: {
-      topSpeed: 41.67,
-      acceleration: 4.73,
+      topSpeed: 50.00,
+      acceleration: 5.68,
       turnRate: 2.15,
       turnResponse: 6.5,
       turnInSpeed: 7.5,

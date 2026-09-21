@@ -577,9 +577,10 @@ test('Time Attack is quicker and Drift Run is more sideways', () => {
   const ta = drive(route, car, 'timeAttack', humanDriver());
   const dr = drive(route, car, 'driftRun', humanDriver());
   assert.ok(ta.state.raceTicks < dr.state.raceTicks, 'the same driver should be faster in Time Attack');
-  // A clear margin, not a large one: with the real cars' gentler acceleration
-  // there is less speed to slide with in either mode (0.29 against 0.20).
-  assert.ok(dr.slideFraction > ta.slideFraction + 0.07, `slide time: drift ${dr.slideFraction.toFixed(2)}, time attack ${ta.slideFraction.toFixed(2)}`);
+  // A clear margin, not a large one: with the real cars' figures Time Attack
+  // slides more than it did (0.35 against 0.29 at pace 1.2), but Drift Run
+  // must still be the more sideways of the two.
+  assert.ok(dr.slideFraction > ta.slideFraction + 0.05, `slide time: drift ${dr.slideFraction.toFixed(2)}, time attack ${ta.slideFraction.toFixed(2)}`);
 });
 
 test('the car brakes by itself for a corner it can see coming', () => {
