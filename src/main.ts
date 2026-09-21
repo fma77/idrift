@@ -79,7 +79,6 @@ function setTuneMode(on: boolean): void {
   saveSettings(settings);
   if (on) applyStoredTuning();
   else restoreShippedHandling();
-  $('tune-chip').hidden = !on;
   $('btn-tune').hidden = !on;
 }
 
