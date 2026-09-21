@@ -937,7 +937,7 @@ function totalRow(label: string, value: string): HTMLElement {
 }
 
 /** The top 20 for this route and mode, under the results, with the player's row marked. */
-async function showResultBoard(): Promise<void> {
+async function showResultBoard(fresh = false): Promise<void> {
   const route = currentRoute;
   const container = $('result-board-rows');
   if (!route) return;
@@ -945,7 +945,7 @@ async function showResultBoard(): Promise<void> {
   $('result-board-title').textContent = mode === 'driftRun' ? 'Top 20 · Drift Run' : 'Top 20 · Time Attack';
   container.replaceChildren(caption('Loading…'));
   try {
-    const board = await fetchBoard(route.id, mode, 'all', route.version, SIM_VERSION);
+    const board = await fetchBoard(route.id, mode, 'all', route.version, SIM_VERSION, fresh);
     container.replaceChildren(
       ...(board.rows.length === 0 ? [caption('No scores posted yet. Be first.')] : board.rows.map((row) => boardRow(row, mode))),
     );
@@ -1060,7 +1060,7 @@ async function postScore(): Promise<void> {
       ? `You're #${response.rank} in the top 20.`
       : `You're #${response.rank} — the top 20 make the board.`;
     status.dataset.top = String(response.inTop20);
-    void showResultBoard();
+    void showResultBoard(true);
   } catch (err) {
     post.disabled = false;
     post.textContent = 'Post score';

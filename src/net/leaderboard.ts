@@ -73,10 +73,17 @@ export function fetchBoard(
   carClass: string,
   routeVersion: number,
   simVersion: number,
+  /**
+   * Skip the browser's copy. Boards are cached for 20s, which is right for
+   * browsing and wrong straight after posting: the player's own run was
+   * missing from the board shown under it.
+   */
+  fresh = false,
 ): Promise<LeaderboardResponse> {
   const query = `?routeVersion=${routeVersion}&simVersion=${simVersion}`;
   return request<LeaderboardResponse>(
     `/api/leaderboard/${encodeURIComponent(routeId)}/${encodeURIComponent(mode)}/${encodeURIComponent(carClass)}${query}`,
+    fresh ? { cache: 'no-store' } : undefined,
   );
 }
 

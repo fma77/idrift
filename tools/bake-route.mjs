@@ -644,7 +644,7 @@ function deriveDriftZones(corners, ds) {
   // drift is still being scored as the car straightens.
   const leadIn = Math.round(18 / ds);
   const runOut = Math.round(12 / ds);
-  return corners
+  const zones = corners
     .filter((c) => c.severity >= 3)
     .map((c, i) => ({
       entryIndex: Math.max(0, c.startIndex - leadIn),
@@ -652,6 +652,23 @@ function deriveDriftZones(corners, ds) {
       cornerIndex: i,
       baseMultiplier: Number((0.8 + c.severity * 0.12).toFixed(2)),
     }));
+
+  // Corners close together make zones that overlap -- or leave a gap too short
+  // to straighten in -- and a drift carried from one into the next was never
+  // scored for the first: the sim only judged a zone on leaving every zone.
+  // Such runs of corners are one zone, as they are one drift.
+  const minGap = Math.round(10 / ds);
+  const merged = [];
+  for (const z of zones) {
+    const last = merged[merged.length - 1];
+    if (last && z.entryIndex <= last.exitIndex + minGap) {
+      last.exitIndex = Math.max(last.exitIndex, z.exitIndex);
+      last.baseMultiplier = Math.max(last.baseMultiplier, z.baseMultiplier);
+    } else {
+      merged.push({ ...z });
+    }
+  }
+  return merged;
 }
 
 /**

@@ -1,6 +1,6 @@
 {
   "id": "akari-downhill",
-  "version": 1,
+  "version": 2,
   "name": "AKARI DOWNHILL",
   "location": "Akari Pass, North Face",
   "seed": 20260915,
@@ -10,26 +10,114 @@
   "startHeading": 0,
   "_note": "Touge descent, ~1.5km. Opens fast to let the player settle, then tightens through three hairpins with an esses section between them. The two long straights exist so the pace-note strip has something to read into, and so a Time Attack run is not one continuous corner. Edit these numbers and re-bake rather than editing the baked JSON, and bump `version` if a leaderboard already exists.",
   "segments": [
-    { "type": "straight", "length": 90 },
-    { "type": "corner", "direction": "right", "radius": 55, "angle": 70 },
-    { "type": "straight", "length": 40 },
-    { "type": "corner", "direction": "left", "radius": 32, "angle": 95 },
-    { "type": "straight", "length": 25 },
-    { "type": "corner", "direction": "right", "radius": 22, "angle": 160 },
-    { "type": "straight", "length": 70 },
-    { "type": "corner", "direction": "left", "radius": 60, "angle": 55 },
-    { "type": "corner", "direction": "right", "radius": 45, "angle": 60 },
-    { "type": "corner", "direction": "left", "radius": 40, "angle": 70 },
-    { "type": "straight", "length": 55 },
-    { "type": "corner", "direction": "right", "radius": 18, "angle": 175 },
-    { "type": "straight", "length": 110 },
-    { "type": "corner", "direction": "left", "radius": 70, "angle": 45 },
-    { "type": "corner", "direction": "right", "radius": 28, "angle": 110, "width": 6.4 },
-    { "type": "straight", "length": 35 },
-    { "type": "corner", "direction": "left", "radius": 20, "angle": 165 },
-    { "type": "straight", "length": 60 },
-    { "type": "corner", "direction": "right", "radius": 50, "angle": 80 },
-    { "type": "corner", "direction": "left", "radius": 35, "angle": 90 },
-    { "type": "straight", "length": 130 }
+    {
+      "type": "straight",
+      "length": 90
+    },
+    {
+      "type": "corner",
+      "direction": "right",
+      "radius": 55,
+      "angle": 70
+    },
+    {
+      "type": "straight",
+      "length": 40
+    },
+    {
+      "type": "corner",
+      "direction": "left",
+      "radius": 32,
+      "angle": 95
+    },
+    {
+      "type": "straight",
+      "length": 25
+    },
+    {
+      "type": "corner",
+      "direction": "right",
+      "radius": 22,
+      "angle": 160
+    },
+    {
+      "type": "straight",
+      "length": 70
+    },
+    {
+      "type": "corner",
+      "direction": "left",
+      "radius": 60,
+      "angle": 55
+    },
+    {
+      "type": "corner",
+      "direction": "right",
+      "radius": 45,
+      "angle": 60
+    },
+    {
+      "type": "corner",
+      "direction": "left",
+      "radius": 40,
+      "angle": 70
+    },
+    {
+      "type": "straight",
+      "length": 55
+    },
+    {
+      "type": "corner",
+      "direction": "right",
+      "radius": 18,
+      "angle": 175
+    },
+    {
+      "type": "straight",
+      "length": 110
+    },
+    {
+      "type": "corner",
+      "direction": "left",
+      "radius": 70,
+      "angle": 45
+    },
+    {
+      "type": "corner",
+      "direction": "right",
+      "radius": 28,
+      "angle": 110,
+      "width": 6.4
+    },
+    {
+      "type": "straight",
+      "length": 35
+    },
+    {
+      "type": "corner",
+      "direction": "left",
+      "radius": 20,
+      "angle": 165
+    },
+    {
+      "type": "straight",
+      "length": 60
+    },
+    {
+      "type": "corner",
+      "direction": "right",
+      "radius": 50,
+      "angle": 80
+    },
+    {
+      "type": "corner",
+      "direction": "left",
+      "radius": 35,
+      "angle": 90
+    },
+    {
+      "type": "straight",
+      "length": 130
+    }
   ]
 }

@@ -65,12 +65,30 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
   // --- Which drift zone, if any, are we in? ---
   const zoneIndex = findZone(route, state.sampleIndex);
   const wasInZone = d.inZone;
+  const previousZone = d.activeZone;
   d.inZone = zoneIndex >= 0;
   d.activeZone = zoneIndex;
 
   if (d.inZone && !wasInZone) {
     d.zonesEntered++;
     d.ticksToInitiation = 0;
+  }
+
+  // --- Straight from one zone into the next ---
+  // Routes are baked so zones never touch, but if two ever do, the first is
+  // judged at the hand-over: what the drift earned there is banked and the
+  // zone counts, without breaking the drift that carries on into the next.
+  // Before this, a zone was only judged on leaving every zone, so a drift
+  // through a run of touching zones cleared one of them at most.
+  if (wasInZone && d.inZone && zoneIndex !== previousZone) {
+    if (d.pending > 0) {
+      d.banked += d.pending;
+      d.pending = 0;
+      d.zoneScored = true;
+    }
+    if (d.zoneScored) d.zonesCleared++;
+    d.zoneScored = false;
+    d.zonesEntered++;
   }
 
   // --- How a combo ends ---

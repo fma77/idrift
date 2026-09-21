@@ -174,14 +174,17 @@ async function submitScore(
     )
     .run();
 
-  // Rank = how many rows on this board beat it, plus one.
+  // Rank = how many rows on this board beat it, plus one -- across every car.
+  // The game shows one board per route and mode, so the rank has to be the
+  // place on that board. Counting only the same car class told a player they
+  // were #2 on a board where they sat third.
   const comparator = isLowerBetter(body.mode) ? '<' : '>';
   const better = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM scores
       WHERE route_id = ? AND route_version = ? AND mode = ?
-        AND car_class = ? AND sim_version = ? AND rank_value ${comparator} ?`,
+        AND sim_version = ? AND rank_value ${comparator} ?`,
   )
-    .bind(body.routeId, body.routeVersion, body.mode, body.carClass, body.simVersion, value)
+    .bind(body.routeId, body.routeVersion, body.mode, body.simVersion, value)
     .first<{ n: number }>();
 
   const rank = (better?.n ?? 0) + 1;
@@ -193,7 +196,8 @@ async function submitScore(
 }
 
 /**
- * Keep only the top BOARD_SIZE rows per board.
+ * Keep only the top BOARD_SIZE rows per board: per route, mode and sim
+ * version, across all cars, matching the one board the game shows.
  *
  * Without this the table grows without bound and every row keeps its replay
  * blob, which is the part that actually costs storage. Runs after the response.
@@ -203,18 +207,18 @@ async function trimBoard(env: Env, key: ScoreSubmission): Promise<void> {
   await env.DB.prepare(
     `DELETE FROM scores
       WHERE route_id = ? AND route_version = ? AND mode = ?
-        AND car_class = ? AND sim_version = ?
+        AND sim_version = ?
         AND id NOT IN (
           SELECT id FROM scores
            WHERE route_id = ? AND route_version = ? AND mode = ?
-             AND car_class = ? AND sim_version = ?
+             AND sim_version = ?
            ORDER BY rank_value ${order}, created_at ASC
            LIMIT ?
         )`,
   )
     .bind(
-      key.routeId, key.routeVersion, key.mode, key.carClass, key.simVersion,
-      key.routeId, key.routeVersion, key.mode, key.carClass, key.simVersion,
+      key.routeId, key.routeVersion, key.mode, key.simVersion,
+      key.routeId, key.routeVersion, key.mode, key.simVersion,
       BOARD_SIZE,
     )
     .run();
