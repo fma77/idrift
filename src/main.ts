@@ -221,6 +221,7 @@ async function openIntro(entry: RouteEntry): Promise<void> {
   const route = currentRoute;
 
   showPoster(route);
+  showIntroCar();
   void refreshBoard();
   showScreen('intro');
 
@@ -449,6 +450,40 @@ function drawMinimap(route: RouteData): void {
 
 // --- Garage -----------------------------------------------------------------
 
+/**
+ * Where the garage goes back to. From a route's page it is a detour: picking a
+ * car returns to that route rather than to the main menu.
+ */
+let garageReturn: 'title' | 'intro' = 'title';
+
+function openGarage(from: 'title' | 'intro'): void {
+  garageReturn = from;
+  buildCarList();
+  showScreen('garage');
+}
+
+function leaveGarage(): void {
+  if (garageReturn === 'intro') {
+    showIntroCar();
+    showScreen('intro');
+  } else {
+    showScreen('title');
+  }
+}
+
+/** The selected car on a route's page: its top-down drawing and name. */
+function showIntroCar(): void {
+  const car = carById(settings.carId);
+  $('intro-car-name').textContent = car.name;
+  const img = $<HTMLImageElement>('intro-car-sprite');
+  if (car.sprite) {
+    img.src = car.sprite.path;
+    img.hidden = false;
+  } else {
+    img.hidden = true;
+  }
+}
+
 function buildCarList(): void {
   $('car-list').replaceChildren(
     ...CARS.map((car) => {
@@ -470,24 +505,32 @@ function buildCarList(): void {
       left.append(name, meta);
       body.append(left);
       // The selected car is already marked by its border; its card offers the
-      // next step instead. Tapping it again goes to the routes.
+      // next step instead. Tapping it again goes to the routes -- or, when the
+      // garage was opened from a route, back to that route.
       const selected = car.id === settings.carId;
       if (selected) {
         const go = document.createElement('span');
         go.className = 'go-race';
-        go.textContent = 'Go race';
+        go.textContent = garageReturn === 'intro' ? 'Use this car' : 'Go race';
         body.appendChild(go);
       }
 
       button.append(carHero(car), body);
       button.addEventListener('click', () => {
+        if (!selected) {
+          settings.carId = car.id;
+          saveSettings(settings);
+        }
+        if (garageReturn === 'intro') {
+          // Picked from a route's page: straight back to it.
+          leaveGarage();
+          return;
+        }
         if (selected) {
           buildRouteList();
           showScreen('routes');
           return;
         }
-        settings.carId = car.id;
-        saveSettings(settings);
         buildCarList();
       });
       return button;
@@ -996,17 +1039,15 @@ $('btn-drive').addEventListener('click', () => {
   buildRouteList();
   showScreen('routes');
 });
-$('btn-garage').addEventListener('click', () => {
-  buildCarList();
-  showScreen('garage');
-});
+$('btn-garage').addEventListener('click', () => openGarage('title'));
+$('btn-intro-car').addEventListener('click', () => openGarage('intro'));
 $('btn-settings').addEventListener('click', () => showScreen('settings'));
 $('btn-sound-lab').addEventListener('click', () => {
   for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;
   soundLab.open(carById(settings.carId).engine);
 });
 $('btn-routes-back').addEventListener('click', () => showScreen('title'));
-$('btn-garage-back').addEventListener('click', () => showScreen('title'));
+$('btn-garage-back').addEventListener('click', leaveGarage);
 $('btn-settings-back').addEventListener('click', () => showScreen('title'));
 $('btn-intro-back').addEventListener('click', () => {
   buildRouteList();

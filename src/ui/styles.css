@@ -729,3 +729,39 @@ input[type='range']::-moz-range-thumb {
 .go-race::after {
   content: ' \2192';
 }
+
+/* --- Route page: the selected car ----------------------------------------- */
+
+.intro-car {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px 12px;
+  background: var(--paper-2);
+}
+
+/* The top-down drawing, laid on its side, nose right. */
+.intro-car__sprite {
+  flex: none;
+  width: 22px;
+  height: 46px;
+  object-fit: contain;
+  transform: rotate(90deg);
+  margin: 0 12px;
+}
+
+.intro-car__sprite[hidden] {
+  display: none;
+}
+
+.intro-car__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.intro-car__change {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
