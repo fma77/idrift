@@ -57,12 +57,21 @@ for (const [source, code] of FLAGS) {
 // Car sprites: top-down, nose up, transparent. Trimmed to the car so the
 // game can size it by length alone, and shipped at 320px long -- about twice
 // the most a phone ever shows one at.
-const CAR_SPRITES = [['Hachiroku.png', 'kaido-zen-r']];
+// [source, car id, degrees to turn it nose-up]
+const CAR_SPRITES = [
+  ['Hachiroku.png', 'kaido-zen-r', 0],
+  ['RX7.png', 'onibi-silhouette', 0],
+  ['Godzilla.png', 'tengu-gt-x', 0],
+  ['Scooby.png', 'kaze-b4', 0],
+  ['Yellowbird.png', 'yellowbird', 0],
+  // Drawn nose-down.
+  ['Silvia.png', 'silvia', 180],
+];
 const CAR_OUT = resolve(root, 'public/art/cars');
 mkdirSync(CAR_OUT, { recursive: true });
-for (const [source, id] of CAR_SPRITES) {
+for (const [source, id, turn] of CAR_SPRITES) {
   const out = resolve(CAR_OUT, `${id}.webp`);
-  const trimmed = await sharp(resolve(root, 'art', source)).trim({ threshold: 10 }).toBuffer();
+  const trimmed = await sharp(resolve(root, 'art', source)).rotate(turn).trim({ threshold: 10 }).toBuffer();
   await sharp(trimmed).resize({ height: 320, kernel: 'lanczos3' }).webp({ quality: 86, alphaQuality: 100 }).toFile(out);
   const { width, height } = await sharp(out).metadata();
   console.log(`cars/${id}.webp  ${width}x${height}, ${(statSync(out).size / 1024).toFixed(1)}KB`);

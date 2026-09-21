@@ -69,6 +69,7 @@ export const CARS: CarParams[] = [
     // In a top-down game the car is the one object that must never be hard to
     // find.
     tint: '#f4f1ea',
+    sprite: { path: 'art/cars/onibi-silhouette.webp', pixelsPerMetre: 70 },
   },
   {
     id: 'tengu-gt-x',
@@ -96,6 +97,7 @@ export const CARS: CarParams[] = [
     maxWheelAngle: 0.52,
     engine: 'turbo6',
     tint: '#e0dbd0',
+    sprite: { path: 'art/cars/tengu-gt-x.webp', pixelsPerMetre: 70 },
   },
   {
     id: 'kaze-b4',
@@ -123,6 +125,7 @@ export const CARS: CarParams[] = [
     maxWheelAngle: 0.56,
     engine: 'boxer4',
     tint: '#cdc7bb',
+    sprite: { path: 'art/cars/kaze-b4.webp', pixelsPerMetre: 70 },
   },
   {
     id: 'yellowbird',
@@ -152,6 +155,7 @@ export const CARS: CarParams[] = [
     maxWheelAngle: 0.55,
     engine: 'flat6tt',
     tint: '#f2c230',
+    sprite: { path: 'art/cars/yellowbird.webp', pixelsPerMetre: 70 },
   },
   {
     id: 'silvia',
@@ -179,6 +183,7 @@ export const CARS: CarParams[] = [
     maxWheelAngle: 0.62,
     engine: 'turbo4',
     tint: '#3a6ea5',
+    sprite: { path: 'art/cars/silvia.webp', pixelsPerMetre: 70 },
   },
 ];
 
