@@ -239,10 +239,15 @@ async function openIntro(entry: RouteEntry): Promise<void> {
 
 // --- Leaderboard ------------------------------------------------------------
 
+/**
+ * The mode picked on a route's page. It is also the leaderboard shown there:
+ * choosing Drift Run shows the drift scores, with a label saying so.
+ */
 function setBoardMode(mode: SimMode): void {
   boardMode = mode;
-  $('board-tab-time').setAttribute('aria-selected', String(mode === 'timeAttack'));
-  $('board-tab-drift').setAttribute('aria-selected', String(mode === 'driftRun'));
+  $('btn-time-attack').setAttribute('aria-pressed', String(mode === 'timeAttack'));
+  $('btn-drift-run').setAttribute('aria-pressed', String(mode === 'driftRun'));
+  $('board-title').textContent = `Leaderboard · ${mode === 'driftRun' ? 'Drift Run' : 'Time Attack'}`;
   void refreshBoard();
 }
 
@@ -1099,8 +1104,9 @@ $('btn-intro-back').addEventListener('click', () => {
   buildRouteList();
   showScreen('routes');
 });
-$('btn-time-attack').addEventListener('click', () => void startRun('timeAttack'));
-$('btn-drift-run').addEventListener('click', () => void startRun('driftRun'));
+$('btn-time-attack').addEventListener('click', () => setBoardMode('timeAttack'));
+$('btn-drift-run').addEventListener('click', () => setBoardMode('driftRun'));
+$('btn-go').addEventListener('click', () => void startRun(boardMode));
 $('btn-retry').addEventListener('click', () => void startRun(currentMode));
 $('btn-result-routes').addEventListener('click', () => {
   buildRouteList();
@@ -1109,8 +1115,6 @@ $('btn-result-routes').addEventListener('click', () => {
 $('btn-result-title').addEventListener('click', () => showScreen('title'));
 $('btn-post').addEventListener('click', () => void postScore());
 $('player-name').addEventListener('input', validateNameField);
-$('board-tab-time').addEventListener('click', () => setBoardMode('timeAttack'));
-$('board-tab-drift').addEventListener('click', () => setBoardMode('driftRun'));
 $('btn-quit').addEventListener('click', quitRun);
 $('btn-resume').addEventListener('click', resumeRun);
 $('btn-pause').addEventListener('click', pauseRun);
