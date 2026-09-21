@@ -15,14 +15,12 @@ import { applySoundOverrides, PROFILES } from './audio/profiles.ts';
 import { SoundLab } from './ui/soundLab.ts';
 import { CARS, carById } from './data/cars.ts';
 import { configFor } from './data/assist.ts';
-import { ROUTES, ROUTE_IDS, loadRoute, type RouteEntry } from './data/routes.ts';
+import { ROUTES, loadRoute, type RouteEntry } from './data/routes.ts';
 import { loadSettings, saveSettings, type Settings } from './storage/settings.ts';
 import {
   getBest,
   submitBest,
   markCompleted,
-  isUnlocked,
-  isCompleted,
   saveReplay,
   compress,
   bestKey,
@@ -30,6 +28,7 @@ import {
 import { loadDecoration } from './render/decoration.ts';
 import { getSprite, preload } from './render/sprites.ts';
 import { drawPosterOverlay } from './ui/poster.ts';
+import { flagElement } from './ui/flags.ts';
 import { fireMeme } from './ui/memes.ts';
 import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
@@ -181,11 +180,9 @@ function showGame(): void {
 function buildRouteList(): void {
   const list = $('route-list');
   list.replaceChildren(
-    ...ROUTES.map((entry, index) => {
-      const unlocked = isUnlocked(ROUTE_IDS, index);
+    ...ROUTES.map((entry) => {
       const button = document.createElement('button');
       button.className = 'card';
-      button.disabled = !unlocked;
 
       const left = document.createElement('div');
       const name = document.createElement('div');
@@ -194,25 +191,12 @@ function buildRouteList(): void {
       const meta = document.createElement('div');
       meta.className = 'card__meta';
 
-      if (!unlocked) {
-        meta.textContent = `Finish ${ROUTES[index - 1].name} to unlock`;
-      } else {
-        const ta = getBest(entry.id, 1, 'timeAttack');
-        const dr = getBest(entry.id, 1, 'driftRun');
-        const bits: string[] = [];
-        if (ta) bits.push(`Best ${formatTime(ta.timeSeconds)}`);
-        if (dr) bits.push(`${dr.points.toLocaleString('en-GB')} pts`);
-        meta.textContent = bits.length ? bits.join(' · ') : entry.blurb;
-      }
+      // Every route is open from the start, and the card always carries the
+      // route's own line rather than a best time.
+      meta.textContent = entry.blurb;
 
       left.append(name, meta);
-
-      const chip = document.createElement('div');
-      chip.className = 'chip';
-      chip.textContent = unlocked ? (isCompleted(entry.id) ? 'DONE' : 'NEW') : 'LOCKED';
-      if (!unlocked) chip.className = 'chip chip--outline';
-
-      button.append(left, chip);
+      button.append(left, flagElement(entry.country, entry.location));
       button.addEventListener('click', () => void openIntro(entry));
       return button;
     }),

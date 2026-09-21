@@ -259,6 +259,8 @@ export function gradeRun(state: SimState, route: RouteData, tickRate: number): R
   score += clamp(1 - correctionPerZone / 2.5, 0, 1) * 25;
   score += clamp(1 - state.wallHits / 4, 0, 1) * 15;
   score += clamp(d.reversals / Math.max(zonesTotal, 1), 0, 1) * 10;
+  // Spins cost style: a fifth of the grade gone by the third one.
+  score = Math.max(0, score - clamp(d.spins / 3, 0, 1) * 20);
 
   const grade: StyleGrade =
     score >= 85 ? 'S' : score >= 70 ? 'A' : score >= 55 ? 'B' : score >= 38 ? 'C' : 'D';

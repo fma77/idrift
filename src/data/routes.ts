@@ -1,4 +1,5 @@
 import type { RouteData } from '../sim/types.ts';
+import type { Country } from '../ui/flags.ts';
 import {
   ESTORIL_POSTER,
   HARUNA_UPPER_POSTER,
@@ -29,6 +30,8 @@ export interface RouteEntry {
   file: string;
   /** Painted course poster. Falls back to a drawn minimap when absent. */
   poster?: PosterArt;
+  /** Shown as a flag on the route card. */
+  country: Country;
   /** Short flavour line for the route card. */
   blurb: string;
   /** Credit line for routes built from third-party data. Shown on the route screen. */
@@ -38,6 +41,7 @@ export interface RouteEntry {
 export const ROUTES: RouteEntry[] = [
   {
     id: 'akari-downhill',
+    country: 'jp',
     name: 'AKARI DOWNHILL',
     location: 'Akari Pass, North Face',
     file: 'routes/akari-downhill.json',
@@ -45,6 +49,7 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'estoril',
+    country: 'pt',
     name: 'ESTORIL',
     location: 'Estoril, Portugal',
     file: 'routes/estoril.json',
@@ -54,6 +59,7 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'nurburg',
+    country: 'de',
     name: 'NURBURG',
     location: 'Nürburg, Eifel',
     file: 'routes/nurburg.json',
@@ -63,6 +69,7 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-upper',
+    country: 'jp',
     name: 'HARUNA UPPER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-upper.json',
@@ -72,6 +79,7 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-middle',
+    country: 'jp',
     name: 'HARUNA MIDDLE',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-middle.json',
@@ -81,6 +89,7 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-lower',
+    country: 'jp',
     name: 'HARUNA LOWER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-lower.json',
@@ -90,6 +99,7 @@ export const ROUTES: RouteEntry[] = [
   },
   {
     id: 'haruna-downhill',
+    country: 'jp',
     name: 'HARUNA FULL PASS',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-downhill.json',
