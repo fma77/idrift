@@ -709,3 +709,19 @@ input[type='range']::-moz-range-thumb {
 .result-board {
   margin-top: var(--s-4);
 }
+
+/* The selected car's call to action: tap the card again to pick a route. */
+.go-race {
+  flex: none;
+  padding: 10px 14px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.go-race::after {
+  content: ' \2192';
+}

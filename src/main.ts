@@ -29,7 +29,6 @@ import { loadDecoration } from './render/decoration.ts';
 import { getSprite, preload } from './render/sprites.ts';
 import { drawPosterOverlay } from './ui/poster.ts';
 import { flagElement } from './ui/flags.ts';
-import { fireMeme } from './ui/memes.ts';
 import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
 import type { LeaderboardRow } from '../shared/api.ts';
@@ -333,13 +332,6 @@ function statRow(label: string, value: string): HTMLElement {
   return row;
 }
 
-function chip(text: string, className: string): HTMLElement {
-  const el = document.createElement('div');
-  el.className = `chip ${className}`;
-  el.textContent = text;
-  return el;
-}
-
 /**
  * Course map.
  *
@@ -477,10 +469,23 @@ function buildCarList(): void {
         (tuneMode && isTuned(car) ? ' · tuned' : '');
       left.append(name, meta);
       body.append(left);
-      if (car.id === settings.carId) body.appendChild(chip('SELECTED', 'chip--red'));
+      // The selected car is already marked by its border; its card offers the
+      // next step instead. Tapping it again goes to the routes.
+      const selected = car.id === settings.carId;
+      if (selected) {
+        const go = document.createElement('span');
+        go.className = 'go-race';
+        go.textContent = 'Go race';
+        body.appendChild(go);
+      }
 
       button.append(carHero(car), body);
       button.addEventListener('click', () => {
+        if (selected) {
+          buildRouteList();
+          showScreen('routes');
+          return;
+        }
         settings.carId = car.id;
         saveSettings(settings);
         buildCarList();
@@ -809,12 +814,6 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
   $('result-submit').hidden = !!unranked;
   showScreen('results');
   if (!unranked) void showResultBoard();
-
-  // Meme triggers fire here -- on a results screen, never mid-drive.
-  if (unranked) return;
-  if (isBest) fireMeme('personalBest');
-  else fireMeme('routeComplete');
-  if (result.grade === 'S') fireMeme('sRank');
 }
 
 /** A line of the score: what it was for, how many, and what it added or took. */
@@ -973,7 +972,6 @@ async function postScore(): Promise<void> {
       : `You're #${response.rank} — the top 20 make the board.`;
     status.dataset.top = String(response.inTop20);
     void showResultBoard();
-    if (response.inTop20) fireMeme('leaderboardTop20');
   } catch (err) {
     post.disabled = false;
     post.textContent = 'Post score';
