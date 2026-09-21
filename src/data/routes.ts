@@ -32,7 +32,10 @@ export interface RouteEntry {
   poster?: PosterArt;
   /** Shown as a flag on the route card. */
   country: Country;
-  /** Short flavour line for the route card. */
+  /**
+   * Short flavour line for the route card. Lengths are the real road's: the
+   * game drives it at 60% scale, but the card describes the place.
+   */
   blurb: string;
   /** Credit line for routes built from third-party data. Shown on the route screen. */
   attribution?: string;
@@ -53,7 +56,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'ESTORIL',
     location: 'Estoril, Portugal',
     file: 'routes/estoril.json',
-    blurb: 'Recta Interior round to the main straight. 7 corners, 1.4km.',
+    blurb: 'Recta Interior round to the main straight. 7 corners, 2.3km.',
     poster: ESTORIL_POSTER,
     attribution: OSM_CREDIT,
   },
@@ -63,7 +66,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'NURBURG',
     location: 'Nürburg, Eifel',
     file: 'routes/nurburg.json',
-    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 1.6km.',
+    blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 2.7km.',
     poster: NURBURG_POSTER,
     attribution: OSM_CREDIT,
   },
@@ -73,7 +76,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA UPPER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-upper.json',
-    blurb: 'Off the top of the mountain. 7 hairpins, 1.5km.',
+    blurb: 'Off the top of the mountain. 7 hairpins, 2.5km.',
     poster: HARUNA_UPPER_POSTER,
     attribution: OSM_CREDIT,
   },
@@ -83,7 +86,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA MIDDLE',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-middle.json',
-    blurb: 'The middle third, corner after corner. 12 hairpins, 1.6km.',
+    blurb: 'The middle third, corner after corner. 12 hairpins, 2.7km.',
     poster: HARUNA_MIDDLE_POSTER,
     attribution: OSM_CREDIT,
   },
@@ -93,7 +96,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA LOWER',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-lower.json',
-    blurb: 'The run to the bottom, and the tightest of it. 12 hairpins, 1.6km.',
+    blurb: 'The run to the bottom, and the tightest of it. 12 hairpins, 2.7km.',
     poster: HARUNA_LOWER_POSTER,
     attribution: OSM_CREDIT,
   },
@@ -103,7 +106,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'HARUNA FULL PASS',
     location: 'Mount Haruna, Gunma',
     file: 'routes/haruna-downhill.json',
-    blurb: 'All three sections in one run. 31 hairpins, 4.7km.',
+    blurb: 'All three sections in one run. 31 hairpins, 7.9km.',
     poster: HARUNA_FULL_POSTER,
     attribution: OSM_CREDIT,
   },
