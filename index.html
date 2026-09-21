@@ -308,10 +308,12 @@
               <span class="keyhint"><span class="keyhint__key">ESC</span> PAUSE</span>
             </div>
 
-            <div class="hud__speed">
+            <div class="hud__speed hud__angle">
               <span class="hud__value" id="hud-angle">0</span>
               <span class="hud__unit">angle °</span>
             </div>
+            <!-- Drift Run throttle controls: takes the angle box's place, and shows the angle itself. -->
+            <div class="drift-gauge" id="drift-gauge" aria-hidden="true"></div>
           </div>
         </div>
 
@@ -322,7 +324,6 @@
         <div class="steer-surface" id="steer-surface"></div>
         <!-- Drift Run throttle controls: tap left to drift, hold right for throttle. -->
         <div class="pedal-surface" id="pedal-surface"></div>
-        <div class="drift-gauge" id="drift-gauge" aria-hidden="true"></div>
 
         <button class="pause-btn" id="btn-pause" type="button" aria-label="Pause">
           <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>

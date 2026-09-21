@@ -282,6 +282,10 @@
   display: flex;
 }
 
+#game[data-controls='throttle'] .hud__angle {
+  display: none;
+}
+
 #game[data-controls='throttle'] .keyhint--throttle {
   display: flex;
 }
@@ -384,17 +388,14 @@
 
 /* --- Drift gauge --------------------------------------------------------- */
 
+/* In the HUD row, where the angle box would be: clear of the car. */
 .drift-gauge {
-  position: absolute;
-  left: 50%;
-  bottom: calc(max(var(--s-4), env(safe-area-inset-bottom)) + 64px);
-  transform: translateX(-50%);
-  width: 172px;
+  width: 132px;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   padding: var(--s-2) var(--s-2) var(--s-2);
-  background: rgba(20, 20, 20, 0.78);
+  background: var(--ink);
   pointer-events: none;
   transition: opacity 150ms linear;
 }
@@ -405,7 +406,7 @@
 }
 
 .drift-gauge svg {
-  width: 160px;
+  width: 120px;
   height: auto;
   display: block;
   overflow: visible;
@@ -577,6 +578,7 @@
   /* The middle row: progress and the pace strip are rows 1 and 2 now. */
   grid-row: 3;
   align-self: start;
+  align-items: flex-start;
 }
 
 /*
