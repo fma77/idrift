@@ -111,6 +111,7 @@ const hud = new Hud({
   progressLabel: $('progress-label'),
   flash: $('hud-flash'),
   bankPop: $('bank-pop'),
+  zoneChip: $('zone-chip'),
   gauge: new DriftGauge($('drift-gauge')),
 });
 
@@ -640,6 +641,7 @@ async function startRun(mode: SimMode): Promise<void> {
   const car = carById(settings.carId);
   currentControls = mode === 'driftRun' ? settings.driftControls : 'steer';
   gameEl.dataset.controls = currentControls;
+  gameEl.dataset.mode = currentMode;
   const renderSettings: RenderSettings = {
     fixedNorth: settings.fixedNorth,
     showSkidMarks: settings.showSkidMarks,
@@ -758,7 +760,8 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
       statRow('Points', result.points.toLocaleString('en-GB')),
       statRow('Style', `${result.grade} · x${result.styleModifier.toFixed(2)}`),
       statRow('Zones cleared', `${result.zonesCleared} / ${result.zonesTotal}`),
-      statRow('Reversals', String(result.reversals)),
+      statRow('Transitions', String(result.reversals)),
+      statRow('Spins', String(result.spins)),
     );
   }
 

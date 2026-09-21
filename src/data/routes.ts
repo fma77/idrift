@@ -5,6 +5,7 @@ import {
   HARUNA_MIDDLE_POSTER,
   HARUNA_LOWER_POSTER,
   HARUNA_FULL_POSTER,
+  NURBURG_POSTER,
   type PosterArt,
 } from './posters.ts';
 
@@ -57,6 +58,7 @@ export const ROUTES: RouteEntry[] = [
     location: 'Nürburg, Eifel',
     file: 'routes/nurburg.json',
     blurb: 'Tiergarten to Quiddelbacher Höhe, through the Hatzenbach esses. 1.6km.',
+    poster: NURBURG_POSTER,
     attribution: OSM_CREDIT,
   },
   {

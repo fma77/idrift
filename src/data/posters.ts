@@ -93,3 +93,25 @@ export const HARUNA_UPPER_POSTER = haruna(0, HARUNA_SPLIT_UPPER, [2, 16]);
 export const HARUNA_MIDDLE_POSTER = haruna(HARUNA_SPLIT_UPPER, HARUNA_SPLIT_LOWER, [33, 41]);
 export const HARUNA_LOWER_POSTER = haruna(HARUNA_SPLIT_LOWER, HARUNA_TRACE.length - 1, [48, 56]);
 export const HARUNA_FULL_POSTER = haruna(0, HARUNA_TRACE.length - 1, [2, 34, 56]);
+
+/**
+ * Nurburg on its painting: the pink ribbon along the valley, from the east
+ * (Tiergarten, by the town) west and then north-west up the grey road to
+ * Quiddelbacher Höhe.
+ */
+export const NURBURG_POSTER: PosterArt = {
+  src: 'art/routes/nurburg-poster.webp',
+  width: 1665,
+  height: 945,
+  north: -10,
+  startSide: 1,
+  finishSide: -1,
+  arrows: [6, 17, 26],
+  trace: [
+    [1330, 748], [1256, 772], [1217, 788], [1183, 797], [1175, 763], [1161, 724], [1133, 686],
+    [1100, 666], [1072, 691], [1044, 747], [1006, 786], [933, 802], [850, 791], [800, 755],
+    [710, 750], [650, 730], [610, 700], [580, 660], [550, 630], [490, 605], [450, 595],
+    [420, 570], [410, 530], [380, 505], [330, 470], [270, 430], [210, 380], [150, 310],
+    [110, 260], [78, 205],
+  ],
+};

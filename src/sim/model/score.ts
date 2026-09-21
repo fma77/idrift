@@ -54,6 +54,14 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
   const absSlip = Math.abs(state.slipAngle);
   const driftSign = state.slipAngle >= 0 ? 1 : -1;
 
+  // --- Spins ---
+  // One per spin: it starts past SPIN_ANGLE (or when throttle controls declare
+  // one) and is not over until the car is back under half that, so a slide
+  // hovering around the threshold does not count several times.
+  const spinningNow = absSlip > SPIN_ANGLE || state.spinTicks > 0;
+  if (spinningNow && !d.spinning) d.spins++;
+  d.spinning = spinningNow || (d.spinning && absSlip > SPIN_ANGLE * 0.5);
+
   // --- Which drift zone, if any, are we in? ---
   const zoneIndex = findZone(route, state.sampleIndex);
   const wasInZone = d.inZone;
@@ -226,6 +234,7 @@ export interface RunResult {
   zonesCleared: number;
   zonesTotal: number;
   reversals: number;
+  spins: number;
 }
 
 /**
@@ -266,5 +275,6 @@ export function gradeRun(state: SimState, route: RouteData, tickRate: number): R
     zonesCleared: d.zonesCleared,
     zonesTotal,
     reversals: d.reversals,
+    spins: d.spins,
   };
 }

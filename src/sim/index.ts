@@ -64,6 +64,8 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
       activeZone: -1,
       brokeThisTick: false,
       reversals: 0,
+      spins: 0,
+      spinning: false,
       correctionSum: 0,
       ticksToInitiation: 0,
       zonesEntered: 0,

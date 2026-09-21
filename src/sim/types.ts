@@ -263,8 +263,15 @@ export interface DriftScoreState {
   activeZone: number;
   /** Set for one tick when a combo breaks, so the renderer can flash. */
   brokeThisTick: boolean;
-  /** Post-run style inputs, accumulated live but only graded at the end. */
+  /**
+   * Post-run style inputs, accumulated live but only graded at the end.
+   * A reversal is a transition: the slide swapping sides while still
+   * committed, as through an S-bend. It is a good thing, not a spin.
+   */
   reversals: number;
+  /** Spins so far, and whether the car is in one now. Counted, not graded. */
+  spins: number;
+  spinning: boolean;
   correctionSum: number;
   ticksToInitiation: number;
   zonesEntered: number;

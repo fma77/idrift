@@ -29,6 +29,8 @@ export interface HudElements {
   flash: HTMLElement;
   /** "+2,340" when a drift ends and its points are banked. */
   bankPop: HTMLElement;
+  /** "DRIFT ZONE 3/7" inside a zone; "ZONE CLEARED" or "ZONE MISSED" leaving it. */
+  zoneChip: HTMLElement;
   /** Shown in Drift Run with throttle controls only. */
   gauge: DriftGauge;
 }
@@ -40,6 +42,9 @@ export class Hud {
   private lastScore = 0;
   private lastBanked = 0;
   private lastPaceKey = '';
+  private lastZone = -1;
+  private lastCleared = 0;
+  private zoneTimer = 0;
 
   private readonly el: HudElements;
 
@@ -107,6 +112,7 @@ export class Hud {
         el.bankPop.classList.add('bank-pop--show');
       }
       this.lastBanked = banked;
+      this.updateZone(state, route);
     } else {
       const seconds = (state.raceTicks + state.penaltyTicks) / TICK_RATE;
       el.comboLabel.textContent = 'Penalty';
@@ -121,6 +127,34 @@ export class Hud {
     }
 
     this.updatePace(state, route);
+  }
+
+  /**
+   * Drift zones, live. Scoring only counts inside them, so the player needs to
+   * know when they are in one and, on the way out, whether it counted: a zone
+   * is cleared by banking any points inside it.
+   */
+  private updateZone(state: SimState, route: RouteData): void {
+    const chip = this.el.zoneChip;
+    const d = state.drift;
+    // A new run: the counters went backwards.
+    if (d.zonesCleared < this.lastCleared) this.lastCleared = 0;
+
+    const zone = d.inZone ? d.activeZone : -1;
+    if (zone !== this.lastZone) {
+      window.clearTimeout(this.zoneTimer);
+      if (zone >= 0) {
+        chip.textContent = `DRIFT ZONE ${zone + 1}/${route.driftZones.length}`;
+        chip.dataset.state = 'in';
+      } else if (this.lastZone >= 0) {
+        const cleared = d.zonesCleared > this.lastCleared;
+        chip.textContent = cleared ? 'ZONE CLEARED' : 'ZONE MISSED';
+        chip.dataset.state = cleared ? 'cleared' : 'missed';
+        this.zoneTimer = window.setTimeout(() => (chip.dataset.state = ''), 1400);
+      }
+      this.lastZone = zone;
+    }
+    this.lastCleared = d.zonesCleared;
   }
 
   /** Combo break / wall contact: a 2-frame red flash, per the design system. */
