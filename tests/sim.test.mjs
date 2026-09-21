@@ -356,9 +356,15 @@ test('the sim never imports the rendering layer', () => {
 // ---------------------------------------------------------------------------
 
 /** A wide-open version of the route, so steering tests never hit a wall. */
+/**
+ * The test route with its walls pushed out of reach. Far out: a held slide at
+ * speed turns a wide circle, and at 230km/h one reaches 500m from the road
+ * inside six seconds -- which read as the slide going unstable, when the car
+ * had simply met the wall.
+ */
 function openRoute() {
   const wide = JSON.parse(JSON.stringify(route));
-  wide.samples.halfWidth = wide.samples.halfWidth.map(() => 500);
+  wide.samples.halfWidth = wide.samples.halfWidth.map(() => 5000);
   return wide;
 }
 
