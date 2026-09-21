@@ -477,17 +477,49 @@ function leaveGarage(): void {
   }
 }
 
-/** The selected car on a route's page: its top-down drawing and name. */
+/** The selected car on a route's page: its hero image (or top-down drawing) and name. */
 function showIntroCar(): void {
   const car = carById(settings.carId);
   $('intro-car-name').textContent = car.name;
   const img = $<HTMLImageElement>('intro-car-sprite');
-  if (car.sprite) {
-    img.src = car.sprite.path;
-    img.hidden = false;
-  } else {
-    img.hidden = true;
-  }
+  const src = car.hero ?? car.sprite?.path;
+  img.hidden = !src;
+  if (src) img.src = src;
+  // The top-down drawing is laid on its side to fit; the hero is already wide.
+  img.classList.toggle('intro-car__img--sprite', !car.hero);
+}
+
+// --- Route poster, zoomed ---------------------------------------------------
+
+/**
+ * The route's painting full screen, at a size a phone can actually read: as
+ * tall as the screen and as wide as that makes it, to drag across. The full
+ * resolution copy loads only here.
+ */
+function openPosterZoom(): void {
+  const art = currentEntry.poster;
+  if (!art) return;
+  const box = $('poster-lightbox');
+  const img = $<HTMLImageElement>('lightbox-img');
+  drawPosterOverlay($('lightbox-overlay') as unknown as SVGSVGElement, art);
+  // Start on the smaller copy, already loaded, and swap in the sharp one.
+  img.src = art.src;
+  const sharp = new Image();
+  sharp.onload = () => {
+    if (!box.hidden) img.src = art.full;
+  };
+  sharp.src = art.full;
+  box.hidden = false;
+  // Centre the view on the painting.
+  requestAnimationFrame(() => {
+    const scroller = $('lightbox-scroll');
+    scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+    scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) / 2;
+  });
+}
+
+function closePosterZoom(): void {
+  $('poster-lightbox').hidden = true;
 }
 
 function buildCarList(): void {
@@ -1049,6 +1081,12 @@ $('btn-drive').addEventListener('click', () => {
 });
 $('btn-garage').addEventListener('click', () => openGarage('title'));
 $('btn-intro-car').addEventListener('click', () => openGarage('intro'));
+$('poster-art').addEventListener('click', openPosterZoom);
+$('poster-art').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') openPosterZoom();
+});
+// A tap closes it; a drag only looks around (a drag does not produce a click).
+$('poster-lightbox').addEventListener('click', closePosterZoom);
 $('btn-settings').addEventListener('click', () => showScreen('settings'));
 $('btn-sound-lab').addEventListener('click', () => {
   for (const key of Object.keys(SCREENS) as ScreenName[]) SCREENS[key].hidden = true;

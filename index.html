@@ -82,15 +82,18 @@
             place the player can see the corner sequence as a shape.
           -->
           <div id="intro-poster" style="background: var(--paper-2); padding: 16px">
-            <div class="poster" id="poster-art" hidden>
+            <div class="poster" id="poster-art" role="button" tabindex="0" aria-label="Zoom into the route map" hidden>
               <img id="poster-img" alt="" />
               <svg class="poster__overlay" id="poster-overlay" aria-hidden="true"></svg>
+              <span class="poster__zoom" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></svg>
+              </span>
             </div>
             <canvas id="minimap"></canvas>
           </div>
 
           <div class="intro-car">
-            <img class="intro-car__sprite" id="intro-car-sprite" alt="" />
+            <img class="intro-car__img" id="intro-car-sprite" alt="" />
             <div class="intro-car__text">
               <div class="label" style="color: var(--ink-muted)">Selected car</div>
               <div class="card__name" id="intro-car-name"></div>
@@ -378,6 +381,17 @@
         <div id="tune-panel" hidden></div>
       </div>
 
+    </div>
+
+    <!-- A route's painting, full screen: drag to look around, tap to close. -->
+    <div class="lightbox" id="poster-lightbox" hidden>
+      <div class="lightbox__scroll" id="lightbox-scroll">
+        <div class="lightbox__frame">
+          <img id="lightbox-img" alt="" />
+          <svg class="poster__overlay" id="lightbox-overlay" aria-hidden="true"></svg>
+        </div>
+      </div>
+      <button class="lightbox__close" id="btn-lightbox-close" type="button" aria-label="Close">✕</button>
     </div>
 
     <!-- Built by src/ui/soundLab.ts. -->

@@ -740,17 +740,23 @@ input[type='range']::-moz-range-thumb {
   background: var(--paper-2);
 }
 
-/* The top-down drawing, laid on its side, nose right. */
-.intro-car__sprite {
+/* The hero image, the row's full height. */
+.intro-car__img {
   flex: none;
-  width: 22px;
-  height: 46px;
+  width: 96px;
+  height: 54px;
   object-fit: contain;
-  transform: rotate(90deg);
-  margin: 0 12px;
 }
 
-.intro-car__sprite[hidden] {
+/* No hero yet: the top-down drawing, laid on its side, nose right. */
+.intro-car__img--sprite {
+  width: 22px;
+  height: 46px;
+  margin: 4px 37px;
+  transform: rotate(90deg);
+}
+
+.intro-car__img[hidden] {
   display: none;
 }
 
@@ -763,5 +769,78 @@ input[type='range']::-moz-range-thumb {
   flex: none;
   border: none;
   background: none;
+  cursor: pointer;
+}
+
+/* --- Route poster: tap to zoom --------------------------------------------- */
+
+.poster {
+  cursor: zoom-in;
+}
+
+.poster__zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 20, 0.7);
+}
+
+.poster__zoom svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--ink);
+}
+
+.lightbox[hidden] {
+  display: none;
+}
+
+.lightbox__scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  display: flex;
+}
+
+/* As tall as the screen; as wide as that makes the painting. */
+.lightbox__frame {
+  position: relative;
+  flex: none;
+  height: 100%;
+  margin: auto;
+}
+
+.lightbox__frame img {
+  display: block;
+  height: 100%;
+  width: auto;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: max(var(--s-3), env(safe-area-inset-top));
+  right: max(var(--s-3), env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--paper);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 18px;
   cursor: pointer;
 }

@@ -11,6 +11,8 @@
  */
 export interface PosterArt {
   src: string;
+  /** The painting at full resolution, for the zoomed view. */
+  full: string;
   /** Size of the original painting. The trace is in these pixels. */
   width: number;
   height: number;
@@ -30,6 +32,7 @@ export interface PosterArt {
 
 export const ESTORIL_POSTER: PosterArt = {
   src: 'art/routes/estoril-poster.webp',
+  full: 'art/routes/estoril-poster-full.webp',
   width: 1468,
   height: 1071,
   north: -2,
@@ -79,6 +82,7 @@ function haruna(from: number, to: number, arrows: number[]): PosterArt {
   const startSide = from === 0 ? 1 : -1;
   return {
     src: 'art/routes/haruna-poster.webp',
+    full: 'art/routes/haruna-poster-full.webp',
     width: 1439,
     height: 1093,
     north: 0,
@@ -101,6 +105,7 @@ export const HARUNA_FULL_POSTER = haruna(0, HARUNA_TRACE.length - 1, [2, 34, 56]
  */
 export const NURBURG_POSTER: PosterArt = {
   src: 'art/routes/nurburg-poster.webp',
+  full: 'art/routes/nurburg-poster-full.webp',
   width: 1665,
   height: 945,
   north: -10,

@@ -39,6 +39,10 @@ for (const [source, id] of POSTERS) {
   const { width, height } = await sharp(input).metadata();
   await sharp(input).resize({ width: WIDTH, kernel: 'lanczos3' }).webp({ quality: 78, effort: 6 }).toFile(out);
   console.log(`${id}-poster.webp  ${width}x${height} source, ${(statSync(out).size / 1024).toFixed(0)}KB`);
+  // The painting at its own size, for the zoomed view: loaded only on a tap.
+  const full = resolve(OUT, `${id}-poster-full.webp`);
+  await sharp(input).webp({ quality: 76, effort: 6 }).toFile(full);
+  console.log(`${id}-poster-full.webp  ${(statSync(full).size / 1024).toFixed(0)}KB`);
 }
 
 const FLAGS = [
