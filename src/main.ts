@@ -222,7 +222,9 @@ async function openIntro(entry: RouteEntry): Promise<void> {
 
   showPoster(route);
   showIntroCar();
-  void refreshBoard();
+  // The board opens on the mode last driven, so coming back from a Drift Run
+  // shows the drift scores.
+  setBoardMode(currentMode);
   showScreen('intro');
 
   // Scenery and car art load in the background. Neither blocks the drive
@@ -255,13 +257,15 @@ async function refreshBoard(): Promise<void> {
   const route = currentRoute;
   const container = $('board-rows');
   if (!route) return;
+  // Taken now: the player can switch tabs while this is in flight.
+  const mode = boardMode;
 
   container.replaceChildren(caption('Loading…'));
 
   try {
     const board = await fetchBoard(
       route.id,
-      boardMode,
+      mode,
       'all',
       route.version,
       SIM_VERSION,
@@ -270,7 +274,8 @@ async function refreshBoard(): Promise<void> {
       container.replaceChildren(caption('No times posted yet. Be first.'));
       return;
     }
-    container.replaceChildren(...board.rows.map(boardRow));
+    if (mode !== boardMode) return;
+    container.replaceChildren(...board.rows.map((row) => boardRow(row, mode)));
   } catch (err) {
     const message =
       err instanceof LeaderboardError ? err.message : 'Could not reach the leaderboard.';
@@ -278,7 +283,8 @@ async function refreshBoard(): Promise<void> {
   }
 }
 
-function boardRow(row: LeaderboardRow): HTMLElement {
+/** One leaderboard row, formatted for the board it is on -- not for whichever tab the route page last showed. */
+function boardRow(row: LeaderboardRow, mode: SimMode): HTMLElement {
   const el = document.createElement('div');
   el.className = row.id === myLastRowId ? 'board__row board__row--me' : 'board__row';
 
@@ -299,10 +305,10 @@ function boardRow(row: LeaderboardRow): HTMLElement {
   // Time Attack shows only a time; Drift Run shows points, with the time as
   // the secondary value, exactly as the brief specifies.
   value.textContent =
-    boardMode === 'timeAttack'
+    mode === 'timeAttack'
       ? formatTime(row.timeMs / 1000)
       : row.points.toLocaleString('en-GB');
-  if (boardMode === 'driftRun') {
+  if (mode === 'driftRun') {
     const time = document.createElement('span');
     time.className = 'board__car';
     time.style.textAlign = 'right';
@@ -898,11 +904,13 @@ async function showResultBoard(): Promise<void> {
   const route = currentRoute;
   const container = $('result-board-rows');
   if (!route) return;
+  const mode = currentMode;
+  $('result-board-title').textContent = mode === 'driftRun' ? 'Top 20 · Drift Run' : 'Top 20 · Time Attack';
   container.replaceChildren(caption('Loading…'));
   try {
-    const board = await fetchBoard(route.id, currentMode, 'all', route.version, SIM_VERSION);
+    const board = await fetchBoard(route.id, mode, 'all', route.version, SIM_VERSION);
     container.replaceChildren(
-      ...(board.rows.length === 0 ? [caption('No scores posted yet. Be first.')] : board.rows.map(boardRow)),
+      ...(board.rows.length === 0 ? [caption('No scores posted yet. Be first.')] : board.rows.map((row) => boardRow(row, mode))),
     );
   } catch (err) {
     container.replaceChildren(
