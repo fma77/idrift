@@ -75,6 +75,7 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
       zoneScored: false,
       entryFactor: 1,
       lastDriftSign: 0,
+      sideTicks: 0,
     },
     rngS0: rng.s0,
     rngS1: rng.s1,

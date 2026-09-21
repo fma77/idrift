@@ -771,23 +771,22 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
 
   $('result-title').textContent = isBest ? 'Best yet' : 'Run over';
   $('result-route').textContent = `${currentEntry.name} · ${currentEntry.location} · ${carById(settings.carId).name}`;
-  $('result-grade').textContent = result.grade;
-
   const rows: HTMLElement[] = [statRow('Time', formatTime(result.timeSeconds))];
 
   if (currentMode === 'driftRun') {
+    // The score as a sum the player can follow: what drifting earned, what the
+    // run's record added and took away, and the total.
     rows.push(
-      statRow('Points', result.points.toLocaleString('en-GB')),
-      statRow('Style', `${result.grade} · x${result.styleModifier.toFixed(2)}`),
-      statRow('Zones cleared', `${result.zonesCleared} / ${result.zonesTotal}`),
-      statRow('Transitions', String(result.reversals)),
-      statRow('Spins', String(result.spins)),
+      scoreRow('Points earned', 'drifting', result.earned, false),
+      scoreRow('Zones cleared', `${result.zonesCleared} / ${result.zonesTotal}`, result.zoneBonus, true),
+      scoreRow('Transitions', String(result.reversals), result.transitionBonus, true),
+      scoreRow('Spins', String(result.spins), -result.spinPenalty, true),
+      scoreRow('Wall hits', String(result.wallHits), -result.wallPenalty, true),
+      totalRow('Final score', result.points.toLocaleString('en-GB')),
     );
-  }
-
-  rows.push(statRow('Wall hits', String(result.wallHits)));
-  if (result.wallHits > 0 && currentMode === 'timeAttack') {
-    rows.push(statRow('Time penalty', `+${(result.wallHits * 2).toFixed(0)}s`));
+  } else {
+    rows.push(statRow('Wall hits', String(result.wallHits)));
+    if (result.wallHits > 0) rows.push(statRow('Time penalty', `+${(result.wallHits * 2).toFixed(0)}s`));
   }
 
   const best = getBest(route.id, route.version, currentMode);
@@ -809,12 +808,64 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
   $('result-tune-note').hidden = !unranked;
   $('result-submit').hidden = !!unranked;
   showScreen('results');
+  if (!unranked) void showResultBoard();
 
   // Meme triggers fire here -- on a results screen, never mid-drive.
   if (unranked) return;
   if (isBest) fireMeme('personalBest');
   else fireMeme('routeComplete');
   if (result.grade === 'S') fireMeme('sRank');
+}
+
+/** A line of the score: what it was for, how many, and what it added or took. */
+function scoreRow(label: string, detail: string, amount: number, signed: boolean): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'score-row';
+  const name = document.createElement('span');
+  name.className = 'score-row__label';
+  name.textContent = label;
+  const count = document.createElement('span');
+  count.className = 'score-row__detail';
+  count.textContent = detail;
+  const value = document.createElement('span');
+  value.className = 'score-row__value';
+  const n = Math.abs(amount).toLocaleString('en-GB');
+  value.textContent = !signed ? n : amount > 0 ? `+${n}` : amount < 0 ? `−${n}` : '0';
+  if (signed && amount > 0) value.classList.add('score-row__value--plus');
+  if (signed && amount < 0) value.classList.add('score-row__value--minus');
+  el.append(name, count, value);
+  return el;
+}
+
+function totalRow(label: string, value: string): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'score-total';
+  const name = document.createElement('span');
+  name.className = 'label';
+  name.textContent = label;
+  const v = document.createElement('span');
+  v.className = 'display score-total__value';
+  v.textContent = value;
+  el.append(name, v);
+  return el;
+}
+
+/** The top 20 for this route and mode, under the results, with the player's row marked. */
+async function showResultBoard(): Promise<void> {
+  const route = currentRoute;
+  const container = $('result-board-rows');
+  if (!route) return;
+  container.replaceChildren(caption('Loading…'));
+  try {
+    const board = await fetchBoard(route.id, currentMode, 'all', route.version, SIM_VERSION);
+    container.replaceChildren(
+      ...(board.rows.length === 0 ? [caption('No scores posted yet. Be first.')] : board.rows.map(boardRow)),
+    );
+  } catch (err) {
+    container.replaceChildren(
+      caption(err instanceof LeaderboardError ? err.message : 'Could not reach the leaderboard.'),
+    );
+  }
 }
 
 function quitRun(): void {
@@ -837,6 +888,7 @@ function resetSubmitPanel(): void {
   input.removeAttribute('aria-invalid');
   $('name-error').textContent = '';
   $('post-status').textContent = '';
+  delete $('post-status').dataset.top;
   const post = $<HTMLButtonElement>('btn-post');
   post.disabled = false;
   post.textContent = 'Post score';
@@ -917,8 +969,10 @@ async function postScore(): Promise<void> {
     myLastRowId = response.id;
     post.textContent = 'Posted';
     status.textContent = response.inTop20
-      ? `Posted — #${response.rank} on the board.`
-      : `Posted — #${response.rank}. Top ${20} to make the board.`;
+      ? `You're #${response.rank} in the top 20.`
+      : `You're #${response.rank} — the top 20 make the board.`;
+    status.dataset.top = String(response.inTop20);
+    void showResultBoard();
     if (response.inTop20) fireMeme('leaderboardTop20');
   } catch (err) {
     post.disabled = false;

@@ -115,10 +115,15 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
   if (drifting) {
     // Count a steering reversal: the slide swapped sides while still committed.
     // This is a style signal, graded after the run rather than shown live.
-    if (d.lastDriftSign !== 0 && d.lastDriftSign !== driftSign && d.driftTicks > 12) {
-      d.reversals++;
+    // Counted against time held on the side just left, not the current combo:
+    // passing through straight on the way over resets driftTicks, so the old
+    // test never fired on a real transition.
+    if (d.lastDriftSign !== 0 && d.lastDriftSign !== driftSign) {
+      if (d.sideTicks > 12) d.reversals++;
+      d.sideTicks = 0;
     }
     d.lastDriftSign = driftSign;
+    d.sideTicks++;
     d.driftTicks++;
     d.ticksToInitiation = 0;
 
@@ -161,6 +166,11 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
 }
 
 function bankCombo(d: SimState['drift']): void {
+  // A drift that ends in a bank is over: the next one starts a fresh side.
+  if (d.pending > 0) {
+    d.lastDriftSign = 0;
+    d.sideTicks = 0;
+  }
   d.banked += d.pending;
   d.pending = 0;
   d.multiplier = 1;
@@ -175,6 +185,7 @@ function breakCombo(d: SimState['drift']): void {
   d.multiplier = 1;
   d.driftTicks = 0;
   d.lastDriftSign = 0;
+  d.sideTicks = 0;
 }
 
 /** Index of the drift zone containing this sample, or -1. Linear over a short array. */
@@ -226,10 +237,18 @@ export interface RunResult {
   /** Sim ticks including penalties. Divide by TICK_RATE for seconds. */
   totalTicks: number;
   timeSeconds: number;
+  /** Final score: earned, plus bonuses, less deductions. */
   points: number;
+  /** Points banked by drifting, before bonuses and deductions. */
+  earned: number;
+  zoneBonus: number;
+  transitionBonus: number;
+  spinPenalty: number;
+  wallPenalty: number;
   wallHits: number;
+  /** Not shown; it picks the celebration on the results screen. */
   grade: StyleGrade;
-  /** Multiplier applied to banked points to produce `points`. */
+  /** points / earned. */
   styleModifier: number;
   zonesCleared: number;
   zonesTotal: number;
@@ -237,43 +256,52 @@ export interface RunResult {
   spins: number;
 }
 
+/** Bonuses and deductions, as shares of the points earned by drifting. */
+const ZONE_BONUS = 0.3; // for clearing every zone, pro rata
+const TRANSITION_BONUS = 0.05; // each
+const TRANSITION_CAP = 0.25;
+const SPIN_PENALTY = 0.12; // each
+const SPIN_CAP = 0.6;
+const WALL_PENALTY = 0.08; // each
+const WALL_CAP = 0.5;
+
 /**
- * Grade the completed run.
+ * Score the completed run.
  *
- * Deliberately post-run rather than live: the brief is right that showing a
- * style meter during the drive would compete for attention with the combo
- * ticker, and these signals (reversal count, time to initiation, correction
- * magnitude) only mean anything averaged over a whole run.
+ * Every adjustment is a line the player can see: drift points earned, a bonus
+ * for zones cleared and for transitions, a deduction for each spin and each
+ * wall hit, and the total. The first version folded all of this into a hidden
+ * style multiplier, which made the final number impossible to read.
  */
 export function gradeRun(state: SimState, route: RouteData, tickRate: number): RunResult {
   const d = state.drift;
   const totalTicks = state.raceTicks + state.penaltyTicks;
   const zonesTotal = route.driftZones.length;
+  const earned = Math.round(d.banked);
 
-  // Clean commitment: cleared most zones, few saves, low correction.
   const clearRate = zonesTotal === 0 ? 1 : d.zonesCleared / zonesTotal;
-  const correctionPerZone = d.zonesCleared === 0 ? 0 : d.correctionSum / d.zonesCleared;
+  const zoneBonus = Math.round(earned * ZONE_BONUS * clearRate);
+  const transitionBonus = Math.round(earned * Math.min(TRANSITION_CAP, TRANSITION_BONUS * d.reversals));
+  const spinPenalty = Math.round(earned * Math.min(SPIN_CAP, SPIN_PENALTY * d.spins));
+  const wallPenalty = Math.round(earned * Math.min(WALL_CAP, WALL_PENALTY * state.wallHits));
+  const points = Math.max(0, earned + zoneBonus + transitionBonus - spinPenalty - wallPenalty);
 
-  let score = 0;
-  score += clearRate * 50;
-  score += clamp(1 - correctionPerZone / 2.5, 0, 1) * 25;
-  score += clamp(1 - state.wallHits / 4, 0, 1) * 15;
-  score += clamp(d.reversals / Math.max(zonesTotal, 1), 0, 1) * 10;
-  // Spins cost style: a fifth of the grade gone by the third one.
-  score = Math.max(0, score - clamp(d.spins / 3, 0, 1) * 20);
-
+  const ratio = earned === 0 ? 0 : points / earned;
   const grade: StyleGrade =
-    score >= 85 ? 'S' : score >= 70 ? 'A' : score >= 55 ? 'B' : score >= 38 ? 'C' : 'D';
-
-  const styleModifier = 0.8 + (score / 100) * 0.7; // 0.8x .. 1.5x
+    ratio >= 1.35 ? 'S' : ratio >= 1.2 ? 'A' : ratio >= 1.05 ? 'B' : ratio >= 0.9 ? 'C' : 'D';
 
   return {
     totalTicks,
     timeSeconds: totalTicks / tickRate,
-    points: Math.round(d.banked * styleModifier),
+    points,
+    earned,
+    zoneBonus,
+    transitionBonus,
+    spinPenalty,
+    wallPenalty,
     wallHits: state.wallHits,
     grade,
-    styleModifier,
+    styleModifier: earned === 0 ? 1 : ratio,
     zonesCleared: d.zonesCleared,
     zonesTotal,
     reversals: d.reversals,

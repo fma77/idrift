@@ -285,6 +285,12 @@ export interface DriftScoreState {
   zoneScored: boolean;
   /** Sign of the drift angle last tick, for reversal counting. */
   lastDriftSign: number;
+  /**
+   * Ticks drifted on the current side. Unlike driftTicks it survives the
+   * moment the car passes through straight on its way to the other side --
+   * which every transition does, and which is why none were ever counted.
+   */
+  sideTicks: number;
   /** 0.5..1. How well timed the last drift entry was. Throttle controls only. */
   entryFactor: number;
 }
