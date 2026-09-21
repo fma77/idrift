@@ -76,3 +76,14 @@ for (const [source, id, turn] of CAR_SPRITES) {
   const { width, height } = await sharp(out).metadata();
   console.log(`cars/${id}.webp  ${width}x${height}, ${(statSync(out).size / 1024).toFixed(1)}KB`);
 }
+
+// Garage hero images: 16:9, shipped at 1200px wide.
+const CAR_HEROES = [['Hachiroku hero.png', 'kaido-zen-r']];
+for (const [source, id] of CAR_HEROES) {
+  const out = resolve(CAR_OUT, `${id}-hero.webp`);
+  await sharp(resolve(root, 'art', source))
+    .resize(1200, 675, { fit: 'cover', kernel: 'lanczos3' })
+    .webp({ quality: 82, effort: 6 })
+    .toFile(out);
+  console.log(`cars/${id}-hero.webp  ${(statSync(out).size / 1024).toFixed(0)}KB`);
+}

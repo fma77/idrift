@@ -40,6 +40,7 @@ export const CARS: CarParams[] = [
     engine: 'na4',
     tint: '#E8402A',
     sprite: { path: 'art/cars/kaido-zen-r.webp', pixelsPerMetre: 76 },
+    hero: 'art/cars/kaido-zen-r-hero.webp',
   },
   {
     id: 'onibi-silhouette',
