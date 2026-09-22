@@ -63,6 +63,14 @@ export interface VoiceParams {
   flutterHz: number;
   /** 0..1. Pops and crackles on the overrun. */
   pops: number;
+  /**
+   * 0..1. Supercharger whine. The blower is belt-driven off the crank, so
+   * unlike a turbo it has no lag and no threshold: its pitch follows the revs
+   * exactly, and it is there on and off the throttle, loudest under load.
+   */
+  blower: number;
+  /** Hz. Whine pitch at the redline. */
+  blowerHz: number;
   /** 1..6. Saturation: how hard the exhaust note is driven. */
   drive: number;
   /** Overall level. */
@@ -110,6 +118,8 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       flutter: 0,
       flutterHz: 15,
       pops: 0.2,
+      blower: 0,
+      blowerHz: 3000,
       drive: 2.6,
       gain: 0.9,
     },
@@ -146,6 +156,8 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       flutter: 0,
       flutterHz: 15,
       pops: 0.9,
+      blower: 0,
+      blowerHz: 3000,
       drive: 3.4,
       gain: 1.2,
     },
@@ -182,6 +194,8 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       flutter: 1,
       flutterHz: 17,
       pops: 0.3,
+      blower: 0,
+      blowerHz: 3000,
       drive: 2.2,
       gain: 0.95,
     },
@@ -218,6 +232,8 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       flutter: 0.45,
       flutterHz: 13,
       pops: 0.45,
+      blower: 0,
+      blowerHz: 3000,
       drive: 2.8,
       gain: 1,
     },
@@ -255,6 +271,8 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       flutter: 0.55,
       flutterHz: 20,
       pops: 0.4,
+      blower: 0,
+      blowerHz: 3000,
       drive: 2.6,
       gain: 0.95,
     },
@@ -291,13 +309,57 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       flutter: 0.9,
       flutterHz: 19,
       pops: 0.4,
+      blower: 0,
+      blowerHz: 3000,
       drive: 2.5,
       gain: 0.95,
     },
   },
+  scv8: {
+    kind: 'scv8',
+    label: 'Supercharged V8',
+    spec: {
+      idleRpm: 750,
+      redlineRpm: 6300,
+      limiterRpm: 6600,
+      gears: 6,
+      // A big heavy crank: it revs lazily and falls slowly.
+      revRise: 8500,
+      revFall: 6000,
+      // No turbo. The supercharger's boost is instant; its sound is the whine.
+      spool: 0,
+      boostThreshold: 1,
+    },
+    // Deep and loping: four firings a revolution from a cross-plane crank,
+    // whose two banks fire unevenly -- the V8 burble. Long, boomy pulses,
+    // driven hard, and over the top of it all the blower's whine, climbing
+    // with the revs.
+    voice: {
+      firesPerRev: 4,
+      pattern: [1.12, 0.88, 1.06, 0.94, 1.1, 0.9, 0.96, 1.04],
+      levels: [1, 0.72, 0.9, 0.78, 0.98, 0.7, 0.86, 0.8],
+      resonance: 170,
+      resonanceTrack: 0.55,
+      pulseDecay: 0.009,
+      rasp: 0.3,
+      jitter: 0.1,
+      lope: 0.12,
+      lopeHz: 2,
+      intake: 0.3,
+      whistle: 0,
+      whistleHz: 5000,
+      flutter: 0,
+      flutterHz: 15,
+      pops: 0.6,
+      blower: 0.8,
+      blowerHz: 3000,
+      drive: 3.2,
+      gain: 1,
+    },
+  },
 };
 
-export const ENGINE_KINDS: EngineKind[] = ['na4', 'rotary', 'turbo6', 'boxer4', 'flat6tt', 'turbo4'];
+export const ENGINE_KINDS: EngineKind[] = ['na4', 'rotary', 'turbo6', 'boxer4', 'flat6tt', 'turbo4', 'scv8'];
 
 /** The voice numbers the sound lab exposes as sliders. */
 export interface VoiceSpec {
@@ -323,6 +385,8 @@ export const VOICE_SPECS: VoiceSpec[] = [
   { key: 'flutter', label: 'Turbo flutter', help: 'The stu-tu-tu on lift-off.', min: 0, max: 1.5, step: 0.05 },
   { key: 'flutterHz', label: 'Flutter speed', help: 'How fast the flutter chatters.', min: 6, max: 30, step: 0.5 },
   { key: 'pops', label: 'Pops and crackles', help: 'On the overrun, off the throttle.', min: 0, max: 1.5, step: 0.05 },
+  { key: 'blower', label: 'Supercharger whine', help: 'The blower: follows the revs with no lag, loudest under load.', min: 0, max: 1.5, step: 0.05 },
+  { key: 'blowerHz', label: 'Whine pitch', help: 'How high the whine climbs at the redline.', min: 800, max: 6000, step: 50 },
   { key: 'gain', label: 'Volume', help: 'This engine only.', min: 0.2, max: 2, step: 0.05 },
 ];
 
@@ -336,6 +400,7 @@ const SHIPPED: Record<EngineKind, VoiceParams> = {
   boxer4: { ...PROFILES.boxer4.voice },
   flat6tt: { ...PROFILES.flat6tt.voice },
   turbo4: { ...PROFILES.turbo4.voice },
+  scv8: { ...PROFILES.scv8.voice },
 };
 
 type Overrides = Partial<Record<EngineKind, Partial<Record<keyof VoiceParams, number>>>>;

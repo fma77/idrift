@@ -9,7 +9,8 @@ import type { VoiceParams } from './profiles.ts';
  * pattern. Everything characterful is a variation on that train -- a flat
  * four's bunched pulses, a rotary's pulses gathering into groups at idle --
  * plus a few separate layers: intake noise, turbo whistle, the flutter of air
- * surging back through the turbo on lift-off, and overrun pops.
+ * surging back through the turbo on lift-off, a supercharger's whine, and
+ * overrun pops.
  *
  * Pure DSP with no Web Audio in it, so it runs the same in the audio worklet
  * and in a Node test.
@@ -66,6 +67,8 @@ export class EngineSynth {
   private readonly flutterFilter = new Svf();
   private readonly popFilter = new Svf();
   private whistlePhase = 0;
+  private blowerPhase = 0;
+  private blowerLevel = 0;
   private flutterLeft = 0;
   private flutterStrength = 0;
   private flutterPhase = 0;
@@ -113,6 +116,11 @@ export class EngineSynth {
     const loud = 0.28 + 0.72 * c.load;
     const intakeCut = 350 + 2600 * Math.min(1, c.rpmFraction);
     const whistleHz = v.whistleHz * (0.35 + 0.65 * c.boost);
+    // The blower turns with the crank, so its pitch is the revs, exactly.
+    const blowerHz = v.blowerHz * Math.min(1.1, c.rpmFraction);
+    // Loudest pulling hard, still there off the throttle and falling revs.
+    const blowerTarget = v.blower * (0.3 + 0.7 * (c.cut ? 0.3 : c.load)) * Math.min(1, 0.25 + c.rpmFraction);
+    const blowerGlide = 1 - Math.exp(-dt / 0.06);
 
     for (let i = 0; i < out.length; i++) {
       // --- Firings ---
@@ -172,6 +180,16 @@ export class EngineSynth {
         whistle = Math.sin(TWO_PI * this.whistlePhase) * v.whistle * c.boost * c.boost * 0.09;
       }
 
+      // --- Supercharger whine: a tone with a little of its own overtones ---
+      let blower = 0;
+      this.blowerLevel += (blowerTarget - this.blowerLevel) * blowerGlide;
+      if (v.blower > 0 && this.blowerLevel > 1e-4) {
+        this.blowerPhase += blowerHz * dt;
+        if (this.blowerPhase >= 1) this.blowerPhase -= 1;
+        const w = TWO_PI * this.blowerPhase;
+        blower = (Math.sin(w) + 0.35 * Math.sin(2 * w) + 0.12 * Math.sin(3 * w)) * this.blowerLevel * 0.075;
+      }
+
       // --- Flutter: stu-tu-tu-tu ---
       let flutter = 0;
       if (this.flutterLeft > 0 && v.flutter > 0) {
@@ -196,7 +214,7 @@ export class EngineSynth {
 
       // --- Exhaust: drive the pulse train, then mix ---
       const driven = Math.tanh(pulse * v.drive) / Math.tanh(v.drive);
-      let sample = (driven * 0.55 + intake + whistle + flutter + pop) * v.gain * 1.3;
+      let sample = (driven * 0.55 + intake + whistle + blower + flutter + pop) * v.gain * 1.3;
       // A gentle one-pole to take the fizz off the top.
       sample = this.lastOut + (sample - this.lastOut) * 0.6;
       this.lastOut = sample;

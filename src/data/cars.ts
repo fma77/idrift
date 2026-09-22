@@ -227,6 +227,41 @@ export const CARS: CarParams[] = [
     sprite: { path: 'art/cars/silvia.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/silvia-hero.webp',
   },
+  {
+    id: 'hellcat',
+    name: 'HELLCAT',
+    carClass: 'A',
+    // Challenger SRT Hellcat, drift-built: 717hp through the rear wheels of a
+    // two-tonne muscle car. Huge speed and huge slides, the laziest steering
+    // here, and power that swings the tail round if it is given the chance.
+    handling: {
+      topSpeed: 64.00,
+      acceleration: 6.15,
+      turnRate: 1.7,
+      turnResponse: 3.5,
+      turnInSpeed: 10.5,
+      grip: 1.0,
+      slideFrictionLow: 0.5,
+      slideFrictionHigh: 1.45,
+      breakAngle: 0.12,
+      regripAngle: 0.05,
+      selfAlign: 2.0,
+    },
+    // Long, wide and nose-heavy.
+    cgToFront: 1.3,
+    cgToRear: 1.65,
+    bodyLength: 5.03,
+    bodyWidth: 1.92,
+    // An angle kit: as much lock as the Silvia.
+    maxWheelAngle: 0.62,
+    engine: 'scv8',
+    driftFeel: { hold: 1, runaway: 1.35, rate: 0.85, swing: 0.75, pivot: 0.8, momentum: 1.35 },
+    stats: { accel: 5, topSpeed: 5, grip: 2, drift: 4, agility: 1, stability: 3 },
+    zeroTo100: 3.9,
+    tagline:
+      'A supercharged muscle car built to drift. Enormous speed and long, smoky slides, but it is heavy and slow to turn in, and too much throttle swings the tail round.',
+    tint: '#8e5bc4',
+  },
 ];
 
 export function carById(id: string): CarParams {

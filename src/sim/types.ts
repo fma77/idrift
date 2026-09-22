@@ -119,7 +119,7 @@ export interface HandlingParams {
  *   turbo6: turbocharged straight six
  *   boxer4: turbocharged flat four
  */
-export type EngineKind = 'na4' | 'rotary' | 'turbo6' | 'boxer4' | 'flat6tt' | 'turbo4';
+export type EngineKind = 'na4' | 'rotary' | 'turbo6' | 'boxer4' | 'flat6tt' | 'turbo4' | 'scv8';
 
 export interface CarParams {
   id: string;

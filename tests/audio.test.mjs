@@ -139,3 +139,38 @@ test('a flutter is heard after lift-off', () => {
   const flutter = rms(render('turbo6', controls, 0.4, (s) => s.triggerFlutter(1)));
   assert.ok(flutter > plain * 1.5, `without ${plain.toFixed(3)}, with flutter ${flutter.toFixed(3)}`);
 });
+
+/** Strength of one frequency in a buffer (Goertzel). */
+function toneAt(buffer, hz) {
+  const w = (2 * Math.PI * hz) / SR;
+  const k = 2 * Math.cos(w);
+  let s1 = 0;
+  let s2 = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    const s = buffer[i] + k * s1 - s2;
+    s2 = s1;
+    s1 = s;
+  }
+  return Math.sqrt(s1 * s1 + s2 * s2 - k * s1 * s2) / buffer.length;
+}
+
+test('the supercharger whines at a pitch that follows the revs', () => {
+  const spec = PROFILES.scv8.spec;
+  const voice = PROFILES.scv8.voice;
+  for (const fraction of [0.4, 0.8]) {
+    const controls = { rpm: spec.redlineRpm * fraction, rpmFraction: fraction, load: 1, boost: 0, overrun: 0, cut: false };
+    const withWhine = render('scv8', controls, 1);
+    const without = render('scv8', controls, 1, (synth) => (synth.voice = { ...voice, blower: 0 }));
+    const hz = voice.blowerHz * fraction;
+    // The whine is there at its pitch, and its pitch is the revs': not at the other rev point's.
+    assert.ok(toneAt(withWhine, hz) > toneAt(without, hz) * 3, `no whine at ${hz} Hz`);
+    const other = voice.blowerHz * (fraction === 0.4 ? 0.8 : 0.4);
+    assert.ok(toneAt(withWhine, hz) > toneAt(withWhine, other) * 2, `whine at ${fraction} is not at its own pitch`);
+  }
+});
+
+test('only the supercharged engine whines', () => {
+  for (const kind of ENGINE_KINDS) {
+    assert.equal(PROFILES[kind].voice.blower > 0, kind === 'scv8', `${kind} blower`);
+  }
+});
