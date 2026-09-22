@@ -23,6 +23,17 @@
     "run_worker_first": ["/api/*"]
   },
 
+  // The game's own address. Custom domains: Cloudflare creates the DNS record
+  // and the certificate. The workers.dev address stays on, so links already
+  // shared keep working; it is set explicitly because adding routes can
+  // otherwise turn it off.
+  "routes": [
+    { "pattern": "idrift.win", "custom_domain": true },
+    { "pattern": "www.idrift.win", "custom_domain": true }
+  ],
+  "workers_dev": true,
+  "preview_urls": true,
+
   "observability": {
     "enabled": true
   },
