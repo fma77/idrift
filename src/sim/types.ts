@@ -286,6 +286,12 @@ export interface AssistParams {
   roadKeeping: number;
   /** 0..1. How much the throttle pulses in a slide, like a driver working the pedal. */
   throttlePulse: number;
+  /**
+   * 0..1. How far corner braking judges each corner by the line the car is on
+   * rather than the centreline: from the outside edge it allows up to the
+   * widest arc through, from the inside a tighter one. Time Attack only.
+   */
+  lineAware: number;
 }
 
 /** Per-run constants. Fixed at run start, recorded with the replay. */
@@ -371,6 +377,9 @@ export interface SimState {
   spinTicks: number;
   /** Whether the drift button was down last tick, so one tap acts once. */
   initiateHeld: boolean;
+  /** The corner whose line was judged on the way in, or -1, and how good it was (-1 inside .. 1 outside). */
+  lineCorner: number;
+  lineQuality: number;
   /** Ticks the drift button has been held since it started the current flick. */
   handbrakeTicks: number;
   /** True from that press until the button is let go. */

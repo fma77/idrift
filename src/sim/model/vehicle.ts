@@ -1,5 +1,5 @@
 import { atan2, sin, cos, clamp, wrapAngle, lerp, HALF_PI, TWO_PI } from '../math/trig.ts';
-import { cornerSpeedLimit, roadKeepingTurn } from './assist.ts';
+import { cornerSpeedLimit, updateLineQuality, roadKeepingTurn } from './assist.ts';
 import type { AssistParams, CarParams, RouteData, SimInput, SimState } from '../types.ts';
 
 const GRAVITY = 9.80665;
@@ -100,6 +100,7 @@ export function stepVehicle(
 
   // --- Speed ---
   const grip = h.grip * assist.gripScale * surfaceGrip;
+  if (assist.lineAware > 0) updateLineQuality(state, route);
   const limit = cornerSpeedLimit(state, route, assist, grip);
   let throttle = playerThrottle ?? 1;
   if (playerThrottle === undefined && state.sliding && assist.throttlePulse > 0) {
@@ -126,7 +127,17 @@ export function stepVehicle(
   state.vx += Math.max(drive, -h.acceleration) * dt;
 
   // Steering and sliding cost speed. This is the pedal the player does not have.
-  decel += assist.steerDrag * Math.abs(steer) * clamp(speed / h.topSpeed, 0, 1);
+  // Cornering scrubs in proportion to how hard the tyres are working -- the
+  // sideways acceleration against what grip allows -- not to how far the wheel
+  // is turned. Charged on the wheel, moving across the road to set up a line
+  // was taxed as heavily as a tight corner, so a good line lost time.
+  // Time Attack only, where the line is the point; elsewhere the wheel is charged.
+  if (assist.lineAware > 0) {
+    const lateral = (Math.abs(state.yawRate) * speed) / Math.max(1, grip * GRAVITY);
+    decel += assist.steerDrag * clamp(lateral, 0, 1.5) * clamp(lateral, 0, 1.5);
+  } else {
+    decel += assist.steerDrag * Math.abs(steer) * clamp(speed / h.topSpeed, 0, 1);
+  }
   decel += assist.slideDrag * clamp(Math.abs(clampedSlip) / HALF_PI, 0, 1);
   if (decel > 0 && speed > 0.01) {
     const scale = Math.max(0, 1 - (decel * dt) / speed);

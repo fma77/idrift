@@ -9,7 +9,7 @@
  * require a bump -- those are versioned separately by carId, routeVersion, and
  * not at all, respectively.
  */
-export const SIM_VERSION = 18;
+export const SIM_VERSION = 19;
 
 /** Fixed simulation rate, Hz. */
 export const TICK_RATE = 120;

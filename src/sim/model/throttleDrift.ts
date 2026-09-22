@@ -386,6 +386,7 @@ const GRIP_ASSIST: AssistParams = {
   slideHoldScale: 1.6,
   maxSlideAngle: 0.35,
   cornerSpeed: 1,
+  lineAware: 0,
   cornerBraking: 9,
   steerDrag: 0,
   slideDrag: 0,
