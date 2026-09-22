@@ -260,7 +260,9 @@ export const CARS: CarParams[] = [
     zeroTo100: 3.9,
     tagline:
       'A supercharged muscle car built to drift. Enormous speed and long, smoky slides, but it is heavy and slow to turn in, and too much throttle swings the tail round.',
-    tint: '#8e5bc4',
+    tint: '#c8102e',
+    sprite: { path: 'art/cars/hellcat.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/hellcat-hero.webp',
   },
 ];
 
