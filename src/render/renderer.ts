@@ -38,6 +38,14 @@ const REVEAL_BEHIND = 40;
 
 /** Max skid trail segments retained. ~6 seconds of continuous drifting. */
 const MAX_SKID = 420;
+/**
+ * Road drawn past each end of the route, in metres: tarmac behind the start
+ * line and on past the finish, carried straight on from the route's ends. The
+ * sim never sees it -- a run starts on the line and ends at the other -- but a
+ * road that stops dead at both lines looks like a set, not a place.
+ */
+const ROAD_BEFORE = 60;
+const ROAD_AFTER = 160;
 
 interface SkidPoint {
   x: number;
@@ -75,6 +83,7 @@ export class Renderer {
   private theme: WorldTheme | null = null;
   private world: WorldArt | null = null;
   private worldRoute = '';
+  private road: DisplayRoad | null = null;
 
   // Declared as a plain field rather than a constructor parameter property:
   // Node's type-stripping loader rejects parameter properties outright, and
@@ -144,7 +153,8 @@ export class Renderer {
     if (this.worldRoute === route.id) return;
     this.worldRoute = route.id;
     this.theme = themeFor(route.id);
-    this.world = this.theme ? new WorldArt(route, this.theme, this.ctx) : null;
+    this.road = extendRoad(route);
+    this.world = this.theme ? new WorldArt(this.road.route, this.theme, this.ctx) : null;
   }
 
   clearTrails(): void {
@@ -211,8 +221,9 @@ export class Renderer {
       );
     }
 
-    if (theme) this.drawPaintedRoad(ctx, route, state, theme);
-    else this.drawRoad(ctx, route, state, px);
+    const road = this.road ?? extendRoad(route);
+    if (theme) this.drawPaintedRoad(ctx, road, state.sampleIndex, theme);
+    else this.drawRoad(ctx, road, state.sampleIndex, px);
     if (this.world) this.world.drawTrees(ctx, this.camera.x, this.camera.y, reach);
     this.drawScoringMarks(ctx, route, state, px);
     if (settings.showSkidMarks) this.drawSkids(ctx, px);
@@ -249,16 +260,19 @@ export class Renderer {
    */
   private drawRoad(
     ctx: CanvasRenderingContext2D,
-    route: RouteData,
-    state: SimState,
+    road: DisplayRoad,
+    sampleIndex: number,
     px: number,
   ): void {
-    const s = route.samples;
+    const s = road.route.samples;
     const last = s.x.length - 1;
-    const spacing = route.sampleSpacing;
-    const from = Math.max(0, state.sampleIndex - Math.round(REVEAL_BEHIND / spacing));
-    const to = Math.min(last, state.sampleIndex + Math.round(REVEAL_AHEAD / spacing));
+    const spacing = road.route.sampleSpacing;
+    const here = sampleIndex + road.before;
+    const from = Math.max(0, here - Math.round(REVEAL_BEHIND / spacing));
+    const to = Math.min(last, here + Math.round(REVEAL_AHEAD / spacing));
     if (to <= from) return;
+    const start = road.before;
+    const finish = road.finish;
 
     // Tarmac: one polygon down the left edge and back up the right.
     ctx.beginPath();
@@ -305,15 +319,16 @@ export class Renderer {
     }
     ctx.stroke();
 
-    // Finish line.
-    if (to >= last - 1) {
-      const h = s.heading[last];
-      const w = s.halfWidth[last];
-      ctx.lineWidth = px * 5;
-      ctx.strokeStyle = PAPER;
+    // Start and finish lines.
+    ctx.lineWidth = px * 5;
+    ctx.strokeStyle = PAPER;
+    for (const line of [start, finish]) {
+      if (line < from || line > to) continue;
+      const h = s.heading[line];
+      const w = s.halfWidth[line];
       ctx.beginPath();
-      ctx.moveTo(s.x[last] - sin(h) * w, s.y[last] + cos(h) * w);
-      ctx.lineTo(s.x[last] + sin(h) * w, s.y[last] - cos(h) * w);
+      ctx.moveTo(s.x[line] - sin(h) * w, s.y[line] + cos(h) * w);
+      ctx.lineTo(s.x[line] + sin(h) * w, s.y[line] - cos(h) * w);
       ctx.stroke();
     }
   }
@@ -324,16 +339,19 @@ export class Renderer {
    */
   private drawPaintedRoad(
     ctx: CanvasRenderingContext2D,
-    route: RouteData,
-    state: SimState,
+    road: DisplayRoad,
+    sampleIndex: number,
     theme: WorldTheme,
   ): void {
-    const s = route.samples;
+    const s = road.route.samples;
     const last = s.x.length - 1;
-    const spacing = route.sampleSpacing;
-    const from = Math.max(0, state.sampleIndex - Math.round(REVEAL_BEHIND / spacing));
-    const to = Math.min(last, state.sampleIndex + Math.round(REVEAL_AHEAD / spacing));
+    const spacing = road.route.sampleSpacing;
+    const here = sampleIndex + road.before;
+    const from = Math.max(0, here - Math.round(REVEAL_BEHIND / spacing));
+    const to = Math.min(last, here + Math.round(REVEAL_AHEAD / spacing));
     if (to <= from) return;
+    const start = road.before;
+    const finish = road.finish;
 
     const band = (extra: number, colour: string) => {
       ctx.beginPath();
@@ -357,7 +375,7 @@ export class Renderer {
     band(theme.vergeWidth, theme.verge);
     band(0.3, theme.outline);
     band(0, theme.tarmac);
-    if (theme.kerbs) this.drawKerbs(ctx, route, from, to);
+    if (theme.kerbs) this.drawKerbs(ctx, road.route, from, to);
 
     // Edge lines, just inside the tarmac.
     ctx.lineWidth = 0.16;
@@ -386,14 +404,26 @@ export class Renderer {
     }
     ctx.stroke();
 
+    // Start: a painted white line across the road.
+    if (start >= from && start <= to) {
+      const h = s.heading[start];
+      const w = s.halfWidth[start];
+      ctx.save();
+      ctx.translate(s.x[start], s.y[start]);
+      ctx.rotate(h);
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(-0.25, -w, 0.5, w * 2);
+      ctx.restore();
+    }
+
     // Finish: a chequered band across the road.
-    if (to >= last - 1) {
-      const h = s.heading[last];
-      const w = s.halfWidth[last];
+    if (finish >= from && finish <= to) {
+      const h = s.heading[finish];
+      const w = s.halfWidth[finish];
       const cells = Math.max(4, Math.round(w));
       const cell = (w * 2) / cells;
       ctx.save();
-      ctx.translate(s.x[last], s.y[last]);
+      ctx.translate(s.x[finish], s.y[finish]);
       ctx.rotate(h);
       for (let row = 0; row < 2; row++) {
         for (let i = 0; i < cells; i++) {
@@ -716,4 +746,50 @@ function interpolate(prev: SimState, next: SimState, alpha: number): SimState {
     speed: lerp(prev.speed, next.speed, a),
     slipAngle: lerp(prev.slipAngle, next.slipAngle, a),
   };
+}
+
+/** The route as drawn: the real one, with straight road added before the start and after the finish. */
+interface DisplayRoad {
+  route: RouteData;
+  /** Samples added before the start: the start line's index in the drawn road. */
+  before: number;
+  /** The finish line's index in the drawn road. */
+  finish: number;
+}
+
+/**
+ * Carry the road straight on from both ends, at the width it has there. Only
+ * the drawing reads the result; the sim keeps the real route.
+ */
+function extendRoad(route: RouteData): DisplayRoad {
+  const s = route.samples;
+  const n = s.x.length;
+  const step = route.sampleSpacing;
+  const before = Math.round(ROAD_BEFORE / step);
+  const after = Math.round(ROAD_AFTER / step);
+  const out = { x: [] as number[], y: [] as number[], heading: [] as number[], curvature: [] as number[], halfWidth: [] as number[], grip: [] as number[] };
+  const push = (i: number, x: number, y: number) => {
+    out.x.push(x);
+    out.y.push(y);
+    out.heading.push(s.heading[i]);
+    out.curvature.push(0);
+    out.halfWidth.push(s.halfWidth[i]);
+    out.grip.push(s.grip[i]);
+  };
+  for (let k = before; k > 0; k--) {
+    push(0, s.x[0] - cos(s.heading[0]) * step * k, s.y[0] - sin(s.heading[0]) * step * k);
+  }
+  for (let i = 0; i < n; i++) {
+    out.x.push(s.x[i]);
+    out.y.push(s.y[i]);
+    out.heading.push(s.heading[i]);
+    out.curvature.push(s.curvature[i]);
+    out.halfWidth.push(s.halfWidth[i]);
+    out.grip.push(s.grip[i]);
+  }
+  const l = n - 1;
+  for (let k = 1; k <= after; k++) {
+    push(l, s.x[l] + cos(s.heading[l]) * step * k, s.y[l] + sin(s.heading[l]) * step * k);
+  }
+  return { route: { ...route, samples: out }, before, finish: before + l };
 }

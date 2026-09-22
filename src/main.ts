@@ -1347,6 +1347,7 @@ function endHold(): void {
   restartTimer = 0;
   holdPointer = null;
   pauseBtn.classList.remove('pause-btn--holding');
+  gameEl.classList.remove('restart-holding');
 }
 
 pauseBtn.addEventListener('pointerdown', (e) => {
@@ -1359,6 +1360,7 @@ pauseBtn.addEventListener('pointerdown', (e) => {
     // Synthetic pointer; the hold still works.
   }
   pauseBtn.classList.add('pause-btn--holding');
+  gameEl.classList.add('restart-holding');
   restartTimer = window.setTimeout(() => {
     endHold();
     restartRun();

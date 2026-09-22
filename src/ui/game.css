@@ -1394,26 +1394,83 @@
   border-color: var(--red);
 }
 
-/* "RESTART" under the button while it is held, so the ring says what it is for. */
-.pause-btn__hint {
+/* The big restart ring, mid-screen above the car. It appears a moment after
+   the press, so a tap to pause never flashes it, and fills in step with the
+   one on the button: both animations start with the press. */
+.restart-hold {
   position: absolute;
-  left: -2px;
-  top: calc(100% + 6px);
-  padding: 3px 6px;
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  background: rgba(20, 20, 20, 0.78);
+  left: 50%;
+  top: 36%;
+  width: 124px;
+  height: 124px;
+  transform: translate(-50%, -50%) scale(0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 50%;
+  background: rgba(20, 20, 20, 0.62);
   color: var(--paper);
-  opacity: 0;
-  transition: opacity 150ms ease-out;
   pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
 }
 
-.pause-btn--holding .pause-btn__hint {
+#game.restart-holding .restart-hold {
   opacity: 1;
-  transition-delay: 250ms;
+  transform: translate(-50%, -50%) scale(1);
+  transition-delay: 180ms;
+}
+
+.restart-hold__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  fill: none;
+}
+
+.restart-hold__track {
+  stroke: rgba(244, 241, 234, 0.2);
+  stroke-width: 5;
+}
+
+.restart-hold__fill {
+  stroke: var(--red);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 263.9;
+  stroke-dashoffset: 263.9;
+}
+
+#game.restart-holding .restart-hold__fill {
+  animation: restart-hold-fill 2s linear forwards;
+}
+
+@keyframes restart-hold-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.restart-hold__icon {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.restart-hold__label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }

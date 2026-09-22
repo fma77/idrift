@@ -380,8 +380,21 @@
             <circle class="pause-ring__track" cx="24" cy="24" r="19" />
             <circle class="pause-ring__fill" cx="24" cy="24" r="19" />
           </svg>
-          <span class="pause-btn__hint" aria-hidden="true">Restart</span>
         </button>
+
+        <!-- The same restart ring, big and in the middle: on a phone the thumb
+             holding the pause button covers the small one. -->
+        <div class="restart-hold" aria-hidden="true">
+          <svg class="restart-hold__ring" viewBox="0 0 100 100">
+            <circle class="restart-hold__track" cx="50" cy="50" r="42" />
+            <circle class="restart-hold__fill" cx="50" cy="50" r="42" />
+          </svg>
+          <svg class="restart-hold__icon" viewBox="0 0 24 24">
+            <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+            <path d="M20 4v5h-5" />
+          </svg>
+          <span class="restart-hold__label">Restart</span>
+        </div>
 
         <button class="tune-btn" id="btn-tune" type="button" hidden>TUNE</button>
 
