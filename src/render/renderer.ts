@@ -599,22 +599,36 @@ export class Renderer {
     const len = car.bodyLength;
     const wid = car.bodyWidth;
 
+    const sprite = getSprite(car.sprite?.path);
+
     // A soft shadow on the painted ground, so the car sits on the road rather
     // than floating over it. The sun is fixed in the world, like the trees'.
+    // Cast by the drawing itself where there is one -- its own outline, blurred
+    // -- and by a rounded, blurred box where there is not.
     if (theme) {
       ctx.save();
       ctx.translate(view.x + 0.35, view.y - 0.45);
       ctx.rotate(view.heading);
-      ctx.fillStyle = theme.treeShadow;
-      ctx.fillRect(-len / 2 - 0.1, -wid / 2 - 0.1, len + 0.2, wid + 0.2);
+      if (sprite) {
+        const shadow = softShadow(sprite, theme.treeShadow);
+        const drawnWidth = (len * sprite.naturalWidth) / sprite.naturalHeight;
+        // The pad around the silhouette, in metres at this car's scale.
+        const pad = (SHADOW_PAD * len) / sprite.naturalHeight;
+        ctx.rotate(-Math.PI / 2);
+        ctx.scale(1, -1);
+        ctx.drawImage(shadow, -drawnWidth / 2 - pad, -len / 2 - pad, drawnWidth + pad * 2, len + pad * 2);
+      } else {
+        const shadow = boxShadow(theme.treeShadow);
+        // The box canvas is drawn at a fixed 20px per metre.
+        const pad = SHADOW_PAD / 20;
+        ctx.drawImage(shadow, -len / 2 - pad, -wid / 2 - pad, len + pad * 2, wid + pad * 2);
+      }
       ctx.restore();
     }
 
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.rotate(view.heading);
-
-    const sprite = getSprite(car.sprite?.path);
 
     if (sprite) {
       // Wheels first, under the body: the drawing's tyres are fixed, so these
@@ -792,4 +806,65 @@ function extendRoad(route: RouteData): DisplayRoad {
     push(l, s.x[l] + cos(s.heading[l]) * step * k, s.y[l] + sin(s.heading[l]) * step * k);
   }
   return { route: { ...route, samples: out }, before, finish: before + l };
+}
+
+// --- Soft shadows -------------------------------------------------------------
+
+/** Pixels of blur round a shadow silhouette, and the margin left for it. */
+const SHADOW_BLUR = 14;
+const SHADOW_PAD = 24;
+const shadows = new Map<string, HTMLCanvasElement>();
+
+/**
+ * A car drawing's shadow: its own outline, filled with the shadow colour and
+ * blurred, made once per drawing and colour and reused every frame.
+ *
+ * Drawn with the canvas shadow rather than a blur filter, which Safari does not
+ * support on a canvas: the drawing is placed off the edge, so only its blurred
+ * shadow lands on the canvas.
+ */
+function softShadow(sprite: HTMLImageElement, colour: string): HTMLCanvasElement {
+  const key = `${sprite.src}|${colour}`;
+  const cached = shadows.get(key);
+  if (cached) return cached;
+  const w = sprite.naturalWidth;
+  const h = sprite.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = w + SHADOW_PAD * 2;
+  canvas.height = h + SHADOW_PAD * 2;
+  const c = canvas.getContext('2d');
+  if (c) {
+    const away = canvas.width + 10;
+    c.shadowColor = colour;
+    c.shadowBlur = SHADOW_BLUR;
+    c.shadowOffsetX = away;
+    c.drawImage(sprite, SHADOW_PAD - away, SHADOW_PAD, w, h);
+  }
+  shadows.set(key, canvas);
+  return canvas;
+}
+
+/** A rounded, blurred box for a car with no drawing: 20px per metre, 4.6m by 1.9m. */
+function boxShadow(colour: string): HTMLCanvasElement {
+  const key = `box|${colour}`;
+  const cached = shadows.get(key);
+  if (cached) return cached;
+  const w = 92;
+  const h = 38;
+  const canvas = document.createElement('canvas');
+  canvas.width = w + SHADOW_PAD * 2;
+  canvas.height = h + SHADOW_PAD * 2;
+  const c = canvas.getContext('2d');
+  if (c) {
+    const away = canvas.width + 10;
+    c.shadowColor = colour;
+    c.shadowBlur = SHADOW_BLUR;
+    c.shadowOffsetX = away;
+    c.fillStyle = '#000';
+    c.beginPath();
+    c.roundRect(SHADOW_PAD - away, SHADOW_PAD, w, h, 8);
+    c.fill();
+  }
+  shadows.set(key, canvas);
+  return canvas;
 }
