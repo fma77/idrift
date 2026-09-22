@@ -51,6 +51,7 @@ export const CARS: CarParams[] = [
     tint: '#E8402A',
     sprite: { path: 'art/cars/kaido-zen-r.webp', pixelsPerMetre: 76 },
     hero: 'art/cars/kaido-zen-r-hero.webp',
+    heroFull: 'art/cars/kaido-zen-r-hero-full.webp',
   },
   {
     id: 'onibi-silhouette',
@@ -88,6 +89,7 @@ export const CARS: CarParams[] = [
     tint: '#f4f1ea',
     sprite: { path: 'art/cars/onibi-silhouette.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/onibi-silhouette-hero.webp',
+    heroFull: 'art/cars/onibi-silhouette-hero-full.webp',
   },
   {
     id: 'tengu-gt-x',
@@ -122,6 +124,7 @@ export const CARS: CarParams[] = [
     tint: '#e0dbd0',
     sprite: { path: 'art/cars/tengu-gt-x.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/tengu-gt-x-hero.webp',
+    heroFull: 'art/cars/tengu-gt-x-hero-full.webp',
   },
   {
     id: 'kaze-b4',
@@ -157,6 +160,7 @@ export const CARS: CarParams[] = [
     tint: '#cdc7bb',
     sprite: { path: 'art/cars/kaze-b4.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/kaze-b4-hero.webp',
+    heroFull: 'art/cars/kaze-b4-hero-full.webp',
   },
   {
     id: 'yellowbird',
@@ -192,6 +196,7 @@ export const CARS: CarParams[] = [
     tint: '#f2c230',
     sprite: { path: 'art/cars/yellowbird.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/yellowbird-hero.webp',
+    heroFull: 'art/cars/yellowbird-hero-full.webp',
   },
   {
     id: 'silvia',
@@ -226,6 +231,7 @@ export const CARS: CarParams[] = [
     tint: '#3a6ea5',
     sprite: { path: 'art/cars/silvia.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/silvia-hero.webp',
+    heroFull: 'art/cars/silvia-hero-full.webp',
   },
   {
     id: 'hellcat',
@@ -263,6 +269,7 @@ export const CARS: CarParams[] = [
     tint: '#c8102e',
     sprite: { path: 'art/cars/hellcat.webp', pixelsPerMetre: 70 },
     hero: 'art/cars/hellcat-hero.webp',
+    heroFull: 'art/cars/hellcat-hero-full.webp',
   },
 ];
 

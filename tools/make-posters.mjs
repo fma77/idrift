@@ -99,4 +99,11 @@ for (const [source, id] of CAR_HEROES) {
     .webp({ quality: 82, alphaQuality: 90, effort: 6 })
     .toFile(out);
   console.log(`cars/${id}-hero.webp  ${(statSync(out).size / 1024).toFixed(0)}KB`);
+  // Full size for the zoom: the drawing as supplied, up to 1920px wide.
+  const full = resolve(CAR_OUT, `${id}-hero-full.webp`);
+  await sharp(resolve(root, 'art', source))
+    .resize({ width: 1920, withoutEnlargement: true, kernel: 'lanczos3' })
+    .webp({ quality: 86, alphaQuality: 95, effort: 6 })
+    .toFile(full);
+  console.log(`cars/${id}-hero-full.webp  ${(statSync(full).size / 1024).toFixed(0)}KB`);
 }

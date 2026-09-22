@@ -624,6 +624,7 @@ function showIntroCar(): void {
   if (src) img.src = src;
   // The top-down drawing is laid on its side to fit; the hero is already wide.
   img.classList.toggle('intro-car__img--sprite', !car.hero);
+  img.classList.toggle('intro-car__img--zoom', !!car.hero);
 }
 
 // --- Route poster, zoomed ---------------------------------------------------
@@ -657,6 +658,35 @@ function openPosterZoom(): void {
 
 function closePosterZoom(): void {
   $('poster-lightbox').hidden = true;
+  $('poster-lightbox').classList.remove('lightbox--car');
+}
+
+/**
+ * A car's hero image full screen, like a route's painting: as tall as the
+ * screen, dragged across on a phone. The full-size copy loads only here.
+ */
+function openCarZoom(car: (typeof CARS)[number]): void {
+  if (!car.hero) return;
+  const box = $('poster-lightbox');
+  const img = $<HTMLImageElement>('lightbox-img');
+  // No route marks on a car.
+  $('lightbox-overlay').replaceChildren();
+  box.classList.add('lightbox--car');
+  img.src = car.hero;
+  if (car.heroFull) {
+    const full = car.heroFull;
+    const sharp = new Image();
+    sharp.onload = () => {
+      if (!box.hidden) img.src = full;
+    };
+    sharp.src = full;
+  }
+  box.hidden = false;
+  requestAnimationFrame(() => {
+    const scroller = $('lightbox-scroll');
+    scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+    scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) / 2;
+  });
 }
 
 function buildCarList(): void {
@@ -764,6 +794,17 @@ function carHero(car: (typeof CARS)[number]): HTMLElement {
     img.decoding = 'async';
     img.loading = 'lazy';
     hero.appendChild(img);
+    const zoom = document.createElement('span');
+    zoom.className = 'poster__zoom car-hero__zoom';
+    zoom.setAttribute('role', 'button');
+    zoom.setAttribute('aria-label', `Zoom into the ${car.name}`);
+    zoom.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></svg>';
+    zoom.addEventListener('click', (e) => {
+      // Inside the card's button: zoom, and do not pick the car as well.
+      e.stopPropagation();
+      openCarZoom(car);
+    });
+    hero.appendChild(zoom);
     return hero;
   }
   hero.classList.add('car-hero--placeholder');
@@ -1299,6 +1340,10 @@ $('btn-drive').addEventListener('click', () => {
 $('btn-garage').addEventListener('click', () => openGarage('title'));
 $('btn-intro-car').addEventListener('click', () => openGarage('intro'));
 $('poster-art').addEventListener('click', openPosterZoom);
+$('intro-car-sprite').addEventListener('click', () => openCarZoom(carById(settings.carId)));
+$('intro-car-sprite').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') openCarZoom(carById(settings.carId));
+});
 $('poster-art').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') openPosterZoom();
 });

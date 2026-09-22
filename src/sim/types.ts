@@ -141,6 +141,8 @@ export interface CarParams {
   sprite?: { path: string; pixelsPerMetre: number };
   /** Garage hero image. A drawn placeholder stands in until it exists. */
   hero?: string;
+  /** The hero at full size, loaded only when it is zoomed into. */
+  heroFull?: string;
   tint?: string;
   /** How the car takes to a throttle-controls drift. See DriftFeel. */
   driftFeel?: DriftFeel;

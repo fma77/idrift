@@ -980,3 +980,18 @@ input[type='range']::-moz-range-thumb {
   background: none;
   cursor: pointer;
 }
+
+/* --- Cars: tap to zoom, like the route posters ---------------------------- */
+
+.car-hero__zoom {
+  cursor: zoom-in;
+}
+
+.intro-car__img--zoom {
+  cursor: zoom-in;
+}
+
+/* A car is transparent art: it sits on the card's paper, not on ink. */
+.lightbox--car {
+  background: var(--paper-2);
+}
