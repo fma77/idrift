@@ -1,0 +1,39 @@
+﻿Group,Characteristic,Used in,Note,Hachiroku,Rotary,Godzilla,Scooby,Yellowbird,Silvia,Hellcat
+What the garage shows,"Top speed, km/h",All modes,1,210,235,290,205,342,250,320
+What the garage shows,"0-100, s",Display,2,6.5,5,3.5,4,4,4.5,3.9
+What the garage shows,★ Acceleration,Display,3,2,3,5,5,5,4,5
+What the garage shows,★ Top speed,Display,3,2,3,5,2,5,4,5
+What the garage shows,★ Grip,Display,3,3,3,5,5,4,3,2
+What the garage shows,★ Drift,Display,3,4,5,3,3,5,5,4
+What the garage shows,★ Agility,Display,3,5,4,2,4,3,4,1
+What the garage shows,★ Stability,Display,3,5,4,5,5,1,4,3
+Speed and steering,Top speed (game units),All modes,,42,47,58,41,68.4,50,64
+Speed and steering,Acceleration,All modes,,4.18,5.21,7.01,6.85,5.92,5.68,6.15
+Speed and steering,Turn rate: how fast the nose can swing,All modes,,2.3,2.15,1.85,2.15,2,2.15,1.7
+Speed and steering,Turn-in speed: speed above which steering gets harder,All modes,,6.5,7.5,9.5,7.5,8.5,7.5,10.5
+Speed and steering,Steering lock (radians),All modes,,0.6,0.56,0.52,0.56,0.55,0.62,0.62
+Speed and steering,Turn response: how quickly steering takes effect,Time Attack,,7.5,6.5,4.5,6.5,5.5,6.5,3.5
+Grip and sliding,Grip,Time Attack,4,1.08,1.08,1.24,1.24,1.16,1.08,1
+Grip and sliding,Break angle: how far before the rear lets go,Time Attack,,0.12,0.11,0.14,0.14,0.11,0.11,0.12
+Grip and sliding,Regrip angle: how straight before it grips again,Time Attack,,0.06,0.055,0.06,0.06,0.04,0.055,0.05
+Grip and sliding,"Slide friction, low speed",Time Attack,,0.5,0.45,0.6,0.6,0.45,0.45,0.5
+Grip and sliding,"Slide friction, high speed",Time Attack,,1.45,1.35,1.55,1.55,1.35,1.35,1.45
+Grip and sliding,Self-align: how hard it straightens itself,Time Attack,,2.6,2.2,2.6,2.6,1.8,2.2,2
+Body,Centre of mass to front axle (m),All modes,5,1.1,1.22,1.34,1.2,1.35,1.2,1.3
+Body,Centre of mass to rear axle (m),All modes,5,1.3,1.38,1.36,1.3,1.1,1.35,1.65
+Body,Width (m),All modes,5,1.68,1.76,1.82,1.74,1.84,1.7,1.92
+Body,Length (m),Drift Run,6,4.2,4.52,4.68,4.4,4.3,4.52,5.03
+"Drift feel (1.00 is neutral, higher is more)",Hold: how easily a slide holds its angle,Drift Run,,1,1.05,0.85,0.85,1.05,1.05,1
+"Drift feel (1.00 is neutral, higher is more)",Runaway: too much throttle swings the tail round,Drift Run,,0.85,1,0.85,0.85,1.6,1,1.35
+"Drift feel (1.00 is neutral, higher is more)",Rate: how fast the angle builds,Drift Run,,1,1.1,0.9,0.9,1.15,1.05,0.85
+"Drift feel (1.00 is neutral, higher is more)",Swing: speed of a side-to-side change of direction,Drift Run,,1.1,1.15,0.7,0.9,1.2,1.1,0.75
+"Drift feel (1.00 is neutral, higher is more)","Pivot: how far forward it turns (higher, wider tail)",Drift Run,,0.85,0.85,0.8,0.75,1,0.9,0.8
+"Drift feel (1.00 is neutral, higher is more)",Momentum: how much it keeps its line while sliding,Drift Run,,1.3,1,1.2,0.9,1,1.1,1.35
+
+Note,Text
+1,"The garage figure is the car's real top speed, converted from the game's own number to real-world km/h."
+2,"The 0-100 time is only shown as text, but each car's acceleration is set so that it reaches 100 km/h in that time. A test checks this for every car."
+3,"The stars change nothing in the game. They are the guide the real numbers were set from, but the game never reads them: change a star, and the real numbers have to be moved to match."
+4,Grip also sets how fast Time Attack Easy lets the car take a corner before it brakes for you.
+5,"These position the four wheels: when wheels count as off the road (dirt, and the off-road slowdown in Time Attack) and where the wheels are drawn. The front distance also sets the turning point for Pivot in Drift Run."
+6,Length decides when the tail hits the wall at big drift angles in Drift Run. In all modes it also sets the size the car is drawn at.
