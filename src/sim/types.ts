@@ -176,6 +176,11 @@ export interface DriftFeel {
    * speed and runs a little wider.
    */
   momentum: number;
+  /**
+   * How quickly the tyres build and reverse their sideways force in a drift.
+   * A light car answers quickly; a heavy one takes longer to change direction.
+   */
+  response: number;
 }
 
 export interface CarStats {
@@ -387,6 +392,19 @@ export interface SimState {
   handbrakeTicks: number;
   /** True from that press until the button is let go. */
   handbrakeOn: boolean;
+  /**
+   * Drifting: how fast the direction of travel is turning, rad/s. Carried from
+   * tick to tick because it can only change as fast as the tyres build force.
+   */
+  pathTurn: number;
+  /** Drifting: metres left of the centreline the game is steering for, gliding to its target. */
+  lineOffset: number;
+  /** Drifting: the drift angle, slowly smoothed, that places the line. */
+  lineAngle: number;
+  /** Drifting: rad/s the drift angle is changing, which can only speed up or slow down so fast. */
+  angleRate: number;
+  /** Ticks a flick has run past its time, still swinging the car into the corner. */
+  flickOver: number;
 
   // --- Derived, cached for renderer/audio/scoring; never an integration input ---
   /** 0..1. How much drive the car is using: 0 while it brakes for a corner, pulsing in a slide. */

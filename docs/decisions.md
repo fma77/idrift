@@ -402,3 +402,24 @@ Four were caught by the headless harness and would have been miserable to find b
   recorded anyway, so it is cheap to add later.
 - Supplied art. The loading, rotation and fallback paths all exist and are
   exercised; there are simply no image files yet.
+
+## Drift Run: inertia in the drift
+
+The throttle-controls drift is kinematic: the game steers the direction of travel
+and lays the body at the drift angle to it. Without inertia in either, the path
+could reverse in a single tick and the angle start swinging at full rate in one;
+because the body turns about a point near its front axle, that threw the whole
+car sideways (measured at 50-115g). Four limits in `throttleDrift.ts` fix it:
+
+- **Tyre response** (`TYRE_RESPONSE`, 8 g/s, per car `driftFeel.response`): the
+  path's corrections -- onto the line, across it in a transition -- build and
+  reverse at a limited rate. Following the road's own bend is not limited: the
+  road curves smoothly, and delaying that too only ran the car wide into walls.
+- **Line glide** (`LINE_GLIDE`): in a transition the line moves across the road
+  rather than jumping to the other side.
+- **Smoothed angle for the line** (`LINE_ANGLE_SMOOTHING`): throttle moving the
+  angle no longer nudges the car sideways.
+- **Swing inertia** (`SWING_ACCEL`, faster to catch than to start, and faster
+  still in a handbrake flick, which may run on until the car is into the corner).
+
+`tests/sim.test.mjs` checks the car's real sideways acceleration stays under 20g.

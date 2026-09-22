@@ -65,6 +65,7 @@ Every characteristic of every car, and what it actually affects.
 | Swing: speed of a side-to-side change of direction | Drift Run | 1.1 | 1.15 | 0.7 | 0.9 | 1.2 | 1.1 | 0.75 |
 | Pivot: how far forward it turns (higher, wider tail) | Drift Run | 0.85 | 0.85 | 0.8 | 0.75 | 1 | 0.9 | 0.8 |
 | Momentum: how much it keeps its line while sliding | Drift Run | 1.3 | 1 | 1.2 | 0.9 | 1 | 1.1 | 1.35 |
+| Response: how quickly the tyres build and reverse sideways force | Drift Run | 1.3 | 1.15 | 0.8 | 1.05 | 1.1 | 1.15 | 0.75 |
 
 ## Notes
 

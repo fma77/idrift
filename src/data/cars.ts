@@ -43,7 +43,7 @@ export const CARS: CarParams[] = [
     bodyWidth: 1.68,
     maxWheelAngle: 0.6,
     engine: 'na4',
-    driftFeel: { hold: 1, runaway: 0.85, rate: 1, swing: 1.1, pivot: 0.85, momentum: 1.3 },
+    driftFeel: { hold: 1, runaway: 0.85, rate: 1, swing: 1.1, pivot: 0.85, momentum: 1.3, response: 1.3 },
     stats: { accel: 2, topSpeed: 2, grip: 3, drift: 4, agility: 5, stability: 5 },
     zeroTo100: 6.5,
     tagline:
@@ -77,7 +77,7 @@ export const CARS: CarParams[] = [
     bodyWidth: 1.76,
     maxWheelAngle: 0.56,
     engine: 'rotary',
-    driftFeel: { hold: 1.05, runaway: 1, rate: 1.1, swing: 1.15, pivot: 0.85, momentum: 1 },
+    driftFeel: { hold: 1.05, runaway: 1, rate: 1.1, swing: 1.15, pivot: 0.85, momentum: 1, response: 1.15 },
     stats: { accel: 3, topSpeed: 3, grip: 3, drift: 5, agility: 4, stability: 4 },
     zeroTo100: 5,
     tagline:
@@ -114,7 +114,7 @@ export const CARS: CarParams[] = [
     bodyWidth: 1.82,
     maxWheelAngle: 0.52,
     engine: 'turbo6',
-    driftFeel: { hold: 0.85, runaway: 0.85, rate: 0.9, swing: 0.7, pivot: 0.8, momentum: 1.2 },
+    driftFeel: { hold: 0.85, runaway: 0.85, rate: 0.9, swing: 0.7, pivot: 0.8, momentum: 1.2, response: 0.8 },
     stats: { accel: 5, topSpeed: 5, grip: 5, drift: 3, agility: 2, stability: 5 },
     zeroTo100: 3.5,
     tagline:
@@ -149,7 +149,7 @@ export const CARS: CarParams[] = [
     bodyWidth: 1.74,
     maxWheelAngle: 0.56,
     engine: 'boxer4',
-    driftFeel: { hold: 0.85, runaway: 0.85, rate: 0.9, swing: 0.9, pivot: 0.75, momentum: 0.9 },
+    driftFeel: { hold: 0.85, runaway: 0.85, rate: 0.9, swing: 0.9, pivot: 0.75, momentum: 0.9, response: 1.05 },
     stats: { accel: 5, topSpeed: 2, grip: 5, drift: 3, agility: 4, stability: 5 },
     zeroTo100: 4,
     tagline:
@@ -184,7 +184,7 @@ export const CARS: CarParams[] = [
     bodyWidth: 1.84,
     maxWheelAngle: 0.55,
     engine: 'flat6tt',
-    driftFeel: { hold: 1.05, runaway: 1.6, rate: 1.15, swing: 1.2, pivot: 1, momentum: 1 },
+    driftFeel: { hold: 1.05, runaway: 1.6, rate: 1.15, swing: 1.2, pivot: 1, momentum: 1, response: 1.1 },
     stats: { accel: 5, topSpeed: 5, grip: 4, drift: 5, agility: 3, stability: 1 },
     zeroTo100: 4,
     tagline:
@@ -218,7 +218,7 @@ export const CARS: CarParams[] = [
     bodyWidth: 1.7,
     maxWheelAngle: 0.62,
     engine: 'turbo4',
-    driftFeel: { hold: 1.05, runaway: 1, rate: 1.05, swing: 1.1, pivot: 0.9, momentum: 1.1 },
+    driftFeel: { hold: 1.05, runaway: 1, rate: 1.05, swing: 1.1, pivot: 0.9, momentum: 1.1, response: 1.15 },
     stats: { accel: 4, topSpeed: 4, grip: 3, drift: 5, agility: 4, stability: 4 },
     zeroTo100: 4.5,
     tagline:
@@ -255,7 +255,7 @@ export const CARS: CarParams[] = [
     // An angle kit: as much lock as the Silvia.
     maxWheelAngle: 0.62,
     engine: 'scv8',
-    driftFeel: { hold: 1, runaway: 1.35, rate: 0.85, swing: 0.75, pivot: 0.8, momentum: 1.35 },
+    driftFeel: { hold: 1, runaway: 1.35, rate: 0.85, swing: 0.75, pivot: 0.8, momentum: 1.35, response: 0.75 },
     stats: { accel: 5, topSpeed: 5, grip: 2, drift: 4, agility: 1, stability: 3 },
     zeroTo100: 3.9,
     tagline:

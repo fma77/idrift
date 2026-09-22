@@ -51,6 +51,7 @@ const ROWS = [
   ['Drift feel (1.00 is neutral, higher is more)', 'Swing: speed of a side-to-side change of direction', 'Drift Run', '', (c) => c.driftFeel?.swing ?? 1],
   ['Drift feel (1.00 is neutral, higher is more)', 'Pivot: how far forward it turns (higher, wider tail)', 'Drift Run', '', (c) => c.driftFeel?.pivot ?? 0.85],
   ['Drift feel (1.00 is neutral, higher is more)', 'Momentum: how much it keeps its line while sliding', 'Drift Run', '', (c) => c.driftFeel?.momentum ?? 1],
+  ['Drift feel (1.00 is neutral, higher is more)', 'Response: how quickly the tyres build and reverse sideways force', 'Drift Run', '', (c) => c.driftFeel?.response ?? 1],
 ];
 
 const NOTES = [

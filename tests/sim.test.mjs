@@ -24,6 +24,7 @@ import { driveBot, DEFAULT_BOT } from '../src/bot/autopilot.ts';
 import { configFor, DRIFT_CONTROL } from '../src/data/assist.ts';
 import { cornerSpeedLimit, roadKeepingTurn } from '../src/sim/model/assist.ts';
 import { buildGhost, ghostTimeGap } from '../src/ghost.ts';
+import { upcomingCornerSign } from '../src/sim/model/throttleDrift.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const route = JSON.parse(readFileSync(resolve(here, '../public/routes/akari-downhill.json'), 'utf8'));
@@ -990,4 +991,38 @@ test('ghost: a replay that does not belong to the route is refused', () => {
   for (let i = 0; i < 120; i++) rec.push(quantiseInput(0.2));
   assert.equal(buildGhost('BOT', car, route, configFor('timeAttack'), rec.encode()), null);
   assert.equal(buildGhost('BOT', car, route, configFor('timeAttack'), new Uint8Array(0)), null);
+});
+
+test('throttle controls: a drifting car never jolts sideways', () => {
+  // The drift used to steer its path and swing its body with no inertia: the
+  // path could reverse in a tick and the angle start swinging at full rate in
+  // one, which read as the whole car sliding bodily sideways. Measured here as
+  // the car's actual acceleration, worked out from where it is each tick.
+  const g = 9.80665;
+  const dt = 1 / TICK_RATE;
+  const config = configFor('driftRun', 'throttle');
+  for (const id of ['kaido-zen-r', 'yellowbird', 'hellcat']) {
+    const car = carById(id);
+    const state = createSimState(route, car);
+    const trail = [];
+    let peak = 0;
+    let held = 0;
+    while (!state.finished && state.tick < TICK_RATE * 200) {
+      const sign = upcomingCornerSign(state, route);
+      if (state.speed > 10 && sign !== 0 && sign !== state.driftDir && held === 0) held = 25;
+      if (held > 0) held--;
+      stepSim(state, { steer: 0, throttle: 0.6, initiate: held > 0 }, car, route, config);
+      trail.push({ x: state.x, y: state.y, h: state.heading, ok: !state.hitThisTick && state.spinTicks === 0 && state.driftDir !== 0 });
+      if (trail.length > 3) trail.shift();
+      if (trail.length < 3 || !trail.every((p) => p.ok)) continue;
+      const [a, b, c] = trail;
+      const ax = (c.x - 2 * b.x + a.x) / (dt * dt);
+      const ay = (c.y - 2 * b.y + a.y) / (dt * dt);
+      peak = Math.max(peak, Math.abs(-ax * Math.sin(b.h) + ay * Math.cos(b.h)) / g);
+    }
+    assert.ok(state.finished, `${car.name} did not finish`);
+    // It was 50-115g. A real car cannot pass about 1.5g; the swing of the body
+    // about its front axle adds some on top, but nothing like a jolt.
+    assert.ok(peak < 20, `${car.name} jolted sideways at ${peak.toFixed(1)}g`);
+  }
 });

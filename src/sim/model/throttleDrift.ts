@@ -99,6 +99,49 @@ const SHORTFALL_GAIN = 1.4;
 const SHORTFALL_BRAKING = 14;
 /** Fraction of the sideways grip a drift is allowed to use for speed; the rest is for the line. */
 const DRIFT_SPEED_MARGIN = 0.78;
+/**
+ * g per second: how fast a drifting car's sideways force can change, for a car
+ * of response 1. Real tyres take time to build and to reverse their force, so
+ * the direction of travel cannot flick from turning one way to the other in a
+ * tick. Without this limit it did, many times a run, and the car was seen to
+ * slide bodily sideways with its angle unchanged -- the one thing a car cannot do.
+ */
+const TYRE_RESPONSE = 8;
+/**
+ * Seconds for the line the game steers for to glide most of the way to a new
+ * one. In a transition the outside of the corner changes sides; jumping the
+ * target there hauled the whole car across the road.
+ */
+const LINE_GLIDE = 0.25;
+/**
+ * Seconds over which the drift angle placing the line is smoothed. The line
+ * allows for how far the tail swings out, and following every change of angle
+ * directly moved the car sideways each time the throttle moved.
+ */
+const LINE_ANGLE_SMOOTHING = 0.8;
+/**
+ * rad/s^2: how fast the body can start or stop swinging, for a car of swing 1.
+ * The angle used to go from still to swinging at full rate in a single tick,
+ * and because the body turns about a point near the front axle, that flung the
+ * whole car sideways -- the largest of the unnatural movements. A car's
+ * rotation has inertia: it winds up and winds down.
+ */
+const SWING_ACCEL = 15;
+/**
+ * The handbrake yanks the tail round far harder than a car rotates on its own,
+ * so during a flick the swing may wind up this many times faster.
+ */
+const FLICK_SWING_ACCEL = 2;
+/** How many times faster a swing can be slowed than started. */
+const SWING_CATCH = 3;
+/**
+ * Seconds a flick may run on past its time while the car has not yet swung
+ * into the corner. A heavy car's swing winds up slowly; ending the flick on the
+ * clock left it straight, and the drift ended before it began.
+ */
+const FLICK_OVERRUN = 0.5;
+/** Share of the flick angle that counts as the car having swung into the corner. */
+const FLICK_DONE = 0.7;
 /** Metres ahead a corner has to be for the car to start setting up on its outside. */
 const SETUP_REACH = 45;
 /** Radius under which a bend counts as a corner to flick into. */
@@ -140,10 +183,17 @@ export function stepThrottleControls(
         state.speed *= 1 - FLICK_SCRUB;
         state.drift.entryFactor = entryTiming(state, route);
         state.driftAngle = 0;
+        state.pathTurn = 0;
+        state.angleRate = 0;
+        state.flickOver = 0;
+        state.lineOffset = state.lateralOffset;
+        state.lineAngle = 0;
       } else {
         // A transition: the angle is now measured against the new direction,
         // so the nose swings through straight to the other side.
         state.driftAngle = -state.driftAngle;
+        state.angleRate = -state.angleRate;
+        state.flickOver = 0;
       }
       state.driftDir = sign;
       state.flickTicks = Math.max(1, Math.round(config.drift.flickTime / dt));
@@ -207,7 +257,12 @@ function stepDrift(
     // a heavy car.
     const rate = angle < 0 ? TRANSITION_RATE * (car.driftFeel?.swing ?? 1) : FLICK_RATE;
     if (elapsed < total * 0.3 || angle < target) angle = moveToward(angle, target, rate * dt);
-    state.flickTicks--;
+    // Out of time but not yet into the corner: keep swinging, for a while.
+    if (state.flickTicks === 1 && angle < flickAngle * FLICK_DONE && state.flickOver < FLICK_OVERRUN / dt) {
+      state.flickOver++;
+    } else {
+      state.flickTicks--;
+    }
   } else if (onStraight(state, route)) {
     // Corner exit. The corner is behind and the road ahead is straight, so the
     // car straightens -- whatever the throttle is doing, because on a straight
@@ -237,6 +292,17 @@ function stepDrift(
   const overHeld = state.handbrakeOn && held > HOLD_FULL;
   if (overHeld) angle += HANDBRAKE_RATE * dt;
 
+  // The body winds up to a swing and winds down from one: whatever the angle
+  // wants to do, its rate of change can only change so fast.
+  const wantedRate = (angle - state.driftAngle) / dt;
+  // Slowing a swing is quicker than starting one: countersteer catches a
+  // rotation faster than the car builds it, or every swing would overshoot.
+  const slowing = wantedRate * state.angleRate < 0 || Math.abs(wantedRate) < Math.abs(state.angleRate);
+  const swingAccel =
+    SWING_ACCEL * (car.driftFeel?.swing ?? 1) * (state.flickTicks > 0 ? FLICK_SWING_ACCEL : 1) * (slowing ? SWING_CATCH : 1);
+  state.angleRate = moveToward(state.angleRate, wantedRate, swingAccel * dt);
+  angle = state.driftAngle + state.angleRate * dt;
+
   if (angle > d.spinAngle) {
     state.handbrakeOn = false;
     state.driftAngle = angle;
@@ -255,16 +321,31 @@ function stepDrift(
   // nothing like a drift line.
   const i = state.sampleIndex;
   const half = route.samples.halfWidth[i];
-  const tailSwing = (car.bodyLength / 2) * sin(clamp(angle, 0, HALF_PI));
+  // Placed by a slowly smoothed angle, so the throttle moving the angle does
+  // not move the line -- and so the car -- sideways with it.
+  state.lineAngle += (angle - state.lineAngle) * (dt / (LINE_ANGLE_SMOOTHING + dt));
+  const tailSwing = (car.bodyLength / 2) * sin(clamp(state.lineAngle, 0, HALF_PI));
   const centre = Math.max(0, half * d.tailLine - tailSwing);
+  // The line glides to its target rather than jumping: in a transition the
+  // outside changes sides, and the car arcs across the road to it.
+  state.lineOffset += (-dir * centre - state.lineOffset) * (dt / (LINE_GLIDE + dt));
   // A car with more momentum is lazier to pull back to the line.
   const momentum = car.driftFeel?.momentum ?? 1;
-  const want = autoSteerYaw(state, route, -dir * centre, DRIFT_LINE_GAIN / Math.sqrt(momentum));
+  const want = autoSteerYaw(state, route, state.lineOffset, DRIFT_LINE_GAIN / Math.sqrt(momentum));
   let v = state.speed;
   const maxTurn = (d.driftGrip * GRAVITY * surfaceGrip) / Math.max(v, 1);
+  // The tyres build sideways force at a limited rate: the turn of the path
+  // moves towards what the line wants, no faster than that.
+  // Only the corrections -- onto the line, across to the other side in a
+  // transition -- are limited. Following the road's own bend is not: the road
+  // curves smoothly, and delaying that too just ran the car wide.
+  const bend = roadTurn(state, route, state.lineOffset);
+  const maxTurnChange = (TYRE_RESPONSE * (car.driftFeel?.response ?? 1) * GRAVITY) / Math.max(v, 1);
+  state.pathTurn = moveToward(state.pathTurn, want - bend, maxTurnChange * dt);
+  const turn = clamp(bend + state.pathTurn, -maxTurn, maxTurn);
   let travel = travelHeading(state);
   const oldNose = wrapAngle(state.heading - travel);
-  travel = wrapAngle(travel + clamp(want, -maxTurn, maxTurn) * dt);
+  travel = wrapAngle(travel + turn * dt);
 
   // The line is asking for more grip than there is: the corner is tighter than
   // this speed can hold. Scrub, which is what a driver does -- otherwise the
@@ -407,6 +488,7 @@ export function endDrift(state: SimState): void {
   state.driftAngle = 0;
   state.flickTicks = 0;
   state.spinTicks = 0;
+  state.angleRate = 0;
 }
 
 /**
@@ -420,23 +502,30 @@ export function autoSteerYaw(
   lineGain = LINE_GAIN,
 ): number {
   const s = route.samples;
-  const last = s.x.length - 1;
-  const ahead = Math.min(last, state.sampleIndex + Math.round((3 + state.speed * 0.22) / route.sampleSpacing));
   const travel = travelHeading(state);
   const line = atan2(-lineGain * (state.lateralOffset - targetOffset), state.speed + 4);
   // Heading error against the road where the car is, not where it is going.
   // Comparing with the heading a few metres ahead builds in a turn-in the
-  // curvature term below already provides, so on any bend the car settled two
+  // road-bend term below already provides, so on any bend the car settled two
   // or three metres to the inside -- which is exactly the apex-hugging line it
   // was not supposed to take. The look-ahead belongs to the curvature alone.
   const error = wrapAngle(s.heading[state.sampleIndex] - travel) + line;
-  // A line offset from the centreline is a different circle: wider round the
-  // outside of a bend, tighter round the inside. Feeding forward the
-  // centreline's curvature on an outside line turns the car in too early, and
-  // it ends up at the apex whatever the line term says.
+  return roadTurn(state, route, targetOffset) + HEADING_GAIN * error;
+}
+
+/**
+ * The part of the auto-steer that just follows the road's own bend, rad/s,
+ * on a line `targetOffset` metres left of the centreline. A line offset from
+ * the centreline is a different circle: wider round the outside of a bend,
+ * tighter round the inside. Feeding forward the centreline's curvature on an
+ * outside line turns the car in too early, and it ends up at the apex whatever
+ * the line term says.
+ */
+function roadTurn(state: SimState, route: RouteData, targetOffset: number): number {
+  const s = route.samples;
+  const ahead = Math.min(s.x.length - 1, state.sampleIndex + Math.round((3 + state.speed * 0.22) / route.sampleSpacing));
   const k = s.curvature[ahead];
-  const pathCurvature = k / Math.max(0.2, 1 - k * targetOffset);
-  return pathCurvature * state.speed + HEADING_GAIN * error;
+  return (k / Math.max(0.2, 1 - k * targetOffset)) * state.speed;
 }
 
 /**
