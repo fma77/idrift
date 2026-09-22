@@ -3,6 +3,7 @@ import type { RouteData, SimConfig, SimState } from '../sim/types.ts';
 import type { DriftGauge } from './driftGauge.ts';
 import { realKmh, WORLD_SCALE } from '../data/scale.ts';
 import { holdPhase, HOLD_OVER } from '../sim/model/throttleDrift.ts';
+import { ghostPointsGap, ghostTimeGap, type GhostTrack } from '../ghost.ts';
 
 /** Seconds the hold meter spans: past HOLD_OVER, with room to see it overshoot. */
 const HOLD_SCALE = HOLD_OVER * 1.6;
@@ -41,6 +42,10 @@ export interface HudElements {
   zoneMarks: HTMLElement;
   /** Shown in Drift Run with throttle controls only. */
   gauge: DriftGauge;
+  /** "GHOST +0.42" beside the distance left, when racing one. */
+  ghostGap: HTMLElement;
+  /** Where the ghost is, on the progress bar. */
+  ghostMark: HTMLElement;
 }
 
 /** Severity 1-6 to a chevron count. Six is a hairpin. */
@@ -64,9 +69,54 @@ export class Hud {
   private zoneResults: ('ahead' | 'in' | 'cleared' | 'missed')[] = [];
 
   private readonly el: HudElements;
+  private ghost: GhostTrack | null = null;
 
   constructor(el: HudElements) {
     this.el = el;
+  }
+
+  /** The ghost this run races, or null. */
+  setGhost(ghost: GhostTrack | null): void {
+    this.ghost = ghost;
+    this.el.ghostGap.hidden = !ghost;
+    this.el.ghostMark.hidden = !ghost;
+    this.el.ghostGap.textContent = '';
+    delete this.el.ghostGap.dataset.lead;
+  }
+
+  /**
+   * The gap to the ghost, measured where the player is on the road: in Time
+   * Attack the seconds between the two passing this point, in Drift Run the
+   * points the ghost had here. Measuring at the same place rather than the
+   * same moment is what makes the number fair -- a car that is behind has not
+   * yet reached the corners the ghost has already scored.
+   */
+  private updateGhost(state: SimState, route: RouteData, config: SimConfig): void {
+    const ghost = this.ghost;
+    if (!ghost) return;
+    const el = this.el;
+    const g = Math.min(state.tick, ghost.ticks);
+    el.ghostMark.style.left = `${Math.min(100, (ghost.reach[g] / route.length) * 100).toFixed(1)}%`;
+
+    // Nothing to compare yet on the start line.
+    if (state.tick === 0 || state.distance < 1) {
+      el.ghostGap.textContent = 'GHOST';
+      delete el.ghostGap.dataset.lead;
+      return;
+    }
+    if (config.mode === 'driftRun') {
+      const gap = ghostPointsGap(ghost, state.distance, state.drift.banked + state.drift.pending);
+      if (gap === null) return;
+      const n = Math.round(gap);
+      el.ghostGap.textContent = `GHOST ${n >= 0 ? '+' : '−'}${Math.abs(n).toLocaleString('en-GB')}`;
+      el.ghostGap.dataset.lead = String(n >= 0);
+    } else {
+      const gap = ghostTimeGap(ghost, state.distance, state.tick, state.penaltyTicks);
+      if (gap === null) return;
+      const seconds = gap / TICK_RATE;
+      el.ghostGap.textContent = `GHOST ${seconds > 0 ? '+' : '−'}${Math.abs(seconds).toFixed(2)}`;
+      el.ghostGap.dataset.lead = String(seconds <= 0);
+    }
   }
 
   setDriftPad(pad: HTMLElement): void {
@@ -136,6 +186,7 @@ export class Hud {
     el.progressFill.style.width = `${Math.min(100, Math.max(0, (state.distance / route.length) * 100)).toFixed(1)}%`;
     el.progressLabel.textContent =
       remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}km` : `${Math.round(remaining / 10) * 10}m`;
+    this.updateGhost(state, route, config);
     if (config.controls === 'throttle') {
       this.updateHold(state);
       el.gauge.update(state.driftAngle, state.throttle, state.driftDir !== 0 || state.spinTicks > 0, config.drift);

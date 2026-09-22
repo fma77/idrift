@@ -19,6 +19,7 @@ import type { InputController } from './input/input.ts';
 import type { Renderer, RenderSettings } from './render/renderer.ts';
 import type { Hud } from './render/hud.ts';
 import type { EngineAudio } from './audio/engine.ts';
+import { ghostPose, type GhostTrack } from './ghost.ts';
 
 /**
  * The game loop.
@@ -74,6 +75,8 @@ export class GameSession {
     private hud: Hud,
     private audio: EngineAudio | null,
     private renderSettings: RenderSettings,
+    /** A leaderboard run to race against, driven in full before the start. */
+    readonly ghost: GhostTrack | null = null,
   ) {
     this.state = createSimState(route, car);
     this.prevState = cloneSimState(this.state);
@@ -201,6 +204,7 @@ export class GameSession {
       this.car,
       this.renderSettings,
       deltaSeconds,
+      this.ghost ? ghostPose(this.ghost, this.state.tick, alpha) : null,
     );
     this.hud.update(this.state, this.route, this.config);
     this.audio?.update(this.state, this.car);

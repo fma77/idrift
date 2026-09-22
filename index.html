@@ -114,6 +114,11 @@
             <button class="level-btn" id="btn-level-pro" type="button" aria-pressed="false">Pro</button>
             <span class="caption level-row__note" id="level-note">The car brakes for corners.</span>
           </div>
+          <!-- The leaderboard run Go will race, picked with a row's Ghost button. -->
+          <div class="ghost-note" id="ghost-note" hidden>
+            <span class="caption" id="ghost-note-text"></span>
+            <button class="btn--text" id="btn-ghost-clear" type="button">Remove</button>
+          </div>
 
           <div class="board">
             <div class="board__head">
@@ -314,7 +319,9 @@
             <div class="progress__track">
               <div class="progress__fill" id="progress-fill"></div>
               <div class="progress__zones" id="zone-marks"></div>
+              <div class="progress__ghost" id="ghost-mark" hidden></div>
             </div>
+            <span class="progress__gap" id="ghost-gap" hidden></span>
             <span class="progress__label" id="progress-label">0m</span>
           </div>
 

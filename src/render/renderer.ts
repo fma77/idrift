@@ -7,6 +7,7 @@ import { TyreSmoke } from './smoke.ts';
 import { DirtSpray } from './dirt.ts';
 import { WorldArt } from './world.ts';
 import { themeFor, type WorldTheme } from './themes.ts';
+import type { GhostPose } from '../ghost.ts';
 
 /**
  * World renderer.
@@ -25,6 +26,8 @@ const INK_2 = '#2b2b2b';
 const PAPER = '#f4f1ea';
 const RULE = 'rgba(244,241,234,0.22)';
 const RED = '#e8402a';
+/** How solid a ghost car is drawn. */
+const GHOST_ALPHA = 0.42;
 /** Dirt on the ink world: dun earth and a darker clod. */
 const INK_DIRT: [string, string] = ['#8a7a60', '#5b5347'];
 
@@ -171,6 +174,7 @@ export class Renderer {
     car: CarParams,
     settings: RenderSettings,
     dtSeconds: number,
+    ghost: GhostPose | null = null,
   ): void {
     const view = interpolate(prev, state, alpha);
     this.prepareWorld(route);
@@ -221,6 +225,9 @@ export class Renderer {
       this.smoke.update(view, car, dtSeconds);
       this.smoke.draw(ctx, PAPER);
     }
+    // The ghost under the player's car: when the two overlap, the one being
+    // driven is the one that shows.
+    if (ghost) this.drawGhost(ctx, ghost, px);
     this.drawCar(ctx, view, car, px, theme);
 
     ctx.restore();
@@ -554,7 +561,7 @@ export class Renderer {
 
   private drawCar(
     ctx: CanvasRenderingContext2D,
-    view: SimState,
+    view: Pick<SimState, 'x' | 'y' | 'heading' | 'steerAngle'>,
     car: CarParams,
     px: number,
     theme: WorldTheme | null,
@@ -610,6 +617,18 @@ export class Renderer {
       drawWheels(ctx, car, view.steerAngle);
     }
 
+    ctx.restore();
+  }
+
+  /**
+   * Someone else's run: the same car drawing, see-through and without a
+   * shadow, so it reads as a memory of a car rather than one to avoid. It is
+   * not solid; the player drives straight through it.
+   */
+  private drawGhost(ctx: CanvasRenderingContext2D, ghost: GhostPose, px: number): void {
+    ctx.save();
+    ctx.globalAlpha = GHOST_ALPHA;
+    this.drawCar(ctx, ghost, ghost.car, px, null);
     ctx.restore();
   }
 

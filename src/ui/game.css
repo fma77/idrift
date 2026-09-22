@@ -1302,3 +1302,38 @@
 #game[data-input='keyboard'] .pro-zone {
   display: none;
 }
+
+/* --- Ghost: where it is on the bar, and the gap to it --------------------- */
+
+.progress__ghost {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1px;
+  background: rgba(244, 241, 234, 0.55);
+  pointer-events: none;
+}
+
+.progress__ghost[hidden],
+.progress__gap[hidden] {
+  display: none;
+}
+
+.progress__gap {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.progress__gap[data-lead='true'] {
+  color: #6fd14f;
+}
+
+.progress__gap[data-lead='false'] {
+  color: var(--red);
+}

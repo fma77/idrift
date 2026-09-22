@@ -444,7 +444,7 @@ input[type='range']::-moz-range-thumb {
 
 .board__row {
   display: grid;
-  grid-template-columns: 2.5ch 1fr auto;
+  grid-template-columns: 2.5ch 1fr auto auto;
   align-items: baseline;
   gap: var(--s-2) var(--s-3);
   padding: 10px 0;
@@ -935,4 +935,45 @@ input[type='range']::-moz-range-thumb {
 .level-row__note {
   flex-basis: 100%;
   margin-top: -2px;
+}
+
+/* --- Ghosts: race a leaderboard run --------------------------------------- */
+
+.board__ghost {
+  align-self: center;
+  padding: 4px 8px;
+  font-family: var(--body);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.board__ghost[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.ghost-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.ghost-note[hidden] {
+  display: none;
+}
+
+.ghost-note .btn--text {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
 }

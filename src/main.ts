@@ -25,13 +25,15 @@ import {
   markCompleted,
   saveReplay,
   compress,
+  decompress,
   bestKey,
 } from './storage/bests.ts';
+import { buildGhost, type GhostTrack } from './ghost.ts';
 import { loadDecoration } from './render/decoration.ts';
 import { getSprite, preload } from './render/sprites.ts';
 import { drawPosterOverlay } from './ui/poster.ts';
 import { flagElement } from './ui/flags.ts';
-import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
+import { submitScore, fetchBoard, fetchReplay, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
 import type { ApiMode, LeaderboardRow } from '../shared/api.ts';
 import { SIM_VERSION, TICK_RATE } from './sim/version.ts';
@@ -99,6 +101,22 @@ let boardMode: SimMode = 'driftRun';
 /** Row id of the score just posted, so it can be highlighted on the board. */
 let myLastRowId: string | null = null;
 
+/**
+ * The leaderboard run picked to race against. It belongs to one board: a
+ * ghost from the Drift Run board is not raced in Time Attack.
+ */
+interface GhostPick {
+  row: LeaderboardRow;
+  board: ApiMode;
+  routeId: string;
+  routeVersion: number;
+  /** Fetched as soon as it is picked, so Go does not wait on the network. */
+  input: Promise<Uint8Array>;
+}
+let ghostPick: GhostPick | null = null;
+/** The ghost the last run raced, for the results. */
+let runGhost: { row: LeaderboardRow; track: GhostTrack } | null = null;
+
 const renderer = new Renderer(canvas);
 const hud = new Hud({
   root: $('game'),
@@ -118,6 +136,8 @@ const hud = new Hud({
   zoneChip: $('zone-chip'),
   zoneMarks: $('zone-marks'),
   gauge: new DriftGauge($('drift-gauge')),
+  ghostGap: $('ghost-gap'),
+  ghostMark: $('ghost-mark'),
 });
 
 const input = new InputController();
@@ -221,6 +241,7 @@ function buildRouteList(): void {
 async function openIntro(entry: RouteEntry): Promise<void> {
   currentEntry = entry;
   currentRoute = await loadRoute(entry);
+  if (ghostPick && ghostPick.routeId !== currentRoute.id) setGhostPick(null);
   $('intro-name').textContent = entry.name;
   $('intro-location').textContent = entry.location;
   // Routes built from someone else's data say whose. Required by the ODbL for
@@ -264,6 +285,8 @@ function setBoardMode(mode: SimMode): void {
   $('btn-level-pro').setAttribute('aria-pressed', String(pro));
   $('level-note').textContent = pro ? 'You work the gas and brake.' : 'The car brakes for corners.';
   $('board-title').textContent = `Leaderboard · ${boardTitle(pageBoard())}`;
+  // A ghost belongs to the board it was picked from.
+  if (ghostPick && ghostPick.board !== pageBoard()) setGhostPick(null);
   void refreshBoard();
 }
 
@@ -317,7 +340,7 @@ async function refreshBoard(): Promise<void> {
       container.replaceChildren(caption('No times posted yet. Be first.'));
       return;
     }
-    container.replaceChildren(...board.rows.map((row) => boardRow(row, mode)));
+    container.replaceChildren(...board.rows.map((row) => boardRow(row, mode, key)));
   } catch (err) {
     const message =
       err instanceof LeaderboardError ? err.message : 'Could not reach the leaderboard.';
@@ -326,7 +349,7 @@ async function refreshBoard(): Promise<void> {
 }
 
 /** One leaderboard row, formatted for the board it is on -- not for whichever tab the route page last showed. */
-function boardRow(row: LeaderboardRow, mode: SimMode): HTMLElement {
+function boardRow(row: LeaderboardRow, mode: SimMode, board: ApiMode): HTMLElement {
   const el = document.createElement('div');
   el.className = row.id === myLastRowId ? 'board__row board__row--me' : 'board__row';
 
@@ -359,7 +382,79 @@ function boardRow(row: LeaderboardRow, mode: SimMode): HTMLElement {
   }
 
   el.append(rank, name, value);
+
+  // Race this run: its stored inputs, driven again beside the player.
+  if (row.hasReplay) {
+    const ghost = document.createElement('button');
+    ghost.type = 'button';
+    ghost.className = 'board__ghost';
+    ghost.textContent = 'Ghost';
+    ghost.dataset.ghostId = row.id;
+    ghost.setAttribute('aria-label', `Race ${row.playerName}'s ghost`);
+    ghost.setAttribute('aria-pressed', String(ghostPick?.row.id === row.id));
+    ghost.addEventListener('click', () => toggleGhost(row, board));
+    el.append(ghost);
+  } else {
+    el.append(document.createElement('span'));
+  }
   return el;
+}
+
+// --- Ghosts -----------------------------------------------------------------
+
+function toggleGhost(row: LeaderboardRow, board: ApiMode): void {
+  const route = currentRoute;
+  if (!route) return;
+  if (ghostPick?.row.id === row.id) {
+    setGhostPick(null);
+    return;
+  }
+  const input = fetchReplay(row.id).then((gz) => decompress(gz));
+  const pick: GhostPick = { row, board, routeId: route.id, routeVersion: route.version, input };
+  // The ghost's car art, so it is there when the race starts.
+  void preload([carById(row.carId).sprite?.path]);
+  input.catch(() => {
+    if (ghostPick !== pick) return;
+    setGhostPick(null);
+    showGhostNote(`Could not load ${row.playerName}'s ghost.`);
+  });
+  setGhostPick(pick);
+}
+
+function setGhostPick(pick: GhostPick | null): void {
+  ghostPick = pick;
+  for (const button of document.querySelectorAll<HTMLElement>('.board__ghost')) {
+    button.setAttribute('aria-pressed', String(!!pick && button.dataset.ghostId === pick.row.id));
+  }
+  if (pick) {
+    const r = pick.row;
+    const value = pick.board === 'driftRun' ? r.points.toLocaleString('en-GB') : formatTime(r.timeMs / 1000);
+    showGhostNote(`Racing ${r.playerName}'s ghost · ${carById(r.carId).name} · ${value}`, true);
+  } else {
+    showGhostNote('');
+  }
+}
+
+/** The line under the mode buttons saying which ghost Go will race. */
+function showGhostNote(text: string, removable = false): void {
+  $('ghost-note-text').textContent = text;
+  $('btn-ghost-clear').hidden = !removable;
+  $('ghost-note').hidden = text === '';
+}
+
+/** The picked ghost, driven in full, if it belongs to this run's route and board. */
+async function loadGhostFor(route: RouteData, board: ApiMode, mode: SimMode): Promise<GhostTrack | null> {
+  const pick = ghostPick;
+  if (!pick || pick.board !== board || pick.routeId !== route.id || pick.routeVersion !== route.version) return null;
+  try {
+    const bytes = await pick.input;
+    // The controls the ghost was driven with: only throttle Drift Runs are
+    // posted, and Time Attack's board says which level.
+    const controls: Controls = board === 'driftRun' ? 'throttle' : board === 'timeAttackPro' ? 'pedals' : 'steer';
+    return buildGhost(pick.row.playerName, carById(pick.row.carId), route, configFor(mode, controls), bytes);
+  } catch {
+    return null;
+  }
 }
 
 function caption(text: string): HTMLElement {
@@ -844,6 +939,12 @@ async function startRun(mode: SimMode): Promise<void> {
   // requires before an AudioContext will run.
   void audio.start(car.engine);
 
+  // After the audio: that has to start inside the tap on Go, before any wait.
+  const ghostTrack = await loadGhostFor(currentRoute, boardFor(mode, currentControls), mode);
+  runGhost = ghostTrack && ghostPick ? { row: ghostPick.row, track: ghostTrack } : null;
+  if (ghostPick && !ghostTrack) showGhostNote(`${ghostPick.row.playerName}'s ghost could not be replayed.`);
+  hud.setGhost(ghostTrack);
+
   session = new GameSession(
     currentRoute,
     car,
@@ -853,6 +954,7 @@ async function startRun(mode: SimMode): Promise<void> {
     hud,
     audio,
     renderSettings,
+    ghostTrack,
   );
 
   const countdownOverlay = $('overlay-countdown');
@@ -964,6 +1066,24 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
     if (result.wallHits > 0) rows.push(statRow('Time penalty', `+${(result.wallHits * 2).toFixed(0)}s`));
   }
 
+  if (runGhost) {
+    const g = runGhost.row;
+    if (currentMode === 'driftRun') {
+      const diff = result.points - g.points;
+      rows.push(
+        statRow(
+          `vs ${g.playerName}'s ghost`,
+          diff >= 0 ? `Won by ${diff.toLocaleString('en-GB')}` : `Lost by ${(-diff).toLocaleString('en-GB')}`,
+        ),
+      );
+    } else {
+      const diff = result.timeSeconds - g.timeMs / 1000;
+      rows.push(
+        statRow(`vs ${g.playerName}'s ghost`, diff <= 0 ? `Won by ${(-diff).toFixed(2)}s` : `Lost by ${diff.toFixed(2)}s`),
+      );
+    }
+  }
+
   const best = getBest(route.id, route.version, boardFor(currentMode, currentControls));
   if (best && !isBest) {
     rows.push(
@@ -1031,7 +1151,9 @@ async function showResultBoard(fresh = false): Promise<void> {
   try {
     const board = await fetchBoard(route.id, key, 'all', route.version, SIM_VERSION, fresh);
     container.replaceChildren(
-      ...(board.rows.length === 0 ? [caption('No scores posted yet. Be first.')] : board.rows.map((row) => boardRow(row, mode))),
+      ...(board.rows.length === 0
+        ? [caption('No scores posted yet. Be first.')]
+        : board.rows.map((row) => boardRow(row, mode, key))),
     );
   } catch (err) {
     container.replaceChildren(
@@ -1192,6 +1314,7 @@ $('btn-intro-back').addEventListener('click', () => {
 $('btn-time-attack').addEventListener('click', () => setBoardMode('timeAttack'));
 $('btn-drift-run').addEventListener('click', () => setBoardMode('driftRun'));
 $('btn-go').addEventListener('click', () => void startRun(boardMode));
+$('btn-ghost-clear').addEventListener('click', () => setGhostPick(null));
 $('btn-level-easy').addEventListener('click', () => setTimeAttackLevel('easy'));
 $('btn-level-pro').addEventListener('click', () => setTimeAttackLevel('pro'));
 $('btn-retry').addEventListener('click', () => void startRun(currentMode));

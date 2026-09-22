@@ -23,6 +23,7 @@ import { realKmh } from '../src/data/scale.ts';
 import { driveBot, DEFAULT_BOT } from '../src/bot/autopilot.ts';
 import { configFor, DRIFT_CONTROL } from '../src/data/assist.ts';
 import { cornerSpeedLimit, roadKeepingTurn } from '../src/sim/model/assist.ts';
+import { buildGhost, ghostTimeGap } from '../src/ghost.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const route = JSON.parse(readFileSync(resolve(here, '../public/routes/akari-downhill.json'), 'utf8'));
@@ -935,4 +936,58 @@ test('pro: a driver who brakes for corners gets round every route, and it replay
     stepSim(state, input, car, route, live.config);
   }
   assert.deepEqual(hashes, live.hashes, 'a pedals replay diverged from the live run');
+});
+
+// ---------------------------------------------------------------------------
+// Ghosts
+// ---------------------------------------------------------------------------
+
+test('ghost: a stored run of every kind drives again to the same finish', () => {
+  const runs = [
+    { car: carById('kaido-zen-r'), config: configFor('timeAttack') },
+    { car: carById('tengu-gt-x'), config: configFor('driftRun', 'throttle') },
+    { car: carById('onibi-silhouette'), config: configFor('timeAttack', 'pedals') },
+  ];
+  for (const { car, config } of runs) {
+    const live =
+      config.controls === 'throttle'
+        ? driveThrottle(route, car, 'balancer')
+        : config.controls === 'pedals'
+          ? driveProRun(route, car)
+          : runBot(car, 'timeAttack');
+    const ghost = buildGhost('BOT', car, route, config, live.recorder.encode());
+    assert.ok(ghost, `a ${config.controls} ghost did not finish`);
+    assert.equal(ghost.ticks, live.state.tick, `a ${config.controls} ghost finished on a different tick`);
+    assert.equal(ghost.x[ghost.ticks], Math.fround(live.state.x));
+    assert.equal(ghost.points[ghost.ticks], Math.fround(live.state.drift.banked + live.state.drift.pending));
+  }
+});
+
+test('ghost: racing yourself is a dead heat all the way round', () => {
+  const car = carById('kaido-zen-r');
+  const live = runBot(car, 'timeAttack');
+  const ghost = buildGhost('BOT', car, route, configFor('timeAttack'), live.recorder.encode());
+  // Drive the same run again beside it: at every point the gap is nil.
+  const state = createSimState(route, car);
+  const input = { steer: 0 };
+  const q = { steer: 0, throttle: 0, flags: 0 };
+  const decoded = InputRecorder.decode(live.recorder.encode());
+  while (!state.finished) {
+    decoded.at(Math.floor(state.tick / TICKS_PER_INPUT), q);
+    dequantiseInput(q, input);
+    stepSim(state, input, car, route, configFor('timeAttack'));
+    if (state.tick % 240 === 0) {
+      const gap = ghostTimeGap(ghost, state.distance, state.tick, state.penaltyTicks);
+      assert.ok(gap !== null && gap <= 0, `gap ${gap} at tick ${state.tick}`);
+    }
+  }
+});
+
+test('ghost: a replay that does not belong to the route is refused', () => {
+  const car = carById('kaido-zen-r');
+  // Two seconds of input then nothing: it never reaches the line.
+  const rec = new InputRecorder();
+  for (let i = 0; i < 120; i++) rec.push(quantiseInput(0.2));
+  assert.equal(buildGhost('BOT', car, route, configFor('timeAttack'), rec.encode()), null);
+  assert.equal(buildGhost('BOT', car, route, configFor('timeAttack'), new Uint8Array(0)), null);
 });

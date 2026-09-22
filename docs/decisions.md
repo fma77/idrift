@@ -381,14 +381,24 @@ Four were caught by the headless harness and would have been miserable to find b
    the renderer had just set. Invisible on a 1x display; misplaces the entire world on
    every retina device. Now covered by `tests/camera.test.mjs`.
 
+## Ghosts
+
+- Any leaderboard row with a stored replay can be raced as a ghost from its board.
+  The whole run is driven once when the race loads (`src/ghost.ts`) and kept as one
+  pose per tick, rather than stepped in lockstep beside the player. Drawing it is
+  then a lookup, and the gap is known both ways: how far behind, and how far ahead.
+- The gap is measured at the player's place on the road, not at the same moment:
+  seconds between the two passing that point in Time Attack (penalties included),
+  points the ghost had there in Drift Run.
+- A ghost is driven with the controls its board implies: only throttle Drift Runs
+  are posted, and Time Attack Easy and Pro have separate boards. A replay that does
+  not reach the finish is refused rather than drawn wrong.
+
 ## Not built (v1 scope)
 
 - Drift Duels / tandem (§7.3) — deferred by the brief. The ghost-replay half is
   already free from the determinism work; the pursuit controller is not started.
 - Server-side re-simulation — explicitly not required for v1. The state-hash stream is
   recorded anyway, so it is cheap to add later.
-- Ghost playback. Replays are recorded, compressed, stored and served
-  byte-identically, and the sim replays them exactly; nothing yet draws a second
-  car from one. This is the cheapest remaining feature by a distance.
 - Supplied art. The loading, rotation and fallback paths all exist and are
   exercised; there are simply no image files yet.
