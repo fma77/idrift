@@ -233,7 +233,7 @@ async function readBoard(
   mode: string,
   carClass: string | undefined,
 ): Promise<Response> {
-  if (mode !== 'timeAttack' && mode !== 'driftRun') {
+  if (mode !== 'timeAttack' && mode !== 'timeAttackPro' && mode !== 'driftRun') {
     return problem(400, 'badRequest', 'Unknown mode.');
   }
 
@@ -365,7 +365,7 @@ function validateShape(b: ScoreSubmission): string | null {
   if (typeof b !== 'object' || b === null) return 'Malformed submission.';
   if (typeof b.routeId !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.routeId)) return 'Bad route.';
   if (!Number.isInteger(b.routeVersion) || b.routeVersion < 1) return 'Bad route version.';
-  if (b.mode !== 'timeAttack' && b.mode !== 'driftRun') return 'Bad mode.';
+  if (b.mode !== 'timeAttack' && b.mode !== 'timeAttackPro' && b.mode !== 'driftRun') return 'Bad mode.';
   if (typeof b.carClass !== 'string' || !/^[A-Z]{1,2}$/.test(b.carClass)) return 'Bad car class.';
   if (!Number.isInteger(b.simVersion) || b.simVersion < 1) return 'Bad sim version.';
   if (typeof b.playerName !== 'string' || b.playerName.length > MAX_NAME_LENGTH * 2) return 'Bad name.';

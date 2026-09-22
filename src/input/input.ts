@@ -7,9 +7,10 @@
  * replay of everything that happened since the last one, or the sim's output
  * would depend on browser event timing and stop being reproducible.
  *
- * Two control schemes feed it. Steering: the car drives itself and the player
+ * Three control schemes feed it. Steering: the car drives itself and the player
  * steers. Throttle (Drift Run only): the game steers, the player holds a
- * throttle and taps to drift.
+ * throttle and taps to drift. Pedals (Time Attack Pro): the player steers and
+ * works the throttle and brake.
  */
 
 export interface RawInput {
@@ -19,14 +20,17 @@ export interface RawInput {
   throttle: number;
   /** The drift button, held. A press shorter than a sample is latched until recorded. */
   initiate: boolean;
+  /** The brake is held. Pedals only. */
+  brake: boolean;
 }
 
-export type Action = 'left' | 'right' | 'throttle' | 'drift';
+export type Action = 'left' | 'right' | 'throttle' | 'brake' | 'drift';
 
 export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'left', label: 'Steer left' },
   { id: 'right', label: 'Steer right' },
-  { id: 'throttle', label: 'Throttle (Drift Run)' },
+  { id: 'throttle', label: 'Throttle (Drift Run, Pro)' },
+  { id: 'brake', label: 'Brake (Time Attack Pro)' },
   { id: 'drift', label: 'Drift (Drift Run)' },
 ];
 
@@ -36,6 +40,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   left: ['ArrowLeft', 'KeyA'],
   right: ['ArrowRight', 'KeyD'],
   throttle: ['ArrowUp', 'KeyW'],
+  brake: ['ArrowDown', 'KeyS'],
   drift: ['Space'],
 };
 
@@ -52,7 +57,7 @@ const STEER_ATTACK = 0.18;
 const STEER_RELEASE = 0.1;
 
 export class InputController {
-  readonly raw: RawInput = { steer: 0, throttle: 0, initiate: false };
+  readonly raw: RawInput = { steer: 0, throttle: 0, initiate: false, brake: false };
   /** Whether the drift button is physically down right now. */
   private driftDown = false;
 
@@ -68,6 +73,8 @@ export class InputController {
   private touchSteer: number | null = null;
   /** The throttle zone is being held. */
   private touchThrottle = false;
+  /** The brake pedal is being held (Time Attack Pro). */
+  private touchBrake = false;
 
   private enabled = false;
   private boundKeyDown = (e: KeyboardEvent) => this.onKeyDown(e);
@@ -75,7 +82,12 @@ export class InputController {
   private boundBlur = () => this.releaseAll();
 
   setKeymap(map: Keymap): void {
-    this.keymap = map;
+    // Older saved keymaps predate the brake; fill in anything missing.
+    this.keymap = { ...DEFAULT_KEYMAP, ...map };
+  }
+
+  setTouchBrake(held: boolean): void {
+    this.touchBrake = held;
   }
 
   /** Steering from the thumb slider, -1..1, or null when the thumb lifts. */
@@ -127,6 +139,8 @@ export class InputController {
     this.held.length = 0;
     this.touchSteer = null;
     this.touchThrottle = false;
+    this.touchBrake = false;
+    this.raw.brake = false;
     this.raw.steer = 0;
     this.raw.throttle = 0;
     this.raw.initiate = false;
@@ -144,6 +158,7 @@ export class InputController {
     const held = this.touchThrottle || this.isDown('throttle');
     const rate = held ? 1 / Math.max(THROTTLE_FEEL.rise, 0.01) : -1 / Math.max(THROTTLE_FEEL.fall, 0.01);
     this.raw.throttle = Math.min(1, Math.max(0, this.raw.throttle + rate * dtSeconds));
+    this.raw.brake = this.touchBrake || this.isDown('brake');
 
     if (this.touchSteer !== null) {
       this.raw.steer = this.touchSteer;

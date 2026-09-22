@@ -14,22 +14,25 @@
 export interface SimInput {
   /** -1 (full left) .. +1 (full right). */
   steer: number;
-  /** 0..1. Throttle controls only. */
+  /** 0..1. Throttle controls and pedals only. */
   throttle: number;
   /**
    * True while the drift button is held. Throttle controls only. How long it
    * is held matters: see HOLD_FULL in throttleDrift.ts.
    */
   initiate: boolean;
+  /** True while the brake is held. Pedals only. */
+  brake?: boolean;
 }
 
 /** Quantised input as stored in a replay: steer int16, throttle uint8, flags uint8. */
 export const STEER_QUANT = 32767;
 export const THROTTLE_QUANT = 255;
 export const FLAG_INITIATE = 1 << 0;
+export const FLAG_BRAKE = 1 << 1;
 
 /** Who steers. See SimInput. */
-export type Controls = 'steer' | 'throttle';
+export type Controls = 'steer' | 'throttle' | 'pedals';
 
 /**
  * Drift Run with throttle controls: how the game steers and how the throttle

@@ -39,6 +39,8 @@ export interface Settings {
    * drift) or 'steer' (the one-thumb steering of Time Attack).
    */
   driftControls: Controls;
+  /** Time Attack difficulty: easy (the car handles speed) or pro (pedals). */
+  timeAttackLevel: 'easy' | 'pro';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundOn: true,
   tuneMode: false,
   driftControls: 'throttle',
+  timeAttackLevel: 'easy',
 };
 
 export function loadSettings(): Settings {
@@ -84,9 +87,11 @@ export function loadSettings(): Settings {
         left: Array.isArray(keymap.left) ? keymap.left : base.keymap.left,
         right: Array.isArray(keymap.right) ? keymap.right : base.keymap.right,
         throttle: Array.isArray(keymap.throttle) ? keymap.throttle : base.keymap.throttle,
+        brake: Array.isArray(keymap.brake) ? keymap.brake : base.keymap.brake,
         drift: Array.isArray(keymap.drift) ? keymap.drift : base.keymap.drift,
       },
       driftControls: pick('driftControls', (v) => v === 'throttle' || v === 'steer'),
+      timeAttackLevel: pick('timeAttackLevel', (v) => v === 'easy' || v === 'pro'),
     };
   } catch {
     return defaults();

@@ -895,3 +895,44 @@ input[type='range']::-moz-range-thumb {
 .car-card--selected .car-stats__pip--on {
   background: var(--red);
 }
+
+/* --- Route page: Time Attack difficulty ----------------------------------- */
+
+.level-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.level-row[hidden] {
+  display: none;
+}
+
+.level-btn {
+  padding: 6px 12px;
+  font-family: var(--body);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  cursor: pointer;
+}
+
+.level-btn + .level-btn {
+  margin-left: -10px;
+  border-left: none;
+}
+
+.level-btn[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.level-row__note {
+  flex-basis: 100%;
+  margin-top: -2px;
+}

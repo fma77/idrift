@@ -1,5 +1,8 @@
+import type { ApiMode } from '../../shared/api.ts';
 import { SIM_VERSION } from '../sim/version.ts';
-import type { SimMode } from '../sim/types.ts';
+
+/** Bests are kept per board: Time Attack and Time Attack Pro separately. */
+type BoardMode = ApiMode;
 
 /**
  * Personal bests, unlock progress, and stored replays.
@@ -21,7 +24,7 @@ const DB_STORE = 'replays';
 export interface BestRecord {
   routeId: string;
   routeVersion: number;
-  mode: SimMode;
+  mode: BoardMode;
   carId: string;
   simVersion: number;
   /** Seconds, including penalties. */
@@ -35,7 +38,7 @@ export interface BestRecord {
 type BestMap = Record<string, BestRecord>;
 
 /** One best per route + mode + sim version. Car is recorded, not partitioned on. */
-export function bestKey(routeId: string, routeVersion: number, mode: SimMode): string {
+export function bestKey(routeId: string, routeVersion: number, mode: BoardMode): string {
   return `${routeId}@${routeVersion}:${mode}:v${SIM_VERSION}`;
 }
 
@@ -50,7 +53,7 @@ function readBests(): BestMap {
 export function getBest(
   routeId: string,
   routeVersion: number,
-  mode: SimMode,
+  mode: BoardMode,
 ): BestRecord | null {
   return readBests()[bestKey(routeId, routeVersion, mode)] ?? null;
 }
@@ -66,7 +69,7 @@ export function submitBest(record: BestRecord): boolean {
 
   const better =
     !existing ||
-    (record.mode === 'timeAttack'
+    (record.mode !== 'driftRun'
       ? record.timeSeconds < existing.timeSeconds
       : record.points > existing.points);
 

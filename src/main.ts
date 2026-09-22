@@ -7,6 +7,7 @@ import { Hud, formatTime } from './render/hud.ts';
 import { InputController, ACTIONS, DEFAULT_KEYMAP, keyLabel, type Action } from './input/input.ts';
 import { ThumbSteer } from './input/thumbSteer.ts';
 import { PedalTouch } from './input/pedals.ts';
+import { ProPedals } from './input/proPedals.ts';
 import { DriftGauge } from './render/driftGauge.ts';
 import { TunePanel } from './ui/tunePanel.ts';
 import { isTuneMode, applyStoredTuning, restoreShippedHandling, isTuned } from './tune/tuning.ts';
@@ -32,7 +33,7 @@ import { drawPosterOverlay } from './ui/poster.ts';
 import { flagElement } from './ui/flags.ts';
 import { submitScore, fetchBoard, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
-import type { LeaderboardRow } from '../shared/api.ts';
+import type { ApiMode, LeaderboardRow } from '../shared/api.ts';
 import { SIM_VERSION, TICK_RATE } from './sim/version.ts';
 import type { Controls, RouteData, SimMode } from './sim/types.ts';
 
@@ -124,6 +125,11 @@ const thumb = new ThumbSteer($('steer-surface'), (value) => input.setTouchSteer(
 thumb.setSensitivity(settings.steerSensitivity);
 
 /** Drift Run's throttle controls: tap the left half to drift, hold the right. */
+const proPedals = new ProPedals($('pro-surface'), {
+  onThrottle: (held) => input.setTouchThrottle(held),
+  onBrake: (held) => input.setTouchBrake(held),
+});
+
 const pedals = new PedalTouch($('pedal-surface'), {
   onThrottle: (held) => input.setTouchThrottle(held),
   onDrift: (held) => (held ? input.pressDrift() : input.releaseDrift()),
@@ -247,10 +253,35 @@ async function openIntro(entry: RouteEntry): Promise<void> {
  */
 function setBoardMode(mode: SimMode): void {
   boardMode = mode;
+  const pro = settings.timeAttackLevel === 'pro';
   $('btn-time-attack').setAttribute('aria-pressed', String(mode === 'timeAttack'));
   $('btn-drift-run').setAttribute('aria-pressed', String(mode === 'driftRun'));
-  $('board-title').textContent = `Leaderboard · ${mode === 'driftRun' ? 'Drift Run' : 'Time Attack'}`;
+  $('level-row').hidden = mode !== 'timeAttack';
+  $('btn-level-easy').setAttribute('aria-pressed', String(!pro));
+  $('btn-level-pro').setAttribute('aria-pressed', String(pro));
+  $('level-note').textContent = pro ? 'You work the gas and brake.' : 'The car brakes for corners.';
+  $('board-title').textContent = `Leaderboard · ${boardTitle(pageBoard())}`;
   void refreshBoard();
+}
+
+function setTimeAttackLevel(level: 'easy' | 'pro'): void {
+  settings.timeAttackLevel = level;
+  saveSettings(settings);
+  setBoardMode(boardMode);
+}
+
+/** The board a run belongs to: Time Attack on pedals has its own. */
+function boardFor(mode: SimMode, controls: Controls): ApiMode {
+  return mode === 'timeAttack' && controls === 'pedals' ? 'timeAttackPro' : mode;
+}
+
+/** The board the route page is showing: its mode, and for Time Attack the level. */
+function pageBoard(): ApiMode {
+  return boardFor(boardMode, settings.timeAttackLevel === 'pro' ? 'pedals' : 'steer');
+}
+
+function boardTitle(board: ApiMode): string {
+  return board === 'driftRun' ? 'Drift Run' : board === 'timeAttackPro' ? 'Time Attack · Pro' : 'Time Attack · Easy';
 }
 
 /**
@@ -264,24 +295,25 @@ async function refreshBoard(): Promise<void> {
   const route = currentRoute;
   const container = $('board-rows');
   if (!route) return;
-  // Taken now: the player can switch tabs while this is in flight.
+  // Taken now: the player can switch mode or level while this is in flight.
   const mode = boardMode;
+  const key = pageBoard();
 
   container.replaceChildren(caption('Loading…'));
 
   try {
     const board = await fetchBoard(
       route.id,
-      mode,
+      key,
       'all',
       route.version,
       SIM_VERSION,
     );
+    if (key !== pageBoard()) return;
     if (board.rows.length === 0) {
       container.replaceChildren(caption('No times posted yet. Be first.'));
       return;
     }
-    if (mode !== boardMode) return;
     container.replaceChildren(...board.rows.map((row) => boardRow(row, mode)));
   } catch (err) {
     const message =
@@ -774,6 +806,8 @@ function syncKeyHints(): void {
     ['hint-left', 'left'],
     ['hint-right', 'right'],
     ['hint-throttle', 'throttle'],
+    ['hint-gas', 'throttle'],
+    ['hint-brake', 'brake'],
     ['hint-drift', 'drift'],
   ];
   for (const [id, action] of map) {
@@ -790,7 +824,8 @@ async function startRun(mode: SimMode): Promise<void> {
   currentMode = mode;
 
   const car = carById(settings.carId);
-  currentControls = mode === 'driftRun' ? settings.driftControls : 'steer';
+  currentControls =
+    mode === 'driftRun' ? settings.driftControls : settings.timeAttackLevel === 'pro' ? 'pedals' : 'steer';
   gameEl.dataset.controls = currentControls;
   gameEl.dataset.mode = currentMode;
   const renderSettings: RenderSettings = {
@@ -819,7 +854,8 @@ async function startRun(mode: SimMode): Promise<void> {
 
   const countdownOverlay = $('overlay-countdown');
   const countdownEl = $('countdown');
-  $('countdown-mode').textContent = mode === 'timeAttack' ? 'TIME ATTACK' : 'DRIFT RUN';
+  $('countdown-mode').textContent =
+    mode === 'driftRun' ? 'DRIFT RUN' : currentControls === 'pedals' ? 'TIME ATTACK · PRO' : 'TIME ATTACK';
   const keys = gameEl.dataset.input === 'keyboard';
   const key = (a: Action) => keyLabel(settings.keymap[a][0]);
   $('countdown-hint').textContent =
@@ -827,9 +863,13 @@ async function startRun(mode: SimMode): Promise<void> {
       ? keys
         ? `Hold ${key('throttle')} for throttle. Press ${key('drift')} before a corner to drift: a tap is a soft kick, a short press a full one, too long and you spin. Then balance the angle with the throttle.`
         : 'Hold the right side for throttle. Press the left side before a corner to drift: a tap is a soft kick, a short press a full one, too long and you spin. Then balance the angle with the throttle.'
-      : keys
-        ? `${key('left')} ${key('right')} to steer. The car drives itself.`
-        : 'Touch anywhere and slide to steer. The car drives itself.';
+      : currentControls === 'pedals'
+        ? keys
+          ? `${key('left')} ${key('right')} to steer, ${key('throttle')} for gas, ${key('brake')} to brake. No help with speed: brake for the corners yourself.`
+          : 'Left half: slide to steer. Right half: gas on the outside, brake on the inside. No help with speed: brake for the corners yourself.'
+        : keys
+          ? `${key('left')} ${key('right')} to steer. The car drives itself.`
+          : 'Touch anywhere and slide to steer. The car drives itself.';
   countdownOverlay.hidden = false;
 
   session.onCountdown = (value) => {
@@ -851,6 +891,7 @@ async function startRun(mode: SimMode): Promise<void> {
 async function finishRun(outcome: RunOutcome): Promise<void> {
   thumb.releaseAll();
   pedals.releaseAll();
+  proPedals.releaseAll();
   tunePanel.close();
   lastOutcome = outcome;
   const route = currentRoute;
@@ -872,7 +913,7 @@ async function finishRun(outcome: RunOutcome): Promise<void> {
   const isBest = submitBest({
     routeId: route.id,
     routeVersion: route.version,
-    mode: currentMode,
+    mode: boardFor(currentMode, currentControls),
     carId: car.id,
     simVersion: SIM_VERSION,
     timeSeconds: result.timeSeconds,
@@ -887,7 +928,7 @@ async function finishRun(outcome: RunOutcome): Promise<void> {
   if (isBest) {
     try {
       const gz = await compress(outcome.recorder.encode());
-      await saveReplay(bestKey(route.id, route.version, currentMode), gz);
+      await saveReplay(bestKey(route.id, route.version, boardFor(currentMode, currentControls)), gz);
     } catch {
       // Replay not stored. The score still stands.
     }
@@ -920,7 +961,7 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
     if (result.wallHits > 0) rows.push(statRow('Time penalty', `+${(result.wallHits * 2).toFixed(0)}s`));
   }
 
-  const best = getBest(route.id, route.version, currentMode);
+  const best = getBest(route.id, route.version, boardFor(currentMode, currentControls));
   if (best && !isBest) {
     rows.push(
       statRow(
@@ -981,10 +1022,11 @@ async function showResultBoard(fresh = false): Promise<void> {
   const container = $('result-board-rows');
   if (!route) return;
   const mode = currentMode;
-  $('result-board-title').textContent = mode === 'driftRun' ? 'Top 20 · Drift Run' : 'Top 20 · Time Attack';
+  const key = boardFor(currentMode, currentControls);
+  $('result-board-title').textContent = `Top 20 · ${boardTitle(key)}`;
   container.replaceChildren(caption('Loading…'));
   try {
-    const board = await fetchBoard(route.id, mode, 'all', route.version, SIM_VERSION, fresh);
+    const board = await fetchBoard(route.id, key, 'all', route.version, SIM_VERSION, fresh);
     container.replaceChildren(
       ...(board.rows.length === 0 ? [caption('No scores posted yet. Be first.')] : board.rows.map((row) => boardRow(row, mode))),
     );
@@ -998,6 +1040,7 @@ async function showResultBoard(fresh = false): Promise<void> {
 function quitRun(): void {
   thumb.releaseAll();
   pedals.releaseAll();
+  proPedals.releaseAll();
   tunePanel.close();
   session?.abort();
   session = null;
@@ -1078,7 +1121,7 @@ async function postScore(): Promise<void> {
     const response = await submitScore({
       routeId: route.id,
       routeVersion: route.version,
-      mode: currentMode,
+      mode: boardFor(currentMode, currentControls),
       carClass: car.carClass,
       simVersion: SIM_VERSION,
       playerName: name,
@@ -1146,6 +1189,8 @@ $('btn-intro-back').addEventListener('click', () => {
 $('btn-time-attack').addEventListener('click', () => setBoardMode('timeAttack'));
 $('btn-drift-run').addEventListener('click', () => setBoardMode('driftRun'));
 $('btn-go').addEventListener('click', () => void startRun(boardMode));
+$('btn-level-easy').addEventListener('click', () => setTimeAttackLevel('easy'));
+$('btn-level-pro').addEventListener('click', () => setTimeAttackLevel('pro'));
 $('btn-retry').addEventListener('click', () => void startRun(currentMode));
 $('btn-result-routes').addEventListener('click', () => {
   buildRouteList();
@@ -1168,6 +1213,7 @@ function pauseRun(): void {
   // A thumb resting on the screen must not come back steering on resume.
   thumb.releaseAll();
   pedals.releaseAll();
+  proPedals.releaseAll();
   $('overlay-paused').hidden = false;
 }
 
@@ -1191,6 +1237,7 @@ function openTuning(): void {
   thumb.releaseAll();
   $('overlay-paused').hidden = true;
   pedals.releaseAll();
+  proPedals.releaseAll();
   tunePanel.open(carById(settings.carId), currentMode, currentControls);
 }
 

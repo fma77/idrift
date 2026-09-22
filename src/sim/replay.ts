@@ -1,5 +1,5 @@
 import { clamp } from './math/trig.ts';
-import { FLAG_INITIATE, STEER_QUANT, THROTTLE_QUANT } from './types.ts';
+import { FLAG_BRAKE, FLAG_INITIATE, STEER_QUANT, THROTTLE_QUANT } from './types.ts';
 import type { SimInput } from './types.ts';
 
 /**
@@ -25,11 +25,11 @@ export interface QuantisedInput {
   flags: number;
 }
 
-export function quantiseInput(steer: number, throttle = 1, initiate = false): QuantisedInput {
+export function quantiseInput(steer: number, throttle = 1, initiate = false, brake = false): QuantisedInput {
   return {
     steer: Math.round(clamp(steer, -1, 1) * STEER_QUANT),
     throttle: Math.round(clamp(throttle, 0, 1) * THROTTLE_QUANT),
-    flags: initiate ? FLAG_INITIATE : 0,
+    flags: (initiate ? FLAG_INITIATE : 0) | (brake ? FLAG_BRAKE : 0),
   };
 }
 
@@ -37,6 +37,7 @@ export function dequantiseInput(q: QuantisedInput, out: SimInput): SimInput {
   out.steer = q.steer / STEER_QUANT;
   out.throttle = q.throttle / THROTTLE_QUANT;
   out.initiate = (q.flags & FLAG_INITIATE) !== 0;
+  out.brake = (q.flags & FLAG_BRAKE) !== 0;
   return out;
 }
 

@@ -65,11 +65,23 @@ export const DRIFT_CONTROL: DriftControlParams = {
 };
 
 /** Throttle controls exist for Drift Run only; Time Attack always steers. */
+/**
+ * Time Attack on pedals: the same help with the steering, none with speed.
+ * No corner braking -- the player brakes -- so the line is judged by the
+ * player's own speed through it, not by the assist.
+ */
+export const PRO_ASSIST: AssistParams = {
+  ...MODE_ASSIST.timeAttack,
+  cornerSpeed: 0,
+  lineAware: 0,
+};
+
 export function configFor(mode: SimMode, controls: Controls = 'steer'): SimConfig {
+  const pedals = mode === 'timeAttack' && controls === 'pedals';
   return {
     mode,
-    assist: MODE_ASSIST[mode],
-    controls: mode === 'driftRun' ? controls : 'steer',
+    assist: pedals ? PRO_ASSIST : MODE_ASSIST[mode],
+    controls: mode === 'driftRun' ? controls : pedals ? 'pedals' : 'steer',
     drift: DRIFT_CONTROL,
   };
 }

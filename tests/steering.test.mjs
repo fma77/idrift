@@ -86,14 +86,18 @@ test('the thumb takes priority over a held key', () => {
   assert.equal(input.raw.steer, 0.5);
 });
 
-test('steering, throttle and drift keys are bound; the old brake is gone', () => {
+test('steering, throttle, brake and drift keys are bound', () => {
+  // The brake came back with Time Attack Pro.
   const input = new InputController();
-  for (const code of ['ArrowLeft', 'KeyD', 'ArrowUp', 'KeyW', 'Space']) {
+  for (const code of ['ArrowLeft', 'KeyD', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'Space']) {
     assert.ok(input.isBound(code), `${code} should be bound`);
   }
-  for (const code of ['ArrowDown', 'KeyS']) {
-    assert.ok(!input.isBound(code), `${code} should no longer do anything`);
-  }
+  input.press('ArrowDown', true);
+  input.update(1 / 60);
+  assert.equal(input.raw.brake, true, 'holding the brake key brakes');
+  input.press('ArrowDown', false);
+  input.update(1 / 60);
+  assert.equal(input.raw.brake, false);
 });
 
 // --- Drift Run throttle controls --------------------------------------------

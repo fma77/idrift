@@ -5,7 +5,8 @@
  * a runtime surprise in production.
  */
 
-export type ApiMode = 'timeAttack' | 'driftRun';
+/** Leaderboards: Time Attack on pedals ('timeAttackPro') has its own. */
+export type ApiMode = 'timeAttack' | 'timeAttackPro' | 'driftRun';
 
 /** Leaderboard partition key, per the brief. */
 export interface BoardKey {
@@ -69,10 +70,10 @@ export const BOARD_SIZE = 20;
  * rather than re-deciding, so the client and the SQL cannot disagree.
  */
 export function isLowerBetter(mode: ApiMode): boolean {
-  return mode === 'timeAttack';
+  return mode === 'timeAttack' || mode === 'timeAttackPro';
 }
 
 /** The value a board is ranked on, derived from the submission. */
 export function rankValue(mode: ApiMode, timeMs: number, points: number): number {
-  return mode === 'timeAttack' ? timeMs : points;
+  return isLowerBetter(mode) ? timeMs : points;
 }

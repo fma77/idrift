@@ -19,6 +19,8 @@ const PULSE_HZ = 2.5;
 const CORNER_BRAKE_GAIN = 6;
 /** m/s^2 of engine braking with the throttle fully closed. */
 const ENGINE_BRAKE = 2.5;
+/** m/s^2. Full braking on pedals, on full grip. */
+const BRAKE_DECEL = 11;
 
 /**
  * One step of the arcade drift model.
@@ -59,6 +61,8 @@ export function stepVehicle(
   surfaceGrip: number,
   dt: number,
   playerThrottle?: number,
+  /** Pedals only: the brake is held. */
+  brake = false,
 ): void {
   const h = car.handling;
   const steer = clamp(input.steer, -1, 1);
@@ -113,6 +117,12 @@ export function stepVehicle(
   // A closed throttle engine-brakes -- the player's throttle, that is; the
   // Drift Run pulse is a driver working the pedal, not lifting off.
   let decel = playerThrottle === undefined ? 0 : (1 - throttle) * ENGINE_BRAKE;
+  if (brake) {
+    // The brake closes the throttle and stops the car as hard as the tyres
+    // allow on this surface.
+    throttle = 0;
+    decel += BRAKE_DECEL * surfaceGrip;
+  }
   if (speed > limit) {
     // Too fast for what is coming: off the throttle and on the brakes, firmly
     // enough to close the gap within a few tenths but never past the limit.

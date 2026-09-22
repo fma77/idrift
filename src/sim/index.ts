@@ -120,6 +120,8 @@ export function stepSim(
   const steered = config.controls !== 'throttle';
   const grip = surfaceGripAt(state, route, steered);
   if (config.controls === 'throttle') stepThrottleControls(state, car, input, config, route, grip, DT);
+  else if (config.controls === 'pedals')
+    stepVehicle(state, car, input, config.assist, route, grip, DT, input.throttle, input.brake === true);
   else stepVehicle(state, car, input, config.assist, route, grip, DT);
   updateProgress(state, route);
   updateWheelsOff(state, car, route);

@@ -860,3 +860,79 @@ test('throttle controls: in a drift the tail draws its arc round the outside of 
     }
   }
 });
+
+// --- Time Attack Pro: pedals ---------------------------------------------------
+
+/**
+ * A plausible Pro driver: steers like the human driver above, and brakes when
+ * the corner ahead needs it -- judging the corner speed itself, since the game
+ * no longer does.
+ */
+function driveProRun(track, car) {
+  const config = configFor('timeAttack', 'pedals');
+  const state = createSimState(track, car);
+  const input = { steer: 0, throttle: 0, initiate: false, brake: false };
+  const recorder = new InputRecorder();
+  const hashes = [];
+  const judge = { ...config.assist, cornerSpeed: 1, cornerBraking: 9 };
+  const steerer = humanDriver();
+  let held = quantiseInput(0, 0, false, false);
+  let brakeTicks = 0;
+  while (!state.finished && state.tick < TICK_RATE * allowance(track)) {
+    if (state.tick % TICKS_PER_INPUT === 0) {
+      const limit = cornerSpeedLimit(state, track, judge, car.handling.grip * config.assist.gripScale * 0.9);
+      const brake = state.speed > limit;
+      held = quantiseInput(steerer(state, track), brake ? 0 : 1, false, brake);
+      recorder.push(held);
+    }
+    dequantiseInput(held, input);
+    if (input.brake) brakeTicks++;
+    if (state.tick % HASH_INTERVAL === 0) hashes.push(hashSimState(state));
+    stepSim(state, input, car, track, config);
+  }
+  return { state, recorder, hashes, config, brakeTicks };
+}
+
+test('pro: no braking for corners unless the player brakes', () => {
+  const car = carById('kaido-zen-r');
+  const config = configFor('timeAttack', 'pedals');
+  assert.equal(config.controls, 'pedals');
+  assert.equal(config.assist.cornerSpeed, 0, 'no automatic corner braking on pedals');
+  // Flat out on an open road: nothing slows the car.
+  const track = openRoute();
+  const state = createSimState(track, car);
+  for (let t = 0; t < TICK_RATE * 8; t++) stepSim(state, { steer: 0, throttle: 1, initiate: false, brake: false }, car, track, config);
+  const flat = state.speed;
+  // The Hachiroku takes 6.5s to 100; eight seconds flat out is well past it.
+  assert.ok(realKmh(flat) > 100, `flat out reached only ${realKmh(flat).toFixed(0)} km/h`);
+  // Brake: well over 1g of stopping, much harder than lifting.
+  const lifted = { ...state };
+  for (let t = 0; t < TICK_RATE; t++) stepSim(state, { steer: 0, throttle: 0, initiate: false, brake: true }, car, track, config);
+  for (let t = 0; t < TICK_RATE; t++) stepSim(lifted, { steer: 0, throttle: 0, initiate: false, brake: false }, car, track, config);
+  assert.ok(flat - state.speed > 9, `one second of brake took off only ${(flat - state.speed).toFixed(1)} m/s`);
+  assert.ok(state.speed < lifted.speed - 6, 'braking must be far stronger than lifting off');
+});
+
+test('pro: a driver who brakes for corners gets round every route, and it replays exactly', () => {
+  for (const track of ROUTES) {
+    const car = carById('onibi-silhouette');
+    const run = driveProRun(track, car);
+    assert.ok(run.state.finished, `did not finish ${track.name}`);
+    assert.equal(run.state.wallHits, 0, `hit ${run.state.wallHits} walls on ${track.name}`);
+    assert.ok(run.brakeTicks > 0, `never braked on ${track.name}`);
+  }
+  const car = carById('tengu-gt-x');
+  const live = driveProRun(route, car);
+  const decoded = InputRecorder.decode(live.recorder.encode());
+  const state = createSimState(route, car);
+  const input = { steer: 0, throttle: 0, initiate: false, brake: false };
+  const q = { steer: 0, throttle: 0, flags: 0 };
+  const hashes = [];
+  while (!state.finished && state.tick < live.state.tick + 10) {
+    decoded.at(Math.floor(state.tick / TICKS_PER_INPUT), q);
+    dequantiseInput(q, input);
+    if (state.tick % HASH_INTERVAL === 0) hashes.push(hashSimState(state));
+    stepSim(state, input, car, route, live.config);
+  }
+  assert.deepEqual(hashes, live.hashes, 'a pedals replay diverged from the live run');
+});
