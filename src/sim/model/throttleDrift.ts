@@ -203,8 +203,9 @@ function stepDrift(
     // Away from the corner for the first part, then into it. Never pulls an
     // angle that is already bigger back down.
     const target = elapsed < total * 0.3 ? -FLICK_SWING : flickAngle;
-    // Coming over from the other side is a pendulum, not a snap.
-    const rate = angle < 0 ? TRANSITION_RATE : FLICK_RATE;
+    // Coming over from the other side is a pendulum, not a snap -- slower for
+    // a heavy car.
+    const rate = angle < 0 ? TRANSITION_RATE * (car.driftFeel?.swing ?? 1) : FLICK_RATE;
     if (elapsed < total * 0.3 || angle < target) angle = moveToward(angle, target, rate * dt);
     state.flickTicks--;
   } else if (onStraight(state, route)) {
@@ -256,7 +257,9 @@ function stepDrift(
   const half = route.samples.halfWidth[i];
   const tailSwing = (car.bodyLength / 2) * sin(clamp(angle, 0, HALF_PI));
   const centre = Math.max(0, half * d.tailLine - tailSwing);
-  const want = autoSteerYaw(state, route, -dir * centre, DRIFT_LINE_GAIN);
+  // A car with more momentum is lazier to pull back to the line.
+  const momentum = car.driftFeel?.momentum ?? 1;
+  const want = autoSteerYaw(state, route, -dir * centre, DRIFT_LINE_GAIN / Math.sqrt(momentum));
   let v = state.speed;
   const maxTurn = (d.driftGrip * GRAVITY * surfaceGrip) / Math.max(v, 1);
   let travel = travelHeading(state);
@@ -278,7 +281,7 @@ function stepDrift(
   // big angle outpulled the weakest engine and slowed it to a standstill
   // mid-drift.
   const power = clamp(h.acceleration / REFERENCE_ACCEL, 0.4, 1.4);
-  let decel = (d.angleDrag * clamp(angle / HALF_PI, 0, 1) + (1 - throttle) * ENGINE_BRAKE) * power;
+  let decel = ((d.angleDrag * clamp(angle / HALF_PI, 0, 1)) / momentum + (1 - throttle) * ENGINE_BRAKE) * power;
   decel += Math.min(SHORTFALL_BRAKING, shortfall * v * SHORTFALL_GAIN);
   if (overHeld) decel += HANDBRAKE_DECEL;
   // Corner speed is judged at the drift grip, with no allowance over it: a
@@ -349,7 +352,7 @@ function placeCar(
     // Swing the body about a point near the front axle rather than its centre:
     // move the centre so that point stays where the change of angle alone
     // would have left it.
-    const p = car.cgToFront * PIVOT;
+    const p = car.cgToFront * (car.driftFeel?.pivot ?? PIVOT);
     const before = travel + oldNose;
     state.x += p * (cos(before) - cos(state.heading));
     state.y += p * (sin(before) - sin(state.heading));

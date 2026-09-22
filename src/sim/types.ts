@@ -139,18 +139,40 @@ export interface CarParams {
   /** Garage hero image. A drawn placeholder stands in until it exists. */
   hero?: string;
   tint?: string;
-  /**
-   * How the car takes to a throttle-controls drift, as multipliers on the
-   * mode's settings: hold (angle a given throttle holds -- all-wheel drive
-   * holds less), runaway (how fast a slide past the limit gets away -- a
-   * nervous rear end, more) and rate (how quickly the angle answers).
-   */
-  driftFeel?: { hold: number; runaway: number; rate: number };
+  /** How the car takes to a throttle-controls drift. See DriftFeel. */
+  driftFeel?: DriftFeel;
   /** Garage only: the car's character, 1-5 each, and a line about it. */
   stats?: CarStats;
   tagline?: string;
   /** Garage only: seconds from 0 to 100km/h, as shown. */
   zeroTo100?: number;
+}
+
+/**
+ * A car's character in a throttle-controls drift, as multipliers on the
+ * mode's settings (1 = as tuned for the mode), except pivot.
+ */
+export interface DriftFeel {
+  /** Angle a given throttle holds. All-wheel drive holds less. */
+  hold: number;
+  /** How fast a slide past the limit gets away. A nervous rear end, more. */
+  runaway: number;
+  /** How quickly the angle answers the throttle. */
+  rate: number;
+  /** How fast the nose swings over in a transition. Heavy cars, slower. */
+  swing: number;
+  /**
+   * Where the body turns when the angle changes, as a share of the distance
+   * from the centre to the front axle: 0 the centre, 1 the front axle. Further
+   * forward, the nose holds its line and the rear does the swinging.
+   */
+  pivot: number;
+  /**
+   * How much the car carries its speed and path through a drift: higher
+   * scrubs less speed and is lazier to pull back to the line, so it keeps
+   * speed and runs a little wider.
+   */
+  momentum: number;
 }
 
 export interface CarStats {
