@@ -62,6 +62,9 @@ const SCREENS: Record<ScreenName, HTMLElement> = {
 };
 
 const gameEl = $('game');
+// Belt and braces for iOS: during a run nothing on the race screen may start a
+// text selection, whatever the CSS says.
+gameEl.addEventListener('selectstart', (e) => e.preventDefault());
 const canvas = $<HTMLCanvasElement>('canvas');
 
 /**
