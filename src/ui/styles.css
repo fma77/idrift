@@ -830,13 +830,17 @@ input[type='range']::-moz-range-thumb {
   font-size: 14px;
   white-space: nowrap;
   background: transparent;
-  border: 2px solid var(--ink);
-  color: var(--ink);
+  border: 2px solid var(--rule);
+  color: var(--ink-faint);
 }
 
+/* Selected: an orange frame round black text, the rest faded back. The same
+   look as the garage's selected car, and never a fill -- GO is the one solid
+   orange thing on the page. */
 .mode-btn[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: #fff;
+  color: var(--ink);
+  border: 3px solid var(--red);
 }
 
 .btn--go {
@@ -917,19 +921,16 @@ input[type='range']::-moz-range-thumb {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   background: transparent;
-  color: var(--ink);
-  border: 2px solid var(--ink);
+  color: var(--ink-faint);
+  border: 2px solid var(--rule);
   cursor: pointer;
 }
 
-.level-btn + .level-btn {
-  margin-left: -10px;
-  border-left: none;
-}
-
 .level-btn[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: #fff;
+  color: var(--ink);
+  border: 3px solid var(--red);
+  padding: 5px 11px;
 }
 
 .level-row__note {
@@ -948,16 +949,18 @@ input[type='range']::-moz-range-thumb {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   background: transparent;
-  color: var(--ink);
-  border: 1.5px solid var(--ink);
+  color: var(--ink-faint);
+  border: 2px solid var(--rule);
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
 }
 
 .board__ghost[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: #fff;
+  color: var(--ink);
+  border: 3px solid var(--red);
+  padding: 3px 7px;
 }
 
 .ghost-note {
