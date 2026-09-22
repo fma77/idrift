@@ -69,6 +69,19 @@ const EXIT_REACH = 25;
 const FLICK_SWING = 0.15;
 /** rad/s. How fast the flick moves the angle. */
 const FLICK_RATE = 7;
+/**
+ * rad/s. The same swing when the nose is coming over from the other side, in
+ * a transition. At the flick rate it snapped across in a tenth of a second, and
+ * the car looked pushed sideways rather than swung; this is a pendulum.
+ */
+const TRANSITION_RATE = 3.2;
+/**
+ * Where along the car it pivots when the drift angle changes, as a share of
+ * the distance from the centre to the front axle. Near the front, as a car
+ * does: the nose holds its line and the rear swings. Turning about the centre
+ * flung the front wheels sideways as fast as the rear.
+ */
+const PIVOT = 0.85;
 /** Fraction of speed the handbrake takes off at the flick. */
 const FLICK_SCRUB = 0.06;
 /** m/s^2 of engine braking with the throttle fully closed. */
@@ -190,7 +203,9 @@ function stepDrift(
     // Away from the corner for the first part, then into it. Never pulls an
     // angle that is already bigger back down.
     const target = elapsed < total * 0.3 ? -FLICK_SWING : flickAngle;
-    if (elapsed < total * 0.3 || angle < target) angle = moveToward(angle, target, FLICK_RATE * dt);
+    // Coming over from the other side is a pendulum, not a snap.
+    const rate = angle < 0 ? TRANSITION_RATE : FLICK_RATE;
+    if (elapsed < total * 0.3 || angle < target) angle = moveToward(angle, target, rate * dt);
     state.flickTicks--;
   } else if (onStraight(state, route)) {
     // Corner exit. The corner is behind and the road ahead is straight, so the
@@ -245,6 +260,7 @@ function stepDrift(
   let v = state.speed;
   const maxTurn = (d.driftGrip * GRAVITY * surfaceGrip) / Math.max(v, 1);
   let travel = travelHeading(state);
+  const oldNose = wrapAngle(state.heading - travel);
   travel = wrapAngle(travel + clamp(want, -maxTurn, maxTurn) * dt);
 
   // The line is asking for more grip than there is: the corner is tighter than
@@ -275,7 +291,7 @@ function stepDrift(
   if (v > limit) decel += Math.min(assist.cornerBraking, (v - limit) * 6);
   v = Math.max(0, v - decel * dt);
 
-  placeCar(state, car, travel, dir * angle, v, dt);
+  placeCar(state, car, travel, dir * angle, v, dt, oldNose);
   state.driftAngle = angle;
   state.throttle = throttle;
   state.sliding = true;
@@ -318,9 +334,26 @@ function stepSpin(state: SimState, route: RouteData, config: SimConfig, surfaceG
 }
 
 /** Put the car on its path with the nose at `noseOffset` from the direction of travel. */
-function placeCar(state: SimState, car: CarParams | null, travel: number, noseOffset: number, v: number, dt: number): void {
+function placeCar(
+  state: SimState,
+  car: CarParams | null,
+  travel: number,
+  noseOffset: number,
+  v: number,
+  dt: number,
+  oldNose?: number,
+): void {
   const previous = state.heading;
   state.heading = wrapAngle(travel + noseOffset);
+  if (car && oldNose !== undefined) {
+    // Swing the body about a point near the front axle rather than its centre:
+    // move the centre so that point stays where the change of angle alone
+    // would have left it.
+    const p = car.cgToFront * PIVOT;
+    const before = travel + oldNose;
+    state.x += p * (cos(before) - cos(state.heading));
+    state.y += p * (sin(before) - sin(state.heading));
+  }
   state.yawRate = wrapAngle(state.heading - previous) / dt;
   const rel = wrapAngle(travel - state.heading);
   state.vx = v * cos(rel);
