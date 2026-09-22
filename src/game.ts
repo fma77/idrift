@@ -110,6 +110,17 @@ export class GameSession {
   }
 
   /**
+   * End this run to start it again, leaving the engine sound running for the
+   * next one. A phone only lets sound start from a tap, and a restart from
+   * holding the pause button fires on a timer, not a tap: a new sound there
+   * would be silent.
+   */
+  abandon(): void {
+    this.phase = 'aborted';
+    this.stop();
+  }
+
+  /**
    * Backgrounding a tab stops rAF but not the clock. Without this the first
    * frame after returning carries a delta of however long the player was away,
    * and the accumulator would try to catch up with tens of thousands of sim

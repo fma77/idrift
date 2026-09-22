@@ -917,7 +917,12 @@ function syncKeyHints(): void {
 
 let audio: EngineAudio | null = null;
 
-async function startRun(mode: SimMode): Promise<void> {
+/**
+ * Start a run. A restart keeps the engine sound of the run it replaces: it may
+ * come from holding the pause button, which is not a tap, and a phone will not
+ * start new sound without one.
+ */
+async function startRun(mode: SimMode, restart = false): Promise<void> {
   if (!currentRoute) return;
   currentMode = mode;
 
@@ -934,7 +939,7 @@ async function startRun(mode: SimMode): Promise<void> {
 
   syncKeyHints();
 
-  audio = new EngineAudio(settings.soundOn);
+  if (!restart || !audio) audio = new EngineAudio(settings.soundOn);
   // Started from the click that got us here, which is the gesture the browser
   // requires before an AudioContext will run.
   void audio.start(car.engine);
@@ -1327,7 +1332,66 @@ $('btn-post').addEventListener('click', () => void postScore());
 $('player-name').addEventListener('input', validateNameField);
 $('btn-quit').addEventListener('click', quitRun);
 $('btn-resume').addEventListener('click', resumeRun);
-$('btn-pause').addEventListener('click', pauseRun);
+$('btn-restart').addEventListener('click', restartRun);
+
+// The pause button: a tap pauses; holding it fills a ring round the button
+// and restarts the run when the ring closes. The run carries on meanwhile, so
+// a restart costs no more than the two seconds.
+const RESTART_HOLD_MS = 2000;
+const pauseBtn = $('btn-pause');
+let restartTimer = 0;
+let holdPointer: number | null = null;
+
+function endHold(): void {
+  window.clearTimeout(restartTimer);
+  restartTimer = 0;
+  holdPointer = null;
+  pauseBtn.classList.remove('pause-btn--holding');
+}
+
+pauseBtn.addEventListener('pointerdown', (e) => {
+  if (!isRunActive() || holdPointer !== null) return;
+  e.preventDefault();
+  holdPointer = e.pointerId;
+  try {
+    pauseBtn.setPointerCapture(e.pointerId);
+  } catch {
+    // Synthetic pointer; the hold still works.
+  }
+  pauseBtn.classList.add('pause-btn--holding');
+  restartTimer = window.setTimeout(() => {
+    endHold();
+    restartRun();
+  }, RESTART_HOLD_MS);
+});
+pauseBtn.addEventListener('pointerup', (e) => {
+  if (e.pointerId !== holdPointer) return;
+  // Let go before the ring closed: that was a tap, or a change of mind.
+  endHold();
+  pauseRun();
+});
+pauseBtn.addEventListener('pointercancel', (e) => {
+  if (e.pointerId === holdPointer) endHold();
+});
+pauseBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+// Keyboard activation still pauses; pointer taps are handled above.
+pauseBtn.addEventListener('click', (e) => {
+  if (e.detail === 0) pauseRun();
+});
+
+/** Start the same run again from the line: same route, mode, car and ghost. */
+function restartRun(): void {
+  if (!isRunActive()) return;
+  endHold();
+  thumb.releaseAll();
+  pedals.releaseAll();
+  proPedals.releaseAll();
+  input.releaseAll();
+  session?.abandon();
+  session = null;
+  $('overlay-paused').hidden = true;
+  void startRun(currentMode, true);
+}
 
 function isRunActive(): boolean {
   return !gameEl.hidden && !!session && session.phase !== 'finished' && session.phase !== 'aborted';

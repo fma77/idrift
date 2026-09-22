@@ -373,8 +373,14 @@
         <!-- Time Attack Pro: brake and gas on the right half; the left half steers. -->
         <div class="pro-surface" id="pro-surface"></div>
 
-        <button class="pause-btn" id="btn-pause" type="button" aria-label="Pause">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>
+        <!-- Tap to pause; hold for two seconds to restart, while the ring fills. -->
+        <button class="pause-btn" id="btn-pause" type="button" aria-label="Pause. Hold to restart">
+          <svg class="pause-btn__icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" /><rect x="9.5" y="2" width="3.5" height="12" /></svg>
+          <svg class="pause-ring" viewBox="0 0 48 48" aria-hidden="true">
+            <circle class="pause-ring__track" cx="24" cy="24" r="19" />
+            <circle class="pause-ring__fill" cx="24" cy="24" r="19" />
+          </svg>
+          <span class="pause-btn__hint" aria-hidden="true">Restart</span>
         </button>
 
         <button class="tune-btn" id="btn-tune" type="button" hidden>TUNE</button>
@@ -389,6 +395,7 @@
           <div class="display">Paused</div>
           <div class="overlay__actions">
             <button class="btn btn--primary" id="btn-resume">Resume</button>
+            <button class="btn btn--secondary" id="btn-restart">Restart</button>
             <button class="btn btn--secondary" id="btn-quit">Back to routes</button>
           </div>
         </div>
