@@ -776,23 +776,33 @@
   }
 
   /*
-   * The touch controls keep to the outer thirds, so the bottom of the road is
-   * clear too: on a wide screen a full-half pad reaches the middle.
+   * The touch controls keep to the outer edges, so the bottom of the road and
+   * the car are clear: on a wide screen a full-half pad reaches the middle.
+   * Drift Run's halves still take the touch anywhere; only the marks move.
    */
   .pedal-zone,
   .pro-zone {
-    max-width: 240px;
+    max-width: 128px;
+    padding: 4px 0;
   }
 
-  .pedal-zone--drift,
-  .pro-zone--brake {
+  .pedal-zone__label,
+  .pro-zone .pedal-zone__label {
+    font-size: 14px;
+  }
+
+  .pedal-zone__hint {
+    font-size: 9px;
+  }
+
+  .pedal-zone--drift {
     margin-right: auto;
   }
 
-  .pedal-zone--throttle,
-  .pro-zone--gas {
+  .pedal-zone--throttle {
     margin-left: auto;
   }
+
 }
 
 /* --- Sound lab ----------------------------------------------------------- */
@@ -1572,4 +1582,19 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+/*
+ * Pro's pedals, held sideways: a real area, not a label. Narrowing them to the
+ * right-hand third moves the touch zones with them and gives the steering the
+ * rest. Last in the file, so it wins over the half-and-half split above.
+ */
+@media (orientation: landscape) and (max-height: 560px) {
+  #game[data-controls='pedals'] .steer-surface {
+    right: 34%;
+  }
+
+  #game[data-controls='pedals'] .pro-surface {
+    width: 34%;
+  }
 }

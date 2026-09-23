@@ -52,7 +52,7 @@ const LOOKAHEAD_FRACTION = 0.26;
 const LANDSCAPE_ZOOM = 0.78;
 /** Where the car sits up the screen, as a fraction of the height. */
 const CAR_UP_SCREEN = 0.62;
-const CAR_UP_SCREEN_LANDSCAPE = 0.76;
+const CAR_UP_SCREEN_LANDSCAPE = 0.7;
 
 /** Held sideways, with room to spare: not merely wider than tall. */
 export function isLandscape(viewWidth: number, viewHeight: number): boolean {

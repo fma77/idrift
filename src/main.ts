@@ -1017,7 +1017,7 @@ async function startRun(mode: SimMode, restart = false): Promise<void> {
       : currentControls === 'pedals'
         ? keys
           ? `${key('left')} ${key('right')} to steer, ${key('throttle')} for gas, ${key('brake')} to brake. No help with speed: brake for the corners yourself.`
-          : 'Left half: slide to steer. Right half: gas on the outside, brake on the inside. No help with speed: brake for the corners yourself.'
+          : 'Slide on the left to steer. On the right: brake on the inner side, gas on the outer. No help with speed: brake for the corners yourself.'
         : keys
           ? `${key('left')} ${key('right')} to steer. The car drives itself.`
           : 'Touch anywhere and slide to steer. The car drives itself.';
