@@ -678,21 +678,120 @@
 
 /* --- Landscape: HUD to the corners, centre clear ------------------------- */
 
+/*
+ * Held sideways.
+ *
+ * The road runs up the middle of a wide screen, so everything moves out to the
+ * columns either side of it and the middle stays clear all the way up: what is
+ * ahead of the car is the one thing a player cannot do without. The readouts
+ * stack instead of spreading, because height is what a landscape phone lacks.
+ */
 @media (orientation: landscape) and (max-height: 560px) {
-  .hud__panel {
-    min-width: 0;
+  .hud {
+    /* The road down the middle; readouts in the columns either side. */
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-rows: auto auto auto 1fr auto;
+    column-gap: var(--s-3);
   }
+
+  /* The progress bar is a hairline: it stays across the top, over everything. */
+  .progress {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  /* Score panel: top left, stacked, clear of the pause button. */
   .hud__top {
-    flex-direction: row;
-    justify-content: space-between;
+    grid-column: 1;
+    grid-row: 2;
     align-items: flex-start;
   }
-  .pace {
-    order: -1;
-  }
-  /* In a landscape row the pace notes start at the left edge, under the pause button. */
+
   #game[data-input='touch'] .hud__top {
-    padding-left: 60px;
+    padding-left: 56px;
+  }
+
+  .hud__panel {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    padding: 6px 10px;
+  }
+
+  .hud__cell,
+  .hud__cell--mid,
+  .hud__cell--end {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--s-2);
+    text-align: left;
+  }
+
+  /* Smaller type: the columns have to stay narrow, or they reach the road. */
+  .hud__value,
+  .hud__value--display {
+    font-size: 18px;
+  }
+
+  .hud__panel .hud__label {
+    min-width: 5.5ch;
+  }
+
+  .hud__top,
+  .pace-row {
+    max-width: 34vw;
+  }
+
+  /* The next corners: under the panel, still on the left, never over the road. */
+  .pace-row {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: start;
+    align-items: flex-start;
+  }
+
+  /* The two notes stack: a wide strip of them reached across the road. */
+  .pace {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Speed, zones and the drift gauge: stacked down the right-hand column. */
+  .hud__bottom,
+  #game[data-input='touch'] .hud__bottom {
+    grid-column: 3;
+    grid-row: 2 / span 3;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-start;
+    align-self: start;
+    gap: var(--s-2);
+  }
+
+  .keyhints {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    justify-content: center;
+  }
+
+  /*
+   * The touch controls keep to the outer thirds, so the bottom of the road is
+   * clear too: on a wide screen a full-half pad reaches the middle.
+   */
+  .pedal-zone,
+  .pro-zone {
+    max-width: 240px;
+  }
+
+  .pedal-zone--drift,
+  .pro-zone--brake {
+    margin-right: auto;
+  }
+
+  .pedal-zone--throttle,
+  .pro-zone--gas {
+    margin-left: auto;
   }
 }
 

@@ -1,6 +1,6 @@
 import { sin, cos, wrapAngle, clamp, lerp } from '../sim/math/trig.ts';
 import type { CarParams, RouteData, SimState } from '../sim/types.ts';
-import { Camera, type CameraSettings } from './camera.ts';
+import { Camera, carScreenY, type CameraSettings } from './camera.ts';
 import { getSprite } from './sprites.ts';
 import { drawDecoration, type DecorationData } from './decoration.ts';
 import { TyreSmoke } from './smoke.ts';
@@ -203,7 +203,7 @@ export class Renderer {
     // is expressed in metres and divided by scale to stay pixel-constant.
     const px = 1 / this.camera.scale;
     // Metres from the camera's focus to the farthest screen corner.
-    const reach = Math.hypot(this.width / 2, this.height * 0.62) * px + 2;
+    const reach = Math.hypot(this.width / 2, carScreenY(this.width, this.height)) * px + 2;
 
     if (this.world) this.world.drawGround(ctx, this.camera.x, this.camera.y, reach);
 
@@ -689,7 +689,7 @@ export class Renderer {
   private drawFog(ctx: CanvasRenderingContext2D, theme: WorldTheme | null): void {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const cx = this.width / 2;
-    const cy = this.height * 0.62;
+    const cy = carScreenY(this.width, this.height);
     const outer = Math.max(this.width, this.height) * 0.78;
     const gradient = ctx.createRadialGradient(cx, cy, outer * 0.34, cx, cy, outer);
     // A painted world gets summer haze instead of the ink void.

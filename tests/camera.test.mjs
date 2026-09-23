@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { Camera } from '../src/render/camera.ts';
+import { Camera, carScreenY, isLandscape } from '../src/render/camera.ts';
 import { sin, cos, HALF_PI } from '../src/sim/math/trig.ts';
 
 /**
@@ -38,7 +38,9 @@ function makeCamera({ x = 0, y = 0, angle = HALF_PI, scale = 12 } = {}) {
 const W = 800;
 const H = 600;
 const ANCHOR_X = W / 2;
-const ANCHOR_Y = H * 0.62;
+// Where the car sits up the screen: lower when the phone is held sideways,
+// which the camera itself decides.
+const ANCHOR_Y = carScreenY(W, H);
 
 test('the camera position maps to the on-screen anchor', () => {
   for (const dpr of [1, 2, 1.5]) {
@@ -101,29 +103,54 @@ test('world left appears on the left of the screen', () => {
   }
 });
 
-test('zoom is viewport-relative, so a phone and a desktop see the same road', () => {
-  const state = {
-    x: 0, y: 0, heading: 0, speed: 0, slipAngle: 0,
-  };
+test('zoom is viewport-relative, so a phone and a tablet see the same road', () => {
+  const state = { x: 0, y: 0, heading: 0, speed: 0, slipAngle: 0 };
   const settings = { fixedNorth: false };
 
   const phone = new Camera();
-  const desktop = new Camera();
+  const tablet = new Camera();
   // One long step so the exponential damping has effectively converged.
   for (let i = 0; i < 400; i++) {
     phone.follow(state, settings, 1 / 60, 390, 844);
-    desktop.follow(state, settings, 1 / 60, 1920, 1080);
+    tablet.follow(state, settings, 1 / 60, 768, 1024);
   }
 
   const roadWidth = 7;
-  const phoneFraction = (roadWidth * phone.scale) / Math.min(390, 844);
-  const desktopFraction = (roadWidth * desktop.scale) / Math.min(1920, 1080);
+  const phoneFraction = (roadWidth * phone.scale) / 390;
+  const tabletFraction = (roadWidth * tablet.scale) / 768;
   assert.ok(
-    Math.abs(phoneFraction - desktopFraction) < 1e-6,
-    `road occupied ${phoneFraction} of the phone short edge but ${desktopFraction} of the desktop one`,
+    Math.abs(phoneFraction - tabletFraction) < 1e-6,
+    `road occupied ${phoneFraction} of the phone's short edge but ${tabletFraction} of the tablet's`,
   );
   // And it should be a sane fraction, not a hairline or a wall.
   assert.ok(phoneFraction > 0.12 && phoneFraction < 0.4, `road fraction was ${phoneFraction}`);
+});
+
+test('held sideways, the car sits lower and the view pulls back', () => {
+  // A landscape phone is short: at the portrait zoom and anchor it showed half
+  // the road ahead that portrait did, which is the one thing a driver needs.
+  assert.ok(isLandscape(844, 390) && !isLandscape(390, 844));
+  // A tablet held upright is not landscape, whatever its width.
+  assert.ok(!isLandscape(768, 1024));
+
+  const state = { x: 0, y: 0, heading: 0, speed: 0, slipAngle: 0 };
+  const settings = { fixedNorth: false };
+  const portrait = new Camera();
+  const landscape = new Camera();
+  for (let i = 0; i < 400; i++) {
+    portrait.follow(state, settings, 1 / 60, 390, 844);
+    landscape.follow(state, settings, 1 / 60, 844, 390);
+  }
+
+  // Metres of road between the car and the top of the screen.
+  const aheadPortrait = carScreenY(390, 844) / portrait.scale;
+  const aheadLandscape = carScreenY(844, 390) / landscape.scale;
+  assert.ok(
+    aheadLandscape > aheadPortrait * 0.65,
+    `sideways showed ${aheadLandscape.toFixed(1)}m ahead against ${aheadPortrait.toFixed(1)}m upright`,
+  );
+  // The car still has to be big enough to read: this is not a zoom to the moon.
+  assert.ok(landscape.scale > portrait.scale * 0.7, 'sideways zoomed out too far');
 });
 
 test('camera rotation damps rather than snapping', () => {

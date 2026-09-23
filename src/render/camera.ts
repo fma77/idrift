@@ -42,6 +42,27 @@ const MAX_METRES_ACROSS = 46;
  * view of the road at a much closer zoom.
  */
 const LOOKAHEAD_FRACTION = 0.26;
+/**
+ * A landscape screen is short, and the zoom is set by its short edge, so the
+ * road ahead ran out half way up: at rest it showed 15 metres ahead where
+ * portrait showed 32. Held sideways the car therefore sits lower and the view
+ * pulls back, which buys back the forward view -- and fills the width either
+ * side of the road, which is what a landscape screen has to spare.
+ */
+const LANDSCAPE_ZOOM = 0.78;
+/** Where the car sits up the screen, as a fraction of the height. */
+const CAR_UP_SCREEN = 0.62;
+const CAR_UP_SCREEN_LANDSCAPE = 0.76;
+
+/** Held sideways, with room to spare: not merely wider than tall. */
+export function isLandscape(viewWidth: number, viewHeight: number): boolean {
+  return viewWidth > viewHeight * 1.3;
+}
+
+/** Pixels from the top of the view to the car. */
+export function carScreenY(viewWidth: number, viewHeight: number): number {
+  return viewHeight * (isLandscape(viewWidth, viewHeight) ? CAR_UP_SCREEN_LANDSCAPE : CAR_UP_SCREEN);
+}
 
 export class Camera {
   x = 0;
@@ -137,7 +158,7 @@ export class Camera {
   applyZoom(viewWidth: number, viewHeight: number): void {
     const shortEdge = Math.min(viewWidth, viewHeight);
     if (shortEdge <= 0) return;
-    this.scale = shortEdge / this.metresAcross;
+    this.scale = (shortEdge / this.metresAcross) * (isLandscape(viewWidth, viewHeight) ? LANDSCAPE_ZOOM : 1);
   }
 
   /**
@@ -158,7 +179,7 @@ export class Camera {
     const ca = cos(this.angle);
     const cx = viewWidth / 2;
     // Sit the car below centre so more of the screen shows the road ahead.
-    const cy = viewHeight * 0.62;
+    const cy = carScreenY(viewWidth, viewHeight);
 
     // setTransform REPLACES the current transform rather than multiplying into
     // it, so any device-pixel-ratio scale the caller set is discarded here. The
