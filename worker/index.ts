@@ -224,14 +224,14 @@ async function trimBoard(env: Env, key: ScoreSubmission): Promise<void> {
     .run();
 }
 
-// --- GET /api/leaderboard/:routeId/:mode/:carClass? -------------------------
+// --- GET /api/leaderboard/:routeId/:mode/:car? ------------------------------
 
 async function readBoard(
   env: Env,
   url: URL,
   routeId: string,
   mode: string,
-  carClass: string | undefined,
+  car: string | undefined,
 ): Promise<Response> {
   if (mode !== 'timeAttack' && mode !== 'timeAttackPro' && mode !== 'driftRun') {
     return problem(400, 'badRequest', 'Unknown mode.');
@@ -244,20 +244,23 @@ async function readBoard(
   const simVersion = Number(url.searchParams.get('simVersion') ?? 1);
   const order = isLowerBetter(mode) ? 'ASC' : 'DESC';
 
-  // carClass is optional in the path: omitting it returns every class merged,
-  // which is what the route list wants; passing it gives the segmented board.
-  const filterClass = carClass && carClass !== 'all';
+  // The car is optional in the path: 'all' (or nothing) ranks every car
+  // together, and a car's id gives that car's own board.
+  if (car && car !== 'all' && !/^[a-z0-9-]{1,40}$/.test(car)) {
+    return problem(400, 'badRequest', 'Unknown car.');
+  }
+  const filterCar = car !== undefined && car !== 'all';
   const sql =
     `SELECT id, player_name, car_id, time_ms, points, grade, created_at,
             (replay IS NOT NULL) AS has_replay
        FROM scores
       WHERE route_id = ? AND route_version = ? AND mode = ? AND sim_version = ?
-        ${filterClass ? 'AND car_class = ?' : ''}
+        ${filterCar ? 'AND car_id = ?' : ''}
       ORDER BY rank_value ${order}, created_at ASC
       LIMIT ?`;
 
   const params: unknown[] = [routeId, routeVersion, mode, simVersion];
-  if (filterClass) params.push(carClass);
+  if (filterCar) params.push(car);
   params.push(BOARD_SIZE);
 
   const { results } = await env.DB.prepare(sql)
@@ -287,7 +290,7 @@ async function readBoard(
 
   return json<LeaderboardResponse>(
     {
-      key: { routeId, routeVersion, mode: mode as ApiMode, carClass: carClass ?? 'all', simVersion },
+      key: { routeId, routeVersion, mode: mode as ApiMode, car: car ?? 'all', simVersion },
       rows,
     },
     // Boards change rarely and are read constantly. A short edge cache takes

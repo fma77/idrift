@@ -70,7 +70,8 @@ export function submitScore(submission: ScoreSubmission): Promise<SubmitResponse
 export function fetchBoard(
   routeId: string,
   mode: string,
-  carClass: string,
+  /** A car's id, or 'all' for every car together. */
+  car: string,
   routeVersion: number,
   simVersion: number,
   /**
@@ -82,7 +83,7 @@ export function fetchBoard(
 ): Promise<LeaderboardResponse> {
   const query = `?routeVersion=${routeVersion}&simVersion=${simVersion}`;
   return request<LeaderboardResponse>(
-    `/api/leaderboard/${encodeURIComponent(routeId)}/${encodeURIComponent(mode)}/${encodeURIComponent(carClass)}${query}`,
+    `/api/leaderboard/${encodeURIComponent(routeId)}/${encodeURIComponent(mode)}/${encodeURIComponent(car)}${query}`,
     fresh ? { cache: 'no-store' } : undefined,
   );
 }

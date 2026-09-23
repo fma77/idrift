@@ -123,6 +123,11 @@
           <div class="board">
             <div class="board__head">
               <div class="label" style="color: var(--ink-muted)" id="board-title">Leaderboard · Drift Run</div>
+            <!-- The same board for every car, or just the car you are driving. -->
+            <div class="board__cars">
+              <button class="level-btn" id="btn-board-all" type="button" aria-pressed="true">All cars</button>
+              <button class="level-btn" id="btn-board-car" type="button" aria-pressed="false">Car</button>
+            </div>
             </div>
             <div id="board-rows"><div class="caption">Loading…</div></div>
           </div>

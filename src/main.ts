@@ -98,6 +98,8 @@ let session: GameSession | null = null;
 let lastOutcome: RunOutcome | null = null;
 /** Which board the route screen is showing. */
 let boardMode: SimMode = 'driftRun';
+/** Which cars the route page's board covers: every car, or the selected one. */
+let boardCar: 'all' | 'mine' = 'all';
 /** Row id of the score just posted, so it can be highlighted on the board. */
 let myLastRowId: string | null = null;
 
@@ -275,8 +277,23 @@ async function openIntro(entry: RouteEntry): Promise<void> {
  * The mode picked on a route's page. It is also the leaderboard shown there:
  * choosing Drift Run shows the drift scores, with a label saying so.
  */
+function setBoardCar(which: 'all' | 'mine'): void {
+  boardCar = which;
+  $('btn-board-all').setAttribute('aria-pressed', String(which === 'all'));
+  $('btn-board-car').setAttribute('aria-pressed', String(which === 'mine'));
+  void refreshBoard();
+}
+
+/** The car a board is asked for: an id for one car's records, or every car. */
+function boardCarId(): string {
+  return boardCar === 'mine' ? settings.carId : 'all';
+}
+
 function setBoardMode(mode: SimMode): void {
   boardMode = mode;
+  $('btn-board-car').textContent = carById(settings.carId).name;
+  $('btn-board-all').setAttribute('aria-pressed', String(boardCar === 'all'));
+  $('btn-board-car').setAttribute('aria-pressed', String(boardCar === 'mine'));
   const pro = settings.timeAttackLevel === 'pro';
   $('btn-time-attack').setAttribute('aria-pressed', String(mode === 'timeAttack'));
   $('btn-drift-run').setAttribute('aria-pressed', String(mode === 'driftRun'));
@@ -321,9 +338,10 @@ async function refreshBoard(): Promise<void> {
   const route = currentRoute;
   const container = $('board-rows');
   if (!route) return;
-  // Taken now: the player can switch mode or level while this is in flight.
+  // Taken now: the player can switch mode, level or car while this is in flight.
   const mode = boardMode;
   const key = pageBoard();
+  const car = boardCarId();
 
   container.replaceChildren(caption('Loading…'));
 
@@ -331,13 +349,19 @@ async function refreshBoard(): Promise<void> {
     const board = await fetchBoard(
       route.id,
       key,
-      'all',
+      car,
       route.version,
       SIM_VERSION,
     );
-    if (key !== pageBoard()) return;
+    if (key !== pageBoard() || car !== boardCarId()) return;
     if (board.rows.length === 0) {
-      container.replaceChildren(caption('No times posted yet. Be first.'));
+      container.replaceChildren(
+        caption(
+          boardCar === 'mine'
+            ? `No times in the ${carById(settings.carId).name} yet. Be first.`
+            : 'No times posted yet. Be first.',
+        ),
+      );
       return;
     }
     container.replaceChildren(...board.rows.map((row) => boardRow(row, mode, key)));
@@ -608,6 +632,7 @@ function openGarage(from: 'title' | 'intro'): void {
 function leaveGarage(): void {
   if (garageReturn === 'intro') {
     showIntroCar();
+    setBoardMode(boardMode);
     showScreen('intro');
   } else {
     showScreen('title');
@@ -1365,6 +1390,8 @@ $('btn-time-attack').addEventListener('click', () => setBoardMode('timeAttack'))
 $('btn-drift-run').addEventListener('click', () => setBoardMode('driftRun'));
 $('btn-go').addEventListener('click', () => void startRun(boardMode));
 $('btn-ghost-clear').addEventListener('click', () => setGhostPick(null));
+$('btn-board-all').addEventListener('click', () => setBoardCar('all'));
+$('btn-board-car').addEventListener('click', () => setBoardCar('mine'));
 $('btn-level-easy').addEventListener('click', () => setTimeAttackLevel('easy'));
 $('btn-level-pro').addEventListener('click', () => setTimeAttackLevel('pro'));
 $('btn-retry').addEventListener('click', () => void startRun(currentMode));

@@ -995,3 +995,24 @@ input[type='range']::-moz-range-thumb {
 .lightbox--car {
   background: var(--paper-2);
 }
+
+/* --- Leaderboard: every car, or one car ----------------------------------- */
+
+.board__cars {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.board__cars .level-btn {
+  padding: 4px 9px;
+  font-size: 11px;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board__cars .level-btn[aria-pressed='true'] {
+  padding: 3px 8px;
+}

@@ -13,12 +13,15 @@ export interface BoardKey {
   routeId: string;
   routeVersion: number;
   mode: ApiMode;
-  carClass: string;
+  /** A car's id for that car's own board, or 'all' for every car together. */
+  car: string;
   simVersion: number;
 }
 
-export interface ScoreSubmission extends BoardKey {
+export interface ScoreSubmission extends Omit<BoardKey, 'car'> {
   playerName: string;
+  /** The class the car belonged to when the run was posted. Kept with the row, not ranked on. */
+  carClass: string;
   carId: string;
   /** Milliseconds, including penalties. Integer. */
   timeMs: number;

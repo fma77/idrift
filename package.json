@@ -17,6 +17,8 @@
     "db:remote": "wrangler d1 migrations apply idrift-db --remote",
     "dev:worker": "npm run build && wrangler dev",
     "setup:cloudflare": "node tools/cloudflare-setup.mjs",
+    "db:scores": "wrangler d1 execute idrift-db --remote --command \"SELECT datetime(created_at/1000,'unixepoch') AS at, route_id, mode, player_name, car_id, time_ms, points, sim_version FROM scores ORDER BY created_at DESC LIMIT 20\"",
+    "db:sql": "wrangler d1 execute idrift-db --remote --command",
     "db:reset": "wrangler d1 execute idrift-db --remote --command \"DELETE FROM scores\"",
     "db:reset:local": "wrangler d1 execute idrift-db --local --command \"DELETE FROM scores\""
   },
