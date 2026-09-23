@@ -1490,7 +1490,7 @@
 }
 
 .pause-btn--holding .pause-ring__fill {
-  animation: pause-ring-fill 2s linear forwards;
+  animation: pause-ring-fill 1s linear forwards;
 }
 
 @keyframes pause-ring-fill {
@@ -1557,7 +1557,7 @@
 }
 
 #game.restart-holding .restart-hold__fill {
-  animation: restart-hold-fill 2s linear forwards;
+  animation: restart-hold-fill 1s linear forwards;
 }
 
 @keyframes restart-hold-fill {

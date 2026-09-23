@@ -1408,8 +1408,9 @@ $('btn-restart').addEventListener('click', restartRun);
 
 // The pause button: a tap pauses; holding it fills a ring round the button
 // and restarts the run when the ring closes. The run carries on meanwhile, so
-// a restart costs no more than the two seconds.
-const RESTART_HOLD_MS = 2000;
+// a restart costs no more than the second it takes. (Must match the ring's
+// animation in game.css.)
+const RESTART_HOLD_MS = 1000;
 const pauseBtn = $('btn-pause');
 let restartTimer = 0;
 let holdPointer: number | null = null;

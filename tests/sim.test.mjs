@@ -25,6 +25,7 @@ import { configFor, DRIFT_CONTROL } from '../src/data/assist.ts';
 import { cornerSpeedLimit, roadKeepingTurn } from '../src/sim/model/assist.ts';
 import { buildGhost, ghostTimeGap } from '../src/ghost.ts';
 import { upcomingCornerSign } from '../src/sim/model/throttleDrift.ts';
+import { stepDriftScore } from '../src/sim/model/score.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const route = JSON.parse(readFileSync(resolve(here, '../public/routes/akari-downhill.json'), 'utf8'));
@@ -1025,4 +1026,26 @@ test('throttle controls: a drifting car never jolts sideways', () => {
     // about its front axle adds some on top, but nothing like a jolt.
     assert.ok(peak < 20, `${car.name} jolted sideways at ${peak.toFixed(1)}g`);
   }
+});
+
+test('throttle controls: a slide caught short of a spin is not scored as one', () => {
+  // Past the angle that used to count as a spin, and still under the sim's own
+  // spin limit: the car held on, so neither a spin nor a broken combo.
+  const car = carById('silvia');
+  const config = configFor('driftRun', 'throttle');
+  const state = createSimState(route, car);
+  state.speed = 25;
+  state.driftDir = 1;
+  state.slipAngle = 1.47;
+  state.drift.pending = 5000;
+  stepDriftScore(state, route, config, 1 / TICK_RATE);
+  assert.equal(state.drift.spins, 0, 'a near miss counted as a spin');
+  assert.ok(state.drift.pending >= 5000, 'a near miss broke the combo');
+
+  // The sim declaring a spin is a spin, once, and it forfeits the combo.
+  state.spinTicks = 60;
+  stepDriftScore(state, route, config, 1 / TICK_RATE);
+  stepDriftScore(state, route, config, 1 / TICK_RATE);
+  assert.equal(state.drift.spins, 1);
+  assert.equal(state.drift.pending, 0);
 });

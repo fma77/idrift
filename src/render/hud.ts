@@ -3,6 +3,7 @@ import type { RouteData, SimConfig, SimState } from '../sim/types.ts';
 import type { DriftGauge } from './driftGauge.ts';
 import { realKmh, WORLD_SCALE } from '../data/scale.ts';
 import { holdPhase, HOLD_OVER } from '../sim/model/throttleDrift.ts';
+import { SPIN_ANGLE } from '../sim/model/score.ts';
 import { ghostPointsGap, ghostTimeGap, type GhostTrack } from '../ghost.ts';
 
 /** Seconds the hold meter spans: past HOLD_OVER, with room to see it overshoot. */
@@ -70,6 +71,8 @@ export class Hud {
 
   private readonly el: HudElements;
   private ghost: GhostTrack | null = null;
+  /** Past the spin angle last frame without spinning: a near miss in progress. */
+  private nearSpin = false;
 
   constructor(el: HudElements) {
     this.el = el;
@@ -217,6 +220,13 @@ export class Hud {
       }
 
       if (state.drift.brokeThisTick) this.flash();
+
+      // A near miss: past the angle that used to count as a spin, and caught
+      // before the car actually went round. It flashes red -- that moment of
+      // nearly losing it is half the fun -- and costs nothing.
+      const near = config.controls === 'throttle' && state.spinTicks === 0 && Math.abs(state.slipAngle) > SPIN_ANGLE;
+      if (near && !this.nearSpin) this.flash();
+      this.nearSpin = near;
 
       // A drift ending is a moment, so it gets one: the points it banked, big,
       // for a second. Without it the only sign a drift was over was the combo

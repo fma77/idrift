@@ -21,7 +21,7 @@ const MIN_DRIFT_ANGLE = 0.14;
  * because Drift Run lets the car hang out at 60 degrees and more, and a lurid
  * slide that briefly overshoots is the thing being rewarded, not a spin.
  */
-const SPIN_ANGLE = 1.45;
+export const SPIN_ANGLE = 1.45;
 /** Radians (~52 degrees). Slide angle worth the most points. */
 const BEST_ANGLE = 0.9;
 /** m/s (90 km/h). Drift speed worth full points; faster is worth up to 1.4x. */
@@ -55,12 +55,17 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
   const driftSign = state.slipAngle >= 0 ? 1 : -1;
 
   // --- Spins ---
-  // One per spin: it starts past SPIN_ANGLE (or when throttle controls declare
-  // one) and is not over until the car is back under half that, so a slide
-  // hovering around the threshold does not count several times.
-  const spinningNow = absSlip > SPIN_ANGLE || state.spinTicks > 0;
+  // With throttle controls the sim decides exactly when the car spins, and only
+  // that counts. Judging by angle as well scored a spin for every slide that
+  // went past SPIN_ANGLE and was caught short of the sim's own limit: the car
+  // held its line, the player felt the save, and the sheet said they had spun.
+  // Steered, there is no such signal, so the angle is the judge. Either way it
+  // is one per spin: not over until the car is back under half the angle, so a
+  // slide hovering around the threshold does not count several times.
+  const overAngle = !throttleControls && absSlip > SPIN_ANGLE;
+  const spinningNow = overAngle || state.spinTicks > 0;
   if (spinningNow && !d.spinning) d.spins++;
-  d.spinning = spinningNow || (d.spinning && absSlip > SPIN_ANGLE * 0.5);
+  d.spinning = spinningNow || (d.spinning && !throttleControls && absSlip > SPIN_ANGLE * 0.5);
 
   // --- Which drift zone, if any, are we in? ---
   const zoneIndex = findZone(route, state.sampleIndex);
@@ -98,7 +103,7 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
   // between two of them felt like being robbed.
   if (state.hitThisTick) {
     breakCombo(d);
-  } else if (absSlip > SPIN_ANGLE || state.spinTicks > 0) {
+  } else if (overAngle || state.spinTicks > 0) {
     breakCombo(d);
   } else if (throttleControls && state.driftDir === 0 && state.spinTicks === 0) {
     // With throttle controls the sim says exactly when a drift is over, so bank
