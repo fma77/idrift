@@ -200,6 +200,10 @@ function showScreen(name: ScreenName): void {
   for (const key of Object.keys(SCREENS) as ScreenName[]) {
     SCREENS[key].hidden = key !== name;
   }
+  // Each screen scrolls by itself and remembers where it was left, so the
+  // results after a second run opened wherever the last ones were scrolled to
+  // -- usually down at the leaderboard, with the run's own score out of sight.
+  SCREENS[name].scrollTop = 0;
   gameEl.hidden = true;
 }
 
@@ -619,17 +623,22 @@ function drawMinimap(route: RouteData): void {
 
 /**
  * Where the garage goes back to. From a route's page it is a detour: picking a
- * car returns to that route rather than to the main menu.
+ * car returns to that route rather than to the main menu. From the results it
+ * is a rematch: picking a car runs the same route and mode again in it.
  */
-let garageReturn: 'title' | 'intro' = 'title';
+let garageReturn: 'title' | 'intro' | 'rerun' = 'title';
 
-function openGarage(from: 'title' | 'intro'): void {
+function openGarage(from: 'title' | 'intro' | 'rerun'): void {
   garageReturn = from;
   buildCarList();
   showScreen('garage');
 }
 
 function leaveGarage(): void {
+  if (garageReturn === 'rerun') {
+    showScreen('results');
+    return;
+  }
   if (garageReturn === 'intro') {
     showIntroCar();
     setBoardMode(boardMode);
@@ -749,7 +758,7 @@ function buildCarList(): void {
       if (selected) {
         const go = document.createElement('span');
         go.className = 'go-race';
-        go.textContent = garageReturn === 'intro' ? 'Use this car' : 'Go race';
+        go.textContent = garageReturn === 'intro' ? 'Use this car' : garageReturn === 'rerun' ? 'Race this car' : 'Go race';
         body.appendChild(go);
       }
 
@@ -758,6 +767,12 @@ function buildCarList(): void {
         if (!selected) {
           settings.carId = car.id;
           saveSettings(settings);
+        }
+        if (garageReturn === 'rerun') {
+          // Picked after a run: the same route and mode again, in this car.
+          // Started from this tap, which is what lets the engine sound start.
+          void startRun(currentMode);
+          return;
         }
         if (garageReturn === 'intro') {
           // Picked from a route's page: straight back to it.
@@ -1174,7 +1189,12 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
   $('result-tune-note').hidden = !unranked;
   $('result-submit').hidden = !!unranked;
   showScreen('results');
-  if (!unranked) void showResultBoard();
+  if (!unranked) {
+    resultCar = 'all';
+    $('btn-result-all').setAttribute('aria-pressed', 'true');
+    $('btn-result-car').setAttribute('aria-pressed', 'false');
+    void showResultBoard();
+  }
 }
 
 /** A line of the score: what it was for, how many, and what it added or took. */
@@ -1211,19 +1231,34 @@ function totalRow(label: string, value: string): HTMLElement {
 }
 
 /** The top 20 for this route and mode, under the results, with the player's row marked. */
+/** Which cars the results board covers: every car, or the one just driven. */
+let resultCar: 'all' | 'mine' = 'all';
+
+function setResultCar(which: 'all' | 'mine'): void {
+  resultCar = which;
+  $('btn-result-all').setAttribute('aria-pressed', String(which === 'all'));
+  $('btn-result-car').setAttribute('aria-pressed', String(which === 'mine'));
+  void showResultBoard();
+}
+
 async function showResultBoard(fresh = false): Promise<void> {
   const route = currentRoute;
   const container = $('result-board-rows');
   if (!route) return;
   const mode = currentMode;
   const key = boardFor(currentMode, currentControls);
+  const carName = carById(settings.carId).name;
+  const car = resultCar === 'mine' ? settings.carId : 'all';
   $('result-board-title').textContent = `Top 20 · ${boardTitle(key)}`;
+  $('btn-result-car').textContent = carName;
   container.replaceChildren(caption('Loading…'));
   try {
-    const board = await fetchBoard(route.id, key, 'all', route.version, SIM_VERSION, fresh);
+    const board = await fetchBoard(route.id, key, car, route.version, SIM_VERSION, fresh);
+    // The player may have switched boards while this was in flight.
+    if (car !== (resultCar === 'mine' ? settings.carId : 'all')) return;
     container.replaceChildren(
       ...(board.rows.length === 0
-        ? [caption('No scores posted yet. Be first.')]
+        ? [caption(resultCar === 'mine' ? `No scores in the ${carName} yet. Be first.` : 'No scores posted yet. Be first.')]
         : board.rows.map((row) => boardRow(row, mode, key))),
     );
   } catch (err) {
@@ -1395,6 +1430,9 @@ $('btn-board-car').addEventListener('click', () => setBoardCar('mine'));
 $('btn-level-easy').addEventListener('click', () => setTimeAttackLevel('easy'));
 $('btn-level-pro').addEventListener('click', () => setTimeAttackLevel('pro'));
 $('btn-retry').addEventListener('click', () => void startRun(currentMode));
+$('btn-result-car-change').addEventListener('click', () => openGarage('rerun'));
+$('btn-result-all').addEventListener('click', () => setResultCar('all'));
+$('btn-result-car').addEventListener('click', () => setResultCar('mine'));
 $('btn-result-routes').addEventListener('click', () => {
   buildRouteList();
   showScreen('routes');

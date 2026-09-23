@@ -281,6 +281,10 @@
             <div class="board result-board">
               <div class="board__head">
                 <div class="label" style="color: var(--ink-muted)" id="result-board-title">Top 20</div>
+                <div class="board__cars">
+                  <button class="level-btn" id="btn-result-all" type="button" aria-pressed="true">All cars</button>
+                  <button class="level-btn" id="btn-result-car" type="button" aria-pressed="false">Car</button>
+                </div>
               </div>
               <div id="result-board-rows"><div class="caption">Loading…</div></div>
             </div>
@@ -290,6 +294,7 @@
 
           <div class="btn-row">
             <button class="btn btn--primary" id="btn-retry">Run again</button>
+            <button class="btn btn--secondary" id="btn-result-car-change">Run again in another car</button>
             <button class="btn btn--secondary" id="btn-result-routes">Routes</button>
             <button class="btn--text" id="btn-result-title" style="border: none; background: none; cursor: pointer">
               Main menu
