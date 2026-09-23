@@ -1546,6 +1546,46 @@ window.addEventListener('resize', () => {
   if (!SCREENS.intro.hidden && currentRoute) showPoster(currentRoute);
 });
 
+// iOS reports a rotation before the page has its new size. Measure again once it
+// has settled; the renderer also watches its own size, this is belt and braces.
+window.addEventListener('orientationchange', () => {
+  for (const ms of [100, 400, 900]) {
+    window.setTimeout(() => {
+      if (!gameEl.hidden) renderer.resize();
+    }, ms);
+  }
+});
+
+// --- No zooming (iOS) ---------------------------------------------------------
+//
+// iOS ignores the page's "no zoom" setting on purpose, for accessibility, so a
+// quick double tap on a pad or two thumbs landing together could zoom the page
+// or open the magnifier loupe mid-run. Pinch and double-tap are cancelled here,
+// and on the race screen a touch that lands on the driving surfaces is claimed
+// outright, which stops the loupe too. Pointer events -- what the controls
+// actually listen to -- still arrive; only the browser's own gestures do not.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+document.addEventListener(
+  'touchmove',
+  (e) => {
+    if (e.touches.length > 1) e.preventDefault();
+  },
+  { passive: false },
+);
+gameEl.addEventListener(
+  'touchstart',
+  (e) => {
+    // Buttons (pause, the pause menu) and the tuning sliders still need their
+    // taps to become clicks and drags.
+    if (e.target instanceof Element && e.target.closest('button, input, select, label, a')) return;
+    e.preventDefault();
+  },
+  { passive: false },
+);
+
 // A real touch anywhere switches to touch hints.
 window.addEventListener(
   'pointerdown',

@@ -1016,3 +1016,12 @@ input[type='range']::-moz-range-thumb {
 .board__cars .level-btn[aria-pressed='true'] {
   padding: 3px 8px;
 }
+
+/*
+ * No double-tap zoom anywhere: taps land straight away and never zoom the page.
+ * Pinch is stopped in main.ts; iOS ignores the viewport's user-scalable=no.
+ */
+html,
+body {
+  touch-action: manipulation;
+}

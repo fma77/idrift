@@ -97,6 +97,25 @@ export class Renderer {
     if (!ctx) throw new Error('2D canvas context unavailable');
     this.ctx = ctx;
     this.resize();
+    // The window's resize event is not enough on an iPhone: it fires during a
+    // rotation, while the page still reports the old size, and never again. The
+    // canvas then kept its old shape and was stretched to the new one -- and
+    // stayed stretched through every rotation after. Watching the canvas's own
+    // laid-out size catches the real, settled size every time.
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => this.resize()).observe(canvas);
+    }
+  }
+
+  /**
+   * Re-measure if the canvas's drawing size no longer matches its size on
+   * screen. Cheap, and called every frame as the last line of defence: a
+   * stretched world is far worse than one extra measurement.
+   */
+  private checkSize(): void {
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    if (w > 0 && h > 0 && (w !== this.width || h !== this.height)) this.resize();
   }
 
   resize(): void {
@@ -186,6 +205,7 @@ export class Renderer {
     dtSeconds: number,
     ghost: GhostPose | null = null,
   ): void {
+    this.checkSize();
     const view = interpolate(prev, state, alpha);
     this.prepareWorld(route);
     const theme = this.theme;
