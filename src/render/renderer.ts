@@ -969,11 +969,23 @@ function repaint(sprite: HTMLImageElement, livery: Livery): HTMLCanvasElement {
     // Back to the car's own outline: the blend filled the empty corners too.
     c.globalCompositeOperation = 'destination-in';
     c.drawImage(sprite, 0, 0);
-    c.globalCompositeOperation = 'source-atop';
-    c.globalAlpha = 0.85;
-    c.fillStyle = livery.secondary;
-    c.fillRect(w * 0.39, 0, w * 0.07, h);
-    c.fillRect(w * 0.54, 0, w * 0.07, h);
+    // The stripes, on painted panels only: drawn on their own, cut to the
+    // car's bodywork, then laid on. Painted straight down the car they ran
+    // over the windscreen and the rear window.
+    const stripes = document.createElement('canvas');
+    stripes.width = w;
+    stripes.height = h;
+    const sc = stripes.getContext('2d');
+    if (sc) {
+      sc.fillStyle = livery.secondary;
+      sc.fillRect(w * 0.39, 0, w * 0.07, h);
+      sc.fillRect(w * 0.54, 0, w * 0.07, h);
+      sc.globalCompositeOperation = 'destination-in';
+      sc.drawImage(bodywork(sprite), 0, 0);
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 0.9;
+      c.drawImage(stripes, 0, 0);
+    }
   }
   repaints.set(key, canvas);
   return canvas;
@@ -986,4 +998,83 @@ function luminance(hex: string): number {
   const g = (n >> 8) & 255;
   const b = n & 255;
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+/** The smallest patch of paint that counts as bodywork, as a share of the car. */
+const PANEL_SHARE = 0.04;
+
+/**
+ * The painted panels of a car drawing, as a mask: opaque on bodywork, clear on
+ * glass, tyres, lights and outlines. Stripes are cut to it.
+ *
+ * Paint is light, or dark but strongly coloured (a blue or red car); glass and
+ * trim are dark and colourless. But the drawings show seats and reflections
+ * through the glass, light enough to pass for paint, and stripes landed on
+ * them. Bodywork is one large connected area, where a seat seen through a
+ * windscreen is a small island in the dark -- so only the large areas count.
+ */
+function bodywork(sprite: HTMLImageElement): HTMLCanvasElement {
+  const w = sprite.naturalWidth;
+  const h = sprite.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const c = canvas.getContext('2d', { willReadFrequently: true });
+  if (!c) return canvas;
+  c.drawImage(sprite, 0, 0);
+  const image = c.getImageData(0, 0, w, h);
+  const d = image.data;
+  const n = w * h;
+
+  const paint = new Uint8Array(n);
+  let solid = 0;
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    if (d[i + 3] <= 128) continue;
+    solid++;
+    const r = d[i] / 255;
+    const g = d[i + 1] / 255;
+    const b = d[i + 2] / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const light = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const saturation = max === 0 ? 0 : (max - min) / max;
+    if (light > 0.42 || (saturation > 0.4 && light > 0.16)) paint[p] = 1;
+  }
+
+  // Label the connected areas of paint, and measure each.
+  const area = new Int32Array(n).fill(-1);
+  const sizes: number[] = [];
+  const stack = new Int32Array(n);
+  for (let p = 0; p < n; p++) {
+    if (!paint[p] || area[p] >= 0) continue;
+    const id = sizes.length;
+    let top = 0;
+    let size = 0;
+    stack[top++] = p;
+    area[p] = id;
+    while (top > 0) {
+      const q = stack[--top];
+      size++;
+      const x = q % w;
+      const next = [x + 1 < w ? q + 1 : -1, x > 0 ? q - 1 : -1, q + w < n ? q + w : -1, q - w >= 0 ? q - w : -1];
+      for (const k of next) {
+        if (k >= 0 && paint[k] && area[k] < 0) {
+          area[k] = id;
+          stack[top++] = k;
+        }
+      }
+    }
+    sizes.push(size);
+  }
+
+  const least = PANEL_SHARE * solid;
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    const panel = area[p] >= 0 && sizes[area[p]] >= least;
+    d[i] = 255;
+    d[i + 1] = 255;
+    d[i + 2] = 255;
+    d[i + 3] = panel ? 255 : 0;
+  }
+  c.putImageData(image, 0, 0);
+  return canvas;
 }
