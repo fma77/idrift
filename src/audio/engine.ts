@@ -22,6 +22,7 @@ export class EngineAudio {
   private lockGain: GainNode | null = null;
   private lastFlick = 0;
   private noise: AudioBufferSourceNode | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
   private model: EngineModel | null = null;
   private profile: EngineProfile | null = null;
   private lastTime = 0;
@@ -119,7 +120,8 @@ export class EngineAudio {
     // Tyre squeal: narrow bands of noise, the sound of rubber sliding. Their
     // pitch rises a little with the angle, so a bigger slide sounds harder.
     this.noise = ctx.createBufferSource();
-    this.noise.buffer = makeNoiseBuffer(ctx);
+    this.noiseBuffer = makeNoiseBuffer(ctx);
+    this.noise.buffer = this.noiseBuffer;
     this.noise.loop = true;
     this.squealGain = ctx.createGain();
     this.squealGain.gain.value = 0;
@@ -263,6 +265,60 @@ export class EngineAudio {
     osc.connect(band).connect(env).connect(this.master);
     osc.start(now);
     osc.stop(now + 0.45);
+  }
+
+  /**
+   * Two cars hitting each other: a low thump of the bodies, a burst of crunch,
+   * and a short metallic ring, all scaled by how hard (0..1).
+   */
+  triggerImpact(strength: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !this.noiseBuffer) return;
+    const s = Math.min(1, Math.max(0.15, strength));
+    const now = ctx.currentTime;
+
+    // Thump: a falling sine, felt more than heard.
+    const thump = ctx.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(95, now);
+    thump.frequency.exponentialRampToValueAtTime(42, now + 0.18);
+    const thumpEnv = ctx.createGain();
+    thumpEnv.gain.setValueAtTime(0, now);
+    thumpEnv.gain.linearRampToValueAtTime(0.9 * s, now + 0.008);
+    thumpEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    thump.connect(thumpEnv).connect(this.master);
+    thump.start(now);
+    thump.stop(now + 0.27);
+
+    // Crunch: noise through a closing low-pass, panels folding.
+    const crunch = ctx.createBufferSource();
+    crunch.buffer = this.noiseBuffer;
+    const low = ctx.createBiquadFilter();
+    low.type = 'lowpass';
+    low.frequency.setValueAtTime(2600 + 2400 * s, now);
+    low.frequency.exponentialRampToValueAtTime(500, now + 0.22);
+    const crunchEnv = ctx.createGain();
+    crunchEnv.gain.setValueAtTime(0, now);
+    crunchEnv.gain.linearRampToValueAtTime(0.75 * s, now + 0.005);
+    crunchEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    crunch.connect(low).connect(crunchEnv).connect(this.master);
+    crunch.start(now, Math.random() * 0.5);
+    crunch.stop(now + 0.32);
+
+    // Ring: a brief, bright clang of metal.
+    const ring = ctx.createBufferSource();
+    ring.buffer = this.noiseBuffer;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 2300 + 900 * s;
+    band.Q.value = 14;
+    const ringEnv = ctx.createGain();
+    ringEnv.gain.setValueAtTime(0, now);
+    ringEnv.gain.linearRampToValueAtTime(1.6 * s, now + 0.004);
+    ringEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    ring.connect(band).connect(ringEnv).connect(this.master);
+    ring.start(now, Math.random() * 0.5);
+    ring.stop(now + 0.18);
   }
 
   /** Swap the voice live, for the sound lab. */

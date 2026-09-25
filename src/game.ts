@@ -54,6 +54,8 @@ export class GameSession {
   private prevState: SimState;
   /** The other car's state a tick ago, for drawing it smoothly. Tandem only. */
   private prevPartner: SimState | null = null;
+  /** The hardest hit between the cars since the last frame, m/s. Tandem only. */
+  private pendingImpact = 0;
   private recorder = new InputRecorder();
   private hashes: number[] = [];
 
@@ -209,6 +211,7 @@ export class GameSession {
     if (this.tandem) {
       this.prevPartner = cloneSimState(this.tandem.partner);
       stepTandem(this.tandem, this.state, this.simInput, this.car, this.route, this.config);
+      if (this.tandem.impact > this.pendingImpact) this.pendingImpact = this.tandem.impact;
     } else {
       stepSim(this.state, this.simInput, this.car, this.route, this.config);
     }
@@ -244,6 +247,9 @@ export class GameSession {
     );
     if (this.tandem) {
       this.hud.updateTandem(this.tandem);
+      // A crash: through the player's own audio, full volume -- it is their car too.
+      if (this.pendingImpact > 0.3) this.audio?.triggerImpact(this.pendingImpact / 8);
+      this.pendingImpact = 0;
       if (this.partnerAudio) {
         // Louder alongside, fading to a quarter forty metres off.
         const p = this.tandem.partner;

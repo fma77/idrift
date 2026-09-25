@@ -132,3 +132,73 @@ test('tandem: a player chasing the house leader is steered onto its line', () =>
   assert.ok(offsets.length > 50, 'never close enough to judge');
   assert.ok(median < 2.5, `the chaser ran ${median.toFixed(1)}m off the leader's line`);
 });
+
+test('tandem: cars that hit bounce apart and trade speed, and the chaser is charged', () => {
+  // A chaser a little behind the leader and much faster, on a straight: it runs into it.
+  const route = ROUTES[1];
+  const car = carById('silvia');
+  const lead = createSimState(route, car);
+  placeAhead(lead, route);
+  const t = createTandem(route, 'chase', car, { kind: 'leadBot', skill: 0.8 });
+  // The leader is the partner; put it just in front of the player, slow.
+  Object.assign(t.partner, { x: lead.x, y: lead.y, heading: lead.heading, sampleIndex: lead.sampleIndex, distance: lead.distance });
+  const player = createSimState(route, car);
+  const h = lead.heading;
+  Object.assign(player, { x: lead.x - Math.cos(h) * 4.2, y: lead.y - Math.sin(h) * 4.2, heading: h, sampleIndex: lead.sampleIndex, distance: lead.distance - 4.2 });
+  player.vx = 25; player.speed = 25;
+  t.partner.vx = 10; t.partner.speed = 10;
+  let hit = 0;
+  for (let i = 0; i < 12; i++) {
+    stepTandem(t, player, { steer: 0, throttle: 1, initiate: false }, car, route, config);
+    hit = Math.max(hit, t.impact);
+  }
+  assert.ok(hit > 5, `the hit was only ${hit.toFixed(1)} m/s`);
+  assert.ok(player.speed < 22, `the chaser kept ${player.speed.toFixed(1)} m/s through the hit`);
+  assert.ok(t.partner.speed > 12, `the leader was not pushed: ${t.partner.speed.toFixed(1)} m/s`);
+  const gap = Math.hypot(player.x - t.partner.x, player.y - t.partner.y);
+  assert.ok(gap > 3.5, `the cars are still inside each other: ${gap.toFixed(2)} m apart`);
+  assert.equal(t.player.contacts, 1, 'one hit, one contact');
+  assert.equal(t.opponent.contacts, 0, 'the leader is not charged');
+});
+
+test('tandem: each difficulty level drives better than the one below, leading and chasing', () => {
+  // The four characters' skills. Scores averaged over three routes, against
+  // the same stand-in driver, so only the house driver changes.
+  const skills = [0.6, 0.8, 0.9, 1.0];
+  const sample = [ROUTES[0], ROUTES[2], ROUTES[4]];
+  const car = carById('silvia');
+  const leads = [];
+  const chases = [];
+  for (const skill of skills) {
+    let lead = 0;
+    let chase = 0;
+    for (const route of sample) {
+      const a = createSimState(route, car);
+      const ta = createTandem(route, 'chase', car, { kind: 'leadBot', skill });
+      const da = standIn();
+      while (!a.finished && a.tick < TICK_RATE * 400) {
+        const o = da(a, route);
+        stepTandem(ta, a, { steer: 0, throttle: o.throttle, initiate: o.tap }, car, route, config);
+      }
+      lead += tandemScore(ta.opponent);
+      const b = createSimState(route, car);
+      placeAhead(b, route);
+      const tb = createTandem(route, 'lead', car, { kind: 'chaseBot', skill });
+      const db = standIn();
+      while (!b.finished && b.tick < TICK_RATE * 400) {
+        const o = db(b, route);
+        stepTandem(tb, b, { steer: 0, throttle: o.throttle, initiate: o.tap }, car, route, config);
+      }
+      chase += tandemScore(tb.opponent);
+    }
+    leads.push(lead / sample.length);
+    chases.push(chase / sample.length);
+  }
+  for (let i = 1; i < skills.length; i++) {
+    assert.ok(leads[i] > leads[i - 1] + 3, `leading: skill ${skills[i]} scored ${leads[i].toFixed(0)}, below ${skills[i - 1]}'s ${leads[i - 1].toFixed(0)}`);
+    // The Pro and the King chase about equally well; the King leads better.
+    assert.ok(chases[i] > chases[i - 1] - 3, `chasing: skill ${skills[i]} scored ${chases[i].toFixed(0)}, below ${skills[i - 1]}'s ${chases[i - 1].toFixed(0)}`);
+  }
+  assert.ok(chases[3] > chases[0] + 20, 'the Drift King chases no better than the Rookie');
+  assert.ok(leads[3] >= 85, `the Drift King only led to ${leads[3].toFixed(0)}`);
+});

@@ -5,7 +5,6 @@ import { cos, sin, clamp } from './math/trig.ts';
 import { findZone } from './model/score.ts';
 import { upcomingCornerSign } from './model/throttleDrift.ts';
 import { updateProgress } from './model/progress.ts';
-import { SWEET_SPOT } from './types.ts';
 import type { CarParams, RouteData, SimConfig, SimInput, SimState } from './types.ts';
 
 /**
@@ -81,8 +80,10 @@ export interface TandemState {
   /** The two cars touched this tick (counted once per contact). */
   contactThisTick: boolean;
   contactCooldown: number;
-  /** Touching last tick: one contact is one touch, however long it lasts. */
-  touching: boolean;
+  /** How hard the cars hit each other this tick, m/s of closing speed; 0 if they did not. */
+  impact: number;
+  /** Ticks since the cars last touched: a leader spun by the chaser is not blamed for it. */
+  sinceContact: number;
   /** The zone in which a pass was last penalised, so one pass costs once. */
   passedZone: number;
   /** Walls and spins already counted, per car. */
@@ -104,7 +105,16 @@ const FOLLOW_RANGE = 60;
 /** m/s below which a car is not drifting, whatever its angle. */
 const MIN_SPEED = 8;
 /** m/s of drift worth full marks for speed. */
-const REFERENCE_SPEED = 25;
+const REFERENCE_SPEED = 20;
+/** Curvature past which the road under a car is a bend (a 90m radius). */
+const BEND = 1 / 90;
+
+function inBend(route: RouteData, i: number): boolean {
+  const k = route.samples.curvature[i];
+  return k > BEND || k < -BEND;
+}
+/** Radians under the limit angle at which a leader's angle earns full marks. */
+const LEAD_FULL_MARGIN = 0.04;
 
 // Penalties, in points out of 100.
 const SPIN_PENALTY = 15;
@@ -113,6 +123,10 @@ const CONTACT_PENALTY = 10;
 const PASS_PENALTY = 15;
 /** Seconds after a contact before another counts. */
 const CONTACT_COOLDOWN = 0.6;
+/** m/s of closing speed below which cars merely brush, without a penalty. */
+const CONTACT_MIN = 0.3;
+/** Seconds after contact in which a leader's spin is the chaser's doing. */
+const SPIN_FORGIVENESS = 1.5;
 
 /** How far ahead of the chaser the leader starts, centre to centre, metres: a car length of clear road between them. */
 export const LEAD_START = 2 * 4.6;
@@ -157,7 +171,8 @@ export function createTandem(
     sameSide: false,
     contactThisTick: false,
     contactCooldown: 0,
-    touching: false,
+    impact: 0,
+    sinceContact: 1e9,
     passedZone: -1,
     playerSpinsSeen: 0,
     playerWallsSeen: 0,
@@ -210,6 +225,7 @@ export function stepTandem(
   if (!partner.finished) stepSim(partner, partnerIn, t.partnerCar, route, config);
   closeUpAssist(lead, chase);
   slipstream(lead, chase);
+  t.impact = player.finished || partner.finished ? 0 : collide(player, playerCar, partner, t.partnerCar);
 
   judge(t, player, lead, chase, route, config);
 }
@@ -278,20 +294,55 @@ function chaseLine(lead: SimState, chase: SimState, route: RouteData): number | 
 
 // --- The other driver --------------------------------------------------------
 
-/** Seconds of drift button for a full flick. */
-const BOT_FLICK_HOLD = 0.22;
+/**
+ * What a driver's skill (0.6 Rookie .. 1.0 Drift King) means in practice. Each
+ * is drawn straight between the Rookie's and the Drift King's value.
+ */
+interface Skill {
+  /** Radians under the limit angle it holds a drift at: the Rookie's 38 degrees to the King's 53. */
+  margin: number;
+  /** Metres before a corner it throws the car in: late and hurried, or early and set up. */
+  flickAhead: number;
+  /** Seconds it holds the drift button: a soft flick, or a full one. */
+  flickHold: number;
+  /** Bumper gap it chases at, car lengths. */
+  gap: number;
+  /** Seconds to answer the leader's change of side. */
+  react: number;
+  /** How hard it steers its angle towards the leader's, chasing. */
+  mirror: number;
+  /** The share of the throttle it dares to use mid-drift. */
+  commit: number;
+  /** How well, 0..1, it matches the force of the leader's flick. */
+  read: number;
+}
+
+function skillOf(skill: number): Skill {
+  const k = clamp((skill - 0.6) / 0.4, 0, 1);
+  const between = (rookie: number, king: number) => rookie + (king - rookie) * k;
+  return {
+    margin: between(0.3, 0.035),
+    flickAhead: between(13, 27),
+    flickHold: between(0.13, 0.24),
+    gap: between(2.4, 0.5),
+    react: between(0.45, 0.08),
+    mirror: between(0.3, 1.0),
+    commit: between(0.82, 1),
+    read: between(0, 1),
+  };
+}
 
 function driveBot(t: TandemState, s: SimState, route: RouteData, config: SimConfig, skill: number): void {
+  const k = skillOf(skill);
   // Throw it in before a corner; switch sides for the next one.
-  const next = upcomingCornerSign(s, route, 24);
+  const next = upcomingCornerSign(s, route, k.flickAhead);
   let tap = false;
   if (s.driftDir === 0 && s.spinTicks === 0 && next !== 0 && s.speed > 10) tap = true;
   if (s.driftDir !== 0 && next === -s.driftDir) tap = true;
-  if (tap && t.botHold === 0 && !s.initiateHeld) t.botHold = Math.round(BOT_FLICK_HOLD / DT);
-  // Balance the angle with the throttle, just under the limit -- a better
-  // driver runs closer to it.
-  const margin = 0.1 + (1 - skill) * 0.15;
-  const hold = s.driftDir === 0 || (upcomingCornerSign(s, route, 40) !== 0 && s.driftAngle < config.drift.limitAngle - margin);
+  if (tap && t.botHold === 0 && !s.initiateHeld) t.botHold = Math.round(k.flickHold / DT);
+  // Balance the angle with the throttle, under the limit -- a better driver
+  // runs closer to it.
+  const hold = s.driftDir === 0 || (upcomingCornerSign(s, route, 40) !== 0 && s.driftAngle < config.drift.limitAngle - k.margin);
   rampThrottle(t, hold ? 1 : 0, skill);
 }
 
@@ -317,7 +368,8 @@ function driveChaser(
   } else {
     t.sinceLeaderChange++;
   }
-  const react = Math.round((0.12 + (1 - skill) * 0.3) / DT);
+  const k = skillOf(skill);
+  const react = Math.round(k.react / DT);
   const wantSide = lead.driftDir;
   if (
     wantSide !== 0 &&
@@ -328,16 +380,36 @@ function driveChaser(
     s.spinTicks === 0 &&
     s.speed > 10
   ) {
-    t.botHold = Math.round(BOT_FLICK_HOLD / DT);
+    // How hard to throw it in: as hard as the leader did. A good chaser reads
+    // a soft flick and answers softly; a full flick behind a gentle leader
+    // overshot its angle and dropped it back. The Rookie cannot read it, and
+    // always flicks the same.
+    const leaderSoft = clamp(lead.driftAngle / config.drift.flickAngle, 0.45, 1);
+    const hold = k.flickHold * (1 - k.read + k.read * leaderSoft);
+    t.botHold = Math.max(1, Math.round(hold / DT));
   }
   // Hold the gap: mirror the leader's throttle, open it up when dropping
-  // back, close it off when too close. A better chaser runs tighter.
-  const target = (0.4 + (1 - skill) * 1.0) * CAR_LENGTH;
+  // back, close it off when too close; and steer the angle towards the
+  // leader's. A better chaser runs tighter and copies the angle closer.
+  const target = k.gap * CAR_LENGTH;
   let throttle = lead.throttle + 0.06 * (gap - target) + 0.12 * (lead.speed - s.speed);
+  // Copy the leader's angle, up to what this driver can hold: at its own
+  // ceiling it stops asking for more angle, but keeps its power.
+  const ceiling = config.drift.limitAngle - k.margin;
+  // Falling back, it trades a little angle for speed -- a tenth of a radian
+  // per car length too far back -- because closeness counts for more.
+  const behind = Math.max(0, gapL - k.gap - 0.3);
+  const wanted = Math.min(lead.driftAngle, ceiling) - 0.1 * behind;
+  if (s.driftDir !== 0 && lead.driftDir === s.driftDir) throttle += k.mirror * (wanted - s.driftAngle);
   // The leader has straightened: so does the chaser, to follow it out.
   if (lead.driftDir === 0 && s.driftDir !== 0) throttle = 0;
-  if (s.driftDir !== 0 && s.driftAngle > config.drift.limitAngle - 0.06) throttle = Math.min(throttle, 0.3);
-  if (gapL < 0.2) throttle = 0;
+  // A less confident driver holds back mid-drift.
+  if (s.driftDir !== 0) throttle *= k.commit;
+  // Close to the limit itself, whoever it is, it backs off before it spins.
+  if (s.driftDir !== 0 && s.driftAngle > config.drift.limitAngle - 0.03) throttle = Math.min(throttle, 0.3);
+  // Right on the leader's bumper it eases off: on grip it lifts, but in a
+  // drift lifting kills the angle and the speed with it, so it only trims.
+  if (gapL < 0.2) throttle = s.driftDir === 0 ? 0 : Math.min(throttle, lead.throttle * 0.8);
   rampThrottle(t, clamp(throttle, 0, 1), skill);
 }
 
@@ -382,10 +454,15 @@ function drifting(s: SimState): boolean {
 /** How well a leader is drifting this tick, 0..1: angle up to the sweet spot, and speed. */
 function leadQuality(s: SimState, config: SimConfig): number {
   if (!drifting(s)) return 0;
-  const full = config.drift.limitAngle - SWEET_SPOT;
-  const angle = clamp(s.driftAngle / full, 0, 1);
+  // Full marks only right at the limit: the bravest angle is the best lead.
+  // (They came at 40 degrees, which paid a Rookie the same as a Drift King.)
+  const full = config.drift.limitAngle - LEAD_FULL_MARGIN;
+  const share = clamp(s.driftAngle / full, 0, 1);
+  // Steeper than straight: the last few degrees before the limit are the
+  // hardest to hold, and worth the most.
+  const angle = share * Math.sqrt(share);
   const speed = clamp(s.speed / REFERENCE_SPEED, 0, 1);
-  return angle * (0.7 + 0.3 * speed);
+  return angle * (0.8 + 0.2 * speed);
 }
 
 /**
@@ -409,18 +486,25 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
   t.sameSide = lead.driftDir !== 0 && lead.driftDir === chase.driftDir;
   const aL = lead.driftDir !== 0 ? lead.driftAngle : 0;
   const aC = chase.driftDir !== 0 ? chase.driftAngle : 0;
-  t.angleMatch = t.sameSide ? clamp(1 - Math.abs(aC - aL) / 0.6, 0, 1) : 0;
+  // Within about ten degrees is a good match; forty apart is none.
+  t.angleMatch = t.sameSide ? clamp(1 - Math.abs(aC - aL) / 0.7, 0, 1) : 0;
 
-  // Leader: judged through its own zones.
-  if (!lead.finished && findZone(route, lead.sampleIndex) >= 0) {
+  // Leader: judged where its zones bend. A zone runs on over the straight
+  // between two bends, and counting that as a failure to drift capped even a
+  // perfect lead at about 75.
+  if (!lead.finished && findZone(route, lead.sampleIndex) >= 0 && inBend(route, lead.sampleIndex)) {
     leadSide.zoneTicks++;
     leadSide.qualitySum += leadQuality(lead, config);
   }
-  // Chaser: judged through its zones, against the leader.
+  // Chaser: judged through its zones while the leader is drifting -- the chase
+  // is judged against the lead, and nobody can be asked to be sideways when
+  // the car they are following is not.
   const zone = findZone(route, chase.sampleIndex);
-  if (!chase.finished && zone >= 0) {
+  if (!chase.finished && zone >= 0 && drifting(lead)) {
     chaseSide.zoneTicks++;
-    if (drifting(chase)) chaseSide.qualitySum += proximity(t.gapLengths) * (0.35 + 0.65 * t.angleMatch);
+    if (drifting(chase)) chaseSide.qualitySum += proximity(t.gapLengths) * (0.45 + 0.55 * t.angleMatch);
+  }
+  if (!chase.finished && zone >= 0) {
     // Passing the leader in a zone.
     if (t.gapLengths < -1.5 && t.passedZone !== zone) {
       t.passedZone = zone;
@@ -431,23 +515,26 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
 
   // Contact: the chaser's to avoid.
   t.contactThisTick = false;
-  const touchingNow = touching(player, t.partner);
-  const newTouch = touchingNow && !t.touching;
-  t.touching = touchingNow;
+  if (t.impact > 0) t.sinceContact = 0;
+  else t.sinceContact++;
   if (t.contactCooldown > 0) t.contactCooldown--;
-  else if (newTouch) {
+  else if (t.impact > CONTACT_MIN) {
     t.contactThisTick = true;
     t.contactCooldown = Math.round(CONTACT_COOLDOWN / DT);
     chaseSide.contacts++;
     chaseSide.penalty += CONTACT_PENALTY;
   }
 
-  // Spins and walls, each driver's own.
+  // Spins and walls, each driver's own -- except a leader spun by the chaser
+  // hitting it, which the judges put down to the chaser.
   const playerSide = t.player;
   const other = t.opponent;
+  const knocked = t.sinceContact < SPIN_FORGIVENESS / DT;
   if (player.drift.spins > t.playerSpinsSeen) {
-    playerSide.spins += player.drift.spins - t.playerSpinsSeen;
-    playerSide.penalty += SPIN_PENALTY * (player.drift.spins - t.playerSpinsSeen);
+    if (!(knocked && t.playerRole === 'lead')) {
+      playerSide.spins += player.drift.spins - t.playerSpinsSeen;
+      playerSide.penalty += SPIN_PENALTY * (player.drift.spins - t.playerSpinsSeen);
+    }
     t.playerSpinsSeen = player.drift.spins;
   }
   if (player.wallHits > t.playerWallsSeen) {
@@ -457,8 +544,10 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
   }
   const p = t.partner;
   if (p.drift.spins > t.partnerSpinsSeen) {
-    other.spins += p.drift.spins - t.partnerSpinsSeen;
-    other.penalty += SPIN_PENALTY * (p.drift.spins - t.partnerSpinsSeen);
+    if (!(knocked && t.playerRole === 'chase')) {
+      other.spins += p.drift.spins - t.partnerSpinsSeen;
+      other.penalty += SPIN_PENALTY * (p.drift.spins - t.partnerSpinsSeen);
+    }
     t.partnerSpinsSeen = p.drift.spins;
   }
   if (p.wallHits > t.partnerWallsSeen) {
@@ -468,30 +557,106 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
   }
 }
 
+/** How bouncy a car-to-car hit is: 0 dead, 1 elastic. Cars crumple; mostly dead. */
+const RESTITUTION = 0.3;
+/** How much a hit off-centre twists a car, radians per (metre x m/s). */
+const TWIST = 0.035;
+
 /**
- * Whether the two cars overlap: each is three discs along its length, as wide
- * as the car. Close enough for a top-down game, and cheap.
+ * Two cars hitting each other. Each car is three discs along its length, as
+ * wide as the car. Where they overlap, the cars are pushed apart, exchange
+ * momentum along the line of the hit (equal masses, mostly dead), and a hit off
+ * a car's centre twists it -- so a chaser that runs into the leader's rear
+ * quarter can spin it, as it would for real. Returns the closing speed, 0 when
+ * they are not touching or already separating.
  */
-function touching(a: SimState, b: SimState): boolean {
-  if (a.finished || b.finished) return false;
-  const reach = CAR_LENGTH * 2;
+function collide(a: SimState, carA: CarParams, b: SimState, carB: CarParams): number {
+  const reach = (carA.bodyLength + carB.bodyLength) * 0.6;
   const dx0 = a.x - b.x;
   const dy0 = a.y - b.y;
-  if (dx0 * dx0 + dy0 * dy0 > reach * reach) return false;
-  const r = 0.85;
-  const along = CAR_LENGTH * 0.32;
+  if (dx0 * dx0 + dy0 * dy0 > reach * reach) return 0;
+
   const ca = cos(a.heading);
   const sa = sin(a.heading);
   const cb = cos(b.heading);
   const sb = sin(b.heading);
+  const alongA = carA.bodyLength * 0.32;
+  const alongB = carB.bodyLength * 0.32;
+  const reachAB = (carA.bodyWidth + carB.bodyWidth) * 0.47;
+
+  // The deepest overlap between the two cars' discs.
+  let depth = 0;
+  let nx = 0;
+  let ny = 0;
+  let cx = 0;
+  let cy = 0;
   for (let i = -1; i <= 1; i++) {
-    const ax = a.x + ca * along * i;
-    const ay = a.y + sa * along * i;
+    const ax = a.x + ca * alongA * i;
+    const ay = a.y + sa * alongA * i;
     for (let j = -1; j <= 1; j++) {
-      const dx = ax - (b.x + cb * along * j);
-      const dy = ay - (b.y + sb * along * j);
-      if (dx * dx + dy * dy < (2 * r) * (2 * r)) return true;
+      const bx = b.x + cb * alongB * j;
+      const by = b.y + sb * alongB * j;
+      const dx = ax - bx;
+      const dy = ay - by;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= reachAB * reachAB) continue;
+      const d = Math.sqrt(d2);
+      const pen = reachAB - d;
+      if (pen <= depth) continue;
+      depth = pen;
+      if (d > 1e-6) {
+        nx = dx / d;
+        ny = dy / d;
+      } else {
+        const d0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1;
+        nx = dx0 / d0;
+        ny = dy0 / d0;
+      }
+      cx = (ax + bx) / 2;
+      cy = (ay + by) / 2;
     }
   }
-  return false;
+  if (depth === 0) return 0;
+
+  // Apart: half each, along the line of the hit.
+  a.x += (nx * depth) / 2;
+  a.y += (ny * depth) / 2;
+  b.x -= (nx * depth) / 2;
+  b.y -= (ny * depth) / 2;
+
+  // Momentum: world velocities from the body frame.
+  const awx = a.vx * ca - a.vy * sa;
+  const awy = a.vx * sa + a.vy * ca;
+  const bwx = b.vx * cb - b.vy * sb;
+  const bwy = b.vx * sb + b.vy * cb;
+  const closing = (awx - bwx) * nx + (awy - bwy) * ny;
+  if (closing >= 0) return 0;
+  const j = (-(1 + RESTITUTION) * closing) / 2;
+  setWorldVelocity(a, awx + j * nx, awy + j * ny, ca, sa);
+  setWorldVelocity(b, bwx - j * nx, bwy - j * ny, cb, sb);
+
+  // Twist: the hit's lever about each car's centre.
+  twist(a, (cx - a.x) * (j * ny) - (cy - a.y) * (j * nx));
+  twist(b, (cx - b.x) * (-j * ny) - (cy - b.y) * (-j * nx));
+  return -closing;
+}
+
+function setWorldVelocity(s: SimState, wx: number, wy: number, c: number, sn: number): void {
+  s.vx = wx * c + wy * sn;
+  s.vy = -wx * sn + wy * c;
+  s.speed = Math.sqrt(wx * wx + wy * wy);
+}
+
+/**
+ * Turn a car by a hit's lever (metres x m/s; positive turns it left). Drifting,
+ * the body is placed at the drift angle to its path, so the twist goes into
+ * that angle -- past the limit, it spins. On grip it goes into the yaw rate.
+ */
+function twist(s: SimState, lever: number): void {
+  const turn = lever * TWIST;
+  if (s.driftDir !== 0) {
+    s.driftAngle = Math.max(-0.3, s.driftAngle + s.driftDir * turn);
+  } else {
+    s.yawRate += turn / 0.25;
+  }
 }
