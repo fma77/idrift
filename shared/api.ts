@@ -5,8 +5,14 @@
  * a runtime surprise in production.
  */
 
-/** Leaderboards: Time Attack on pedals ('timeAttackPro') has its own. */
-export type ApiMode = 'timeAttack' | 'timeAttackPro' | 'driftRun';
+/**
+ * Leaderboards: Time Attack on pedals ('timeAttackPro') has its own, and so do
+ * tandem battles against the house ('tandem'), ranked on the player's battle
+ * total out of 200.
+ */
+export type ApiMode = 'timeAttack' | 'timeAttackPro' | 'driftRun' | 'tandem';
+
+export const API_MODES: readonly ApiMode[] = ['timeAttack', 'timeAttackPro', 'driftRun', 'tandem'];
 
 /** Leaderboard partition key, per the brief. */
 export interface BoardKey {

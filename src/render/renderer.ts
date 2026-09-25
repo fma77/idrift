@@ -9,6 +9,13 @@ import { WorldArt } from './world.ts';
 import { themeFor, type WorldTheme } from './themes.ts';
 import type { GhostPose } from '../ghost.ts';
 
+/** The other car in a tandem, a tick ago and now, for drawing it between them. */
+export interface PartnerView {
+  prev: SimState;
+  next: SimState;
+  car: CarParams;
+}
+
 /**
  * World renderer.
  *
@@ -71,6 +78,8 @@ export class Renderer {
   private skidLeft: SkidPoint[] = [];
   private skidRight: SkidPoint[] = [];
   private readonly smoke = new TyreSmoke();
+  /** The tandem partner's own smoke: the two cars' clouds are half the spectacle. */
+  private readonly partnerSmoke = new TyreSmoke();
   private readonly dirt = new DirtSpray();
 
   /**
@@ -180,6 +189,7 @@ export class Renderer {
     this.skidLeft.length = 0;
     this.skidRight.length = 0;
     this.smoke.clear();
+    this.partnerSmoke.clear();
     this.dirt.clear();
   }
 
@@ -204,9 +214,11 @@ export class Renderer {
     settings: RenderSettings,
     dtSeconds: number,
     ghost: GhostPose | null = null,
+    partner: PartnerView | null = null,
   ): void {
     this.checkSize();
     const view = interpolate(prev, state, alpha);
+    const partnerView = partner ? interpolate(partner.prev, partner.next, alpha) : null;
     this.prepareWorld(route);
     const theme = this.theme;
 
@@ -255,10 +267,17 @@ export class Renderer {
     if (settings.showSmoke) {
       this.smoke.update(view, car, dtSeconds);
       this.smoke.draw(ctx, PAPER);
+      if (partner && partnerView) {
+        this.partnerSmoke.update(partnerView, partner.car, dtSeconds);
+        this.partnerSmoke.draw(ctx, PAPER);
+      }
     }
     // The ghost under the player's car: when the two overlap, the one being
     // driven is the one that shows.
     if (ghost) this.drawGhost(ctx, ghost, px);
+    // The other tandem car is a real car, solid and shadowed, drawn under the
+    // player's so the player's own car is always the one on top.
+    if (partner && partnerView) this.drawCar(ctx, partnerView, partner.car, px, theme);
     this.drawCar(ctx, view, car, px, theme);
 
     ctx.restore();

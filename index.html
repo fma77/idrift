@@ -105,6 +105,7 @@
           <div class="mode-row">
             <button class="btn mode-btn" id="btn-drift-run" type="button" aria-pressed="true">Drift Run</button>
             <button class="btn mode-btn" id="btn-time-attack" type="button" aria-pressed="false">Time Attack</button>
+            <button class="btn mode-btn" id="btn-tandem" type="button" aria-pressed="false">Tandem</button>
             <button class="btn btn--go" id="btn-go" type="button">Go</button>
           </div>
           <!-- Time Attack only: who handles the speed. Each level has its own board. -->
@@ -113,6 +114,20 @@
             <button class="level-btn" id="btn-level-easy" type="button" aria-pressed="true">Easy</button>
             <button class="level-btn" id="btn-level-pro" type="button" aria-pressed="false">Pro</button>
             <span class="caption level-row__note" id="level-note">The car brakes for corners.</span>
+          </div>
+          <!-- Tandem only: who Go battles, and how a battle is judged, in four lines. -->
+          <div class="tandem-row" id="tandem-row" hidden>
+            <div class="tandem-row__vs">
+              <span class="label" style="color: var(--ink-muted)">Battle</span>
+              <span class="card__name" id="tandem-vs">vs the house</span>
+              <span class="caption">same car as you</span>
+            </div>
+            <ol class="tandem-how">
+              <li><b>Two runs:</b> you chase, then you lead. The game steers; your throttle and angle set the gap.</li>
+              <li><b>Chasing:</b> keep the gap bar green (within a car length), same side, same angle.</li>
+              <li><b>Leading:</b> big angle and good speed.</li>
+              <li>Each run is judged out of 100. Contact, spins and passing cost points; within 2%, it's one more time.</li>
+            </ol>
           </div>
           <!-- The leaderboard run Go will race, picked with a row's Ghost button. -->
           <div class="ghost-note" id="ghost-note" hidden>
@@ -130,6 +145,15 @@
             </div>
             </div>
             <div id="board-rows"><div class="caption">Loading…</div></div>
+          </div>
+
+          <!-- Tandem only: chase anyone's posted Drift Run instead of battling the house. -->
+          <div class="board" id="chase-board" hidden>
+            <div class="board__head">
+              <div class="label" style="color: var(--ink-muted)">Or chase a Drift Run</div>
+            </div>
+            <div class="caption">Chase anyone's posted run. Not ranked: only battles against the house are.</div>
+            <div id="chase-rows"><div class="caption">Loading…</div></div>
           </div>
 
           <div class="spacer"></div>
@@ -309,6 +333,33 @@
 
         <div class="hud">
           <div class="hud__top">
+            <!-- Tandem: both drivers' live scores, the gap, and how well the angles match. -->
+            <div class="tandem-hud" id="tandem-hud" hidden>
+              <div class="tandem-hud__scores">
+                <div class="tandem-hud__side">
+                  <span class="hud__label" data-t="you-label">You · chase</span>
+                  <span class="hud__value" data-t="you">—</span>
+                </div>
+                <div class="tandem-hud__run" data-t="run">Run 1/2</div>
+                <div class="tandem-hud__side tandem-hud__side--them">
+                  <span class="hud__label" data-t="them-label">House · lead</span>
+                  <span class="hud__value" data-t="them">—</span>
+                </div>
+              </div>
+              <div class="tandem-hud__gap">
+                <span class="hud__label" data-t="gap-label">Gap</span>
+                <div class="gapbar" aria-hidden="true">
+                  <span class="gapbar__good"></span><span class="gapbar__ok"></span><span class="gapbar__far"></span>
+                  <span class="gapbar__mark" data-t="mark"></span>
+                </div>
+                <span class="tandem-hud__gapval" data-t="gap">—</span>
+              </div>
+              <div class="tandem-hud__match" data-t="match-row">
+                <span class="hud__label">Angle</span>
+                <span class="tandem-hud__matchval" data-t="match">—</span>
+                <span class="tandem-hud__flag" data-t="side">—</span>
+              </div>
+            </div>
             <div class="hud__panel">
               <div class="hud__cell">
                 <span class="hud__label" id="hud-combo-label">Combo</span>
@@ -374,6 +425,8 @@
         </div>
 
         <div class="hud__flash" id="hud-flash"></div>
+        <!-- Tandem penalties as they happen: CONTACT -10, PASSED -15. -->
+        <div class="tandem-pop" id="tandem-pop" aria-live="polite"></div>
         <div class="bank-pop" id="bank-pop" aria-live="polite"></div>
 
         <!-- Touch anywhere and slide to steer. See src/input/thumbSteer.ts. -->

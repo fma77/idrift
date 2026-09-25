@@ -1025,3 +1025,53 @@ html,
 body {
   touch-action: manipulation;
 }
+
+/* --- Tandem on the route page --------------------------------------------- */
+
+/* Three modes and Go in one row: the labels may take two lines on a phone. */
+.mode-row .mode-btn {
+  white-space: normal;
+  line-height: 1.1;
+  font-size: 13px;
+  padding: 0 6px;
+}
+
+.tandem-row[hidden] {
+  display: none;
+}
+
+.tandem-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.tandem-row__vs {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.tandem-how {
+  margin: 0;
+  padding: 0 0 0 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.tandem-how b {
+  font-weight: 800;
+}
+
+#chase-board[hidden] {
+  display: none;
+}
+
+#chase-board > .caption {
+  margin: 4px 0 var(--s-2);
+}

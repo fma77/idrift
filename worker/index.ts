@@ -1,5 +1,6 @@
 import { checkName, MAX_NAME_LENGTH } from '../shared/moderation.ts';
 import {
+  API_MODES,
   BOARD_SIZE,
   isLowerBetter,
   rankValue,
@@ -233,7 +234,7 @@ async function readBoard(
   mode: string,
   car: string | undefined,
 ): Promise<Response> {
-  if (mode !== 'timeAttack' && mode !== 'timeAttackPro' && mode !== 'driftRun') {
+  if (!API_MODES.includes(mode as ApiMode)) {
     return problem(400, 'badRequest', 'Unknown mode.');
   }
 
@@ -242,7 +243,7 @@ async function readBoard(
 
   const routeVersion = Number(url.searchParams.get('routeVersion') ?? bounds.version);
   const simVersion = Number(url.searchParams.get('simVersion') ?? 1);
-  const order = isLowerBetter(mode) ? 'ASC' : 'DESC';
+  const order = isLowerBetter(mode as ApiMode) ? 'ASC' : 'DESC';
 
   // The car is optional in the path: 'all' (or nothing) ranks every car
   // together, and a car's id gives that car's own board.
@@ -368,7 +369,9 @@ function validateShape(b: ScoreSubmission): string | null {
   if (typeof b !== 'object' || b === null) return 'Malformed submission.';
   if (typeof b.routeId !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.routeId)) return 'Bad route.';
   if (!Number.isInteger(b.routeVersion) || b.routeVersion < 1) return 'Bad route version.';
-  if (b.mode !== 'timeAttack' && b.mode !== 'timeAttackPro' && b.mode !== 'driftRun') return 'Bad mode.';
+  if (!API_MODES.includes(b.mode)) return 'Bad mode.';
+  // A tandem battle is two runs judged out of 100 each.
+  if (b.mode === 'tandem' && b.points > 200) return 'Bad points.';
   if (typeof b.carClass !== 'string' || !/^[A-Z]{1,2}$/.test(b.carClass)) return 'Bad car class.';
   if (!Number.isInteger(b.simVersion) || b.simVersion < 1) return 'Bad sim version.';
   if (typeof b.playerName !== 'string' || b.playerName.length > MAX_NAME_LENGTH * 2) return 'Bad name.';

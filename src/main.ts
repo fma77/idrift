@@ -29,6 +29,9 @@ import {
   bestKey,
 } from './storage/bests.ts';
 import { buildGhost, type GhostTrack } from './ghost.ts';
+import { createTandem, tandemScore, type TandemSide, type TandemState } from './sim/tandem.ts';
+import { InputRecorder } from './sim/replay.ts';
+import { houseDriver } from './data/house.ts';
 import { loadDecoration } from './render/decoration.ts';
 import { getSprite, preload } from './render/sprites.ts';
 import { drawPosterOverlay } from './ui/poster.ts';
@@ -37,7 +40,7 @@ import { submitScore, fetchBoard, fetchReplay, bytesToBase64, LeaderboardError }
 import { checkName } from '../shared/moderation.ts';
 import type { ApiMode, LeaderboardRow } from '../shared/api.ts';
 import { SIM_VERSION, TICK_RATE } from './sim/version.ts';
-import type { Controls, RouteData, SimMode } from './sim/types.ts';
+import type { CarParams, Controls, RouteData, SimMode } from './sim/types.ts';
 
 /**
  * App shell: screen routing, settings, and the bridge between the menus and a
@@ -96,8 +99,37 @@ let currentRoute: RouteData | null = null;
 let currentMode: SimMode = 'driftRun';
 let session: GameSession | null = null;
 let lastOutcome: RunOutcome | null = null;
+/** The route page's modes: the two run modes, and tandem battles. */
+type PageMode = SimMode | 'tandem';
 /** Which board the route screen is showing. */
-let boardMode: SimMode = 'driftRun';
+let boardMode: PageMode = 'driftRun';
+/** The mode last driven: the route page reopens on it. */
+let lastPageMode: PageMode = 'driftRun';
+
+/**
+ * A tandem battle in progress. Against the house: two runs, the player chasing
+ * then leading, both judged out of 100, and one more time if the totals are
+ * within 2%. Chasing a posted run: one run, not ranked.
+ */
+interface Battle {
+  kind: 'house' | 'chase';
+  /** The other driver's name. */
+  name: string;
+  skill: number;
+  run: 1 | 2;
+  /** One-more-time rounds so far. */
+  omt: number;
+  youChase: number;
+  theyLead: number;
+  youLead: number;
+  theyChase: number;
+  /** Both runs' time, for the board. */
+  timeMs: number;
+  outcome?: 'win' | 'loss' | 'omt';
+  /** Chasing a posted run: its inputs and car. */
+  leader?: { inputs: InputRecorder; car: CarParams };
+}
+let battle: Battle | null = null;
 /** Which cars the route page's board covers: every car, or the selected one. */
 let boardCar: 'all' | 'mine' = 'all';
 /** Row id of the score just posted, so it can be highlighted on the board. */
@@ -140,6 +172,8 @@ const hud = new Hud({
   gauge: new DriftGauge($('drift-gauge')),
   ghostGap: $('ghost-gap'),
   ghostMark: $('ghost-mark'),
+  tandem: $('tandem-hud'),
+  tandemPop: $('tandem-pop'),
 });
 
 const input = new InputController();
@@ -262,7 +296,8 @@ async function openIntro(entry: RouteEntry): Promise<void> {
   showIntroCar();
   // The board opens on the mode last driven, so coming back from a Drift Run
   // shows the drift scores.
-  setBoardMode(currentMode);
+  battle = null;
+  setBoardMode(lastPageMode);
   showScreen('intro');
 
   // Scenery and car art load in the background. Neither blocks the drive
@@ -293,8 +328,13 @@ function boardCarId(): string {
   return boardCar === 'mine' ? settings.carId : 'all';
 }
 
-function setBoardMode(mode: SimMode): void {
+function setBoardMode(mode: PageMode): void {
   boardMode = mode;
+  $('btn-tandem').setAttribute('aria-pressed', String(mode === 'tandem'));
+  $('tandem-row').hidden = mode !== 'tandem';
+  $('chase-board').hidden = mode !== 'tandem';
+  if (currentRoute) $('tandem-vs').textContent = `vs ${houseDriver(currentRoute.id).name}`;
+  if (mode === 'tandem') void refreshChaseBoard();
   $('btn-board-car').textContent = carById(settings.carId).name;
   $('btn-board-all').setAttribute('aria-pressed', String(boardCar === 'all'));
   $('btn-board-car').setAttribute('aria-pressed', String(boardCar === 'mine'));
@@ -324,10 +364,12 @@ function boardFor(mode: SimMode, controls: Controls): ApiMode {
 
 /** The board the route page is showing: its mode, and for Time Attack the level. */
 function pageBoard(): ApiMode {
+  if (boardMode === 'tandem') return 'tandem';
   return boardFor(boardMode, settings.timeAttackLevel === 'pro' ? 'pedals' : 'steer');
 }
 
 function boardTitle(board: ApiMode): string {
+  if (board === 'tandem') return 'Tandem · vs the house';
   return board === 'driftRun' ? 'Drift Run' : board === 'timeAttackPro' ? 'Time Attack · Pro' : 'Time Attack · Easy';
 }
 
@@ -377,7 +419,7 @@ async function refreshBoard(): Promise<void> {
 }
 
 /** One leaderboard row, formatted for the board it is on -- not for whichever tab the route page last showed. */
-function boardRow(row: LeaderboardRow, mode: SimMode, board: ApiMode): HTMLElement {
+function boardRow(row: LeaderboardRow, mode: PageMode, board: ApiMode, action: 'ghost' | 'chase' = 'ghost'): HTMLElement {
   const el = document.createElement('div');
   el.className = row.id === myLastRowId ? 'board__row board__row--me' : 'board__row';
 
@@ -398,10 +440,19 @@ function boardRow(row: LeaderboardRow, mode: SimMode, board: ApiMode): HTMLEleme
   // Time Attack shows only a time; Drift Run shows points, with the time as
   // the secondary value, exactly as the brief specifies.
   value.textContent =
-    mode === 'timeAttack'
-      ? formatTime(row.timeMs / 1000)
-      : row.points.toLocaleString('en-GB');
-  if (mode === 'driftRun') {
+    board === 'tandem'
+      ? String(row.points)
+      : mode === 'timeAttack'
+        ? formatTime(row.timeMs / 1000)
+        : row.points.toLocaleString('en-GB');
+  if (board === 'tandem') {
+    // A battle total out of 200, and whether it beat the house.
+    const result = document.createElement('span');
+    result.className = 'board__car';
+    result.style.textAlign = 'right';
+    result.textContent = row.grade === 'W' ? 'Win' : 'Loss';
+    value.appendChild(result);
+  } else if (mode === 'driftRun') {
     const time = document.createElement('span');
     time.className = 'board__car';
     time.style.textAlign = 'right';
@@ -410,6 +461,18 @@ function boardRow(row: LeaderboardRow, mode: SimMode, board: ApiMode): HTMLEleme
   }
 
   el.append(rank, name, value);
+
+  // Chase this run in a tandem: its stored inputs lead.
+  if (action === 'chase') {
+    const chase = document.createElement('button');
+    chase.type = 'button';
+    chase.className = 'board__ghost';
+    chase.textContent = 'Chase';
+    chase.setAttribute('aria-label', `Chase ${row.playerName}'s run`);
+    chase.addEventListener('click', () => void startChase(row));
+    el.append(chase);
+    return el;
+  }
 
   // Race this run: its stored inputs, driven again beside the player.
   if (row.hasReplay) {
@@ -426,6 +489,220 @@ function boardRow(row: LeaderboardRow, mode: SimMode, board: ApiMode): HTMLEleme
     el.append(document.createElement('span'));
   }
   return el;
+}
+
+// --- Tandem ------------------------------------------------------------------
+
+/** Posted Drift Runs to chase, under the tandem board. */
+async function refreshChaseBoard(): Promise<void> {
+  const route = currentRoute;
+  const box = $('chase-rows');
+  if (!route) return;
+  box.replaceChildren(caption('Loading…'));
+  try {
+    const board = await fetchBoard(route.id, 'driftRun', 'all', route.version, SIM_VERSION);
+    if (boardMode !== 'tandem') return;
+    const rows = board.rows.filter((row) => row.hasReplay);
+    box.replaceChildren(
+      ...(rows.length === 0
+        ? [caption('No Drift Runs posted yet.')]
+        : rows.map((row) => boardRow(row, 'driftRun', 'driftRun', 'chase'))),
+    );
+  } catch (err) {
+    box.replaceChildren(caption(err instanceof LeaderboardError ? err.message : 'Could not reach the leaderboard.'));
+  }
+}
+
+function newHouseBattle(): Battle | null {
+  if (!currentRoute) return null;
+  const d = houseDriver(currentRoute.id);
+  return { kind: 'house', name: d.name, skill: d.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0 };
+}
+
+/** The caption for the run under way: "Run 1/2", "One more time · Run 2/2", "Chase". */
+function battleRunLabel(b: Battle): string {
+  if (b.kind === 'chase') return 'Chase';
+  return `${b.omt > 0 ? 'OMT · ' : ''}Run ${b.run}/2`;
+}
+
+/** Start the battle's current run: in run 1 the player chases, in run 2 leads. */
+function startBattleRun(restart = false): void {
+  const route = currentRoute;
+  const b = battle;
+  if (!route || !b) return;
+  const car = carById(settings.carId);
+  let t: TandemState;
+  if (b.kind === 'chase' && b.leader) {
+    t = createTandem(route, 'chase', b.leader.car, { kind: 'replay', inputs: b.leader.inputs });
+  } else if (b.run === 1) {
+    t = createTandem(route, 'chase', car, { kind: 'leadBot', skill: b.skill });
+  } else {
+    t = createTandem(route, 'lead', car, { kind: 'chaseBot', skill: b.skill });
+  }
+  lastPageMode = 'tandem';
+  void startRun('driftRun', restart, t);
+}
+
+function startHouseBattle(): void {
+  battle = newHouseBattle();
+  startBattleRun();
+}
+
+/** Chase a posted Drift Run: its recording leads. */
+async function startChase(row: LeaderboardRow): Promise<void> {
+  // The engine sound has to start inside this tap, before the download.
+  audio?.stop();
+  audio = new EngineAudio(settings.soundOn);
+  void audio.start(carById(settings.carId).engine);
+  try {
+    const inputs = InputRecorder.decode(await decompress(await fetchReplay(row.id)));
+    battle = {
+      kind: 'chase',
+      name: row.playerName,
+      skill: 0,
+      run: 1,
+      omt: 0,
+      youChase: 0,
+      theyLead: 0,
+      youLead: 0,
+      theyChase: 0,
+      timeMs: 0,
+      leader: { inputs, car: carById(row.carId) },
+    };
+    startBattleRun(true);
+  } catch {
+    $('chase-rows').prepend(caption(`Could not load ${row.playerName}'s run.`));
+  }
+}
+
+/** A tandem run is over: record both drivers' scores and, after run 2, decide the battle. */
+function finishBattleRun(outcome: RunOutcome): void {
+  const b = battle;
+  const t = outcome.tandem;
+  if (!b || !t) return;
+  const you = tandemScore(t.player);
+  const them = tandemScore(t.opponent);
+  b.timeMs += Math.round(outcome.result.timeSeconds * 1000);
+  b.outcome = undefined;
+  if (b.kind === 'chase' || b.run === 1) {
+    b.youChase = you;
+    b.theyLead = them;
+  } else {
+    b.youLead = you;
+    b.theyChase = them;
+    const yours = b.youChase + b.youLead;
+    const theirs = b.theyLead + b.theyChase;
+    // Within 2% is too close to call, as the judges would say: one more time.
+    const close = Math.abs(yours - theirs) <= 0.02 * Math.max(yours, theirs, 1);
+    b.outcome = close ? 'omt' : yours > theirs ? 'win' : 'loss';
+  }
+  showBattleResults(t.player);
+}
+
+/** "2 contacts · 1 spin", or "None". */
+function penaltiesText(s: TandemSide): string {
+  const parts: string[] = [];
+  const add = (n: number, one: string, many: string) => {
+    if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`);
+  };
+  add(s.contacts, 'contact', 'contacts');
+  add(s.passes, 'pass', 'passes');
+  add(s.spins, 'spin', 'spins');
+  add(s.walls, 'wall hit', 'wall hits');
+  return parts.length ? parts.join(' · ') : 'None';
+}
+
+function showBattleResults(yourSide: TandemSide): void {
+  const b = battle;
+  const route = currentRoute;
+  if (!b || !route) return;
+  const car = carById(settings.carId);
+  const final = b.kind === 'house' && b.run === 2;
+  const yours = b.youChase + b.youLead;
+  const theirs = b.theyLead + b.theyChase;
+
+  $('result-title').textContent =
+    b.kind === 'chase'
+      ? 'Chase done'
+      : !final
+        ? 'Run 1 done'
+        : b.outcome === 'win'
+          ? 'You win'
+          : b.outcome === 'loss'
+            ? `${b.name} wins`
+            : 'One more time';
+  $('result-route').textContent = `${currentEntry.name} · ${car.name} · vs ${b.name}`;
+
+  const rows: HTMLElement[] = [];
+  if (b.kind === 'chase') {
+    rows.push(scoreRow('Your chase', `of ${b.name}'s run`, b.youChase, false));
+  } else {
+    rows.push(scoreRow('Run 1 · you chase', `${b.name} leads: ${b.theyLead}`, b.youChase, false));
+    if (final) {
+      rows.push(scoreRow('Run 2 · you lead', `${b.name} chases: ${b.theyChase}`, b.youLead, false));
+      rows.push(totalRow(`You · ${b.name}`, `${yours} – ${theirs}`));
+    }
+  }
+  rows.push(statRow('Your penalties', penaltiesText(yourSide)));
+  $('result-stats').replaceChildren(...rows);
+
+  // What next: the second run, one more time, or another battle.
+  $('btn-retry').textContent =
+    b.kind === 'chase' ? 'Chase again' : !final ? 'Run 2: you lead' : b.outcome === 'omt' ? 'One more time' : 'Battle again';
+  // Changing car mid-battle would start a new one: only offered between battles.
+  $('btn-result-car-change').hidden = b.kind === 'house' && (!final || b.outcome === 'omt');
+
+  // Only a decided battle against the house is ranked.
+  const ranked = final && b.outcome !== 'omt' && !tuneMode;
+  resetSubmitPanel();
+  const note =
+    b.kind === 'chase'
+      ? "Chasing a posted run isn't ranked: only battles against the house are."
+      : tuneMode && final
+        ? 'Tuning mode. This battle is not posted to the leaderboard.'
+        : '';
+  $('result-tune-note').textContent = note;
+  $('result-tune-note').hidden = !note;
+  $('result-submit').hidden = !ranked;
+  showScreen('results');
+  if (ranked) {
+    resultCar = 'all';
+    $('btn-result-all').setAttribute('aria-pressed', 'true');
+    $('btn-result-car').setAttribute('aria-pressed', 'false');
+    void showResultBoard();
+  }
+}
+
+/** The results screen's primary button: the next step of a battle, or the same run again. */
+function retry(): void {
+  const b = battle;
+  if (!b) {
+    void startRun(currentMode);
+    return;
+  }
+  if (b.kind === 'chase') {
+    startBattleRun();
+    return;
+  }
+  if (b.run === 1) {
+    b.run = 2;
+    startBattleRun();
+    return;
+  }
+  if (b.outcome === 'omt') {
+    b.omt++;
+    b.run = 1;
+    b.timeMs = 0;
+    b.outcome = undefined;
+    startBattleRun();
+    return;
+  }
+  startHouseBattle();
+}
+
+/** The board the results show: a house battle's, or the run's own. */
+function resultBoardKey(): ApiMode {
+  return battle?.kind === 'house' ? 'tandem' : boardFor(currentMode, currentControls);
 }
 
 // --- Ghosts -----------------------------------------------------------------
@@ -771,7 +1048,10 @@ function buildCarList(): void {
         if (garageReturn === 'rerun') {
           // Picked after a run: the same route and mode again, in this car.
           // Started from this tap, which is what lets the engine sound start.
-          void startRun(currentMode);
+          // After a battle, that is a new battle, the house in the new car too.
+          if (battle?.kind === 'house') startHouseBattle();
+          else if (battle) startBattleRun();
+          else void startRun(currentMode);
           return;
         }
         if (garageReturn === 'intro') {
@@ -1003,13 +1283,23 @@ let audio: EngineAudio | null = null;
  * come from holding the pause button, which is not a tap, and a phone will not
  * start new sound without one.
  */
-async function startRun(mode: SimMode, restart = false): Promise<void> {
+async function startRun(mode: SimMode, restart = false, tandem: TandemState | null = null): Promise<void> {
   if (!currentRoute) return;
   currentMode = mode;
+  if (!tandem) {
+    battle = null;
+    lastPageMode = mode;
+  }
 
   const car = carById(settings.carId);
-  currentControls =
-    mode === 'driftRun' ? settings.driftControls : settings.timeAttackLevel === 'pro' ? 'pedals' : 'steer';
+  // Tandem is Drift Run on the throttle controls, whatever the setting.
+  currentControls = tandem
+    ? 'throttle'
+    : mode === 'driftRun'
+      ? settings.driftControls
+      : settings.timeAttackLevel === 'pro'
+        ? 'pedals'
+        : 'steer';
   gameEl.dataset.controls = currentControls;
   gameEl.dataset.mode = currentMode;
   const renderSettings: RenderSettings = {
@@ -1026,10 +1316,13 @@ async function startRun(mode: SimMode, restart = false): Promise<void> {
   void audio.start(car.engine);
 
   // After the audio: that has to start inside the tap on Go, before any wait.
-  const ghostTrack = await loadGhostFor(currentRoute, boardFor(mode, currentControls), mode);
+  const ghostTrack = tandem ? null : await loadGhostFor(currentRoute, boardFor(mode, currentControls), mode);
   runGhost = ghostTrack && ghostPick ? { row: ghostPick.row, track: ghostTrack } : null;
   if (ghostPick && !ghostTrack) showGhostNote(`${ghostPick.row.playerName}'s ghost could not be replayed.`);
   hud.setGhost(ghostTrack);
+  hud.setTandem(
+    tandem && battle ? { playerRole: tandem.playerRole, name: battle.name, run: battleRunLabel(battle) } : null,
+  );
 
   session = new GameSession(
     currentRoute,
@@ -1041,12 +1334,19 @@ async function startRun(mode: SimMode, restart = false): Promise<void> {
     audio,
     renderSettings,
     ghostTrack,
+    tandem,
   );
 
   const countdownOverlay = $('overlay-countdown');
   const countdownEl = $('countdown');
   $('countdown-mode').textContent =
-    mode === 'driftRun' ? 'DRIFT RUN' : currentControls === 'pedals' ? 'TIME ATTACK · PRO' : 'TIME ATTACK';
+    tandem && battle
+      ? `TANDEM · ${battleRunLabel(battle).toUpperCase()}`
+      : mode === 'driftRun'
+        ? 'DRIFT RUN'
+        : currentControls === 'pedals'
+          ? 'TIME ATTACK · PRO'
+          : 'TIME ATTACK';
   const keys = gameEl.dataset.input === 'keyboard';
   const key = (a: Action) => keyLabel(settings.keymap[a][0]);
   $('countdown-hint').textContent =
@@ -1061,6 +1361,15 @@ async function startRun(mode: SimMode, restart = false): Promise<void> {
         : keys
           ? `${key('left')} ${key('right')} to steer. The car drives itself.`
           : 'Touch anywhere and slide to steer. The car drives itself.';
+  if (tandem && battle) {
+    const controls = keys
+      ? `${key('throttle')} throttle, ${key('drift')} drift.`
+      : 'Right side: throttle. Left side: drift.';
+    $('countdown-hint').textContent =
+      tandem.playerRole === 'chase'
+        ? `You chase ${battle.name}. The game steers you onto the line: keep the gap bar green with throttle and angle, same side, same angle. ${controls}`
+        : `You lead; ${battle.name} chases. Big angle, good speed: set the pace. ${controls}`;
+  }
   countdownOverlay.hidden = false;
 
   session.onCountdown = (value) => {
@@ -1085,6 +1394,10 @@ async function finishRun(outcome: RunOutcome): Promise<void> {
   proPedals.releaseAll();
   tunePanel.close();
   lastOutcome = outcome;
+  if (outcome.tandem && battle) {
+    finishBattleRun(outcome);
+    return;
+  }
   const route = currentRoute;
   if (!route) return;
 
@@ -1133,6 +1446,8 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
   if (!route) return;
 
   $('result-title').textContent = isBest ? 'Best yet' : 'Run over';
+  $('btn-retry').textContent = 'Run again';
+  $('btn-result-car-change').hidden = false;
   $('result-route').textContent = `${currentEntry.name} · ${currentEntry.location} · ${carById(settings.carId).name}`;
   const rows: HTMLElement[] = [statRow('Time', formatTime(result.timeSeconds))];
 
@@ -1245,8 +1560,8 @@ async function showResultBoard(fresh = false): Promise<void> {
   const route = currentRoute;
   const container = $('result-board-rows');
   if (!route) return;
-  const mode = currentMode;
-  const key = boardFor(currentMode, currentControls);
+  const mode: PageMode = battle?.kind === 'house' ? 'tandem' : currentMode;
+  const key = resultBoardKey();
   const carName = carById(settings.carId).name;
   const car = resultCar === 'mine' ? settings.carId : 'all';
   $('result-board-title').textContent = `Top 20 · ${boardTitle(key)}`;
@@ -1344,7 +1659,8 @@ async function postScore(): Promise<void> {
     // for a record -- and it is what makes ghost playback possible later.
     let replay: string | undefined;
     try {
-      replay = bytesToBase64(await compress(outcome.recorder.encode()));
+      // A battle has two runs and a computer driver; there is no one ghost to keep.
+      if (!battle) replay = bytesToBase64(await compress(outcome.recorder.encode()));
     } catch {
       // Compression unavailable: post the score without a ghost.
     }
@@ -1352,14 +1668,14 @@ async function postScore(): Promise<void> {
     const response = await submitScore({
       routeId: route.id,
       routeVersion: route.version,
-      mode: boardFor(currentMode, currentControls),
+      mode: resultBoardKey(),
       carClass: car.carClass,
       simVersion: SIM_VERSION,
       playerName: name,
       carId: car.id,
-      timeMs: Math.round(result.timeSeconds * 1000),
-      points: result.points,
-      grade: result.grade,
+      timeMs: battle ? battle.timeMs : Math.round(result.timeSeconds * 1000),
+      points: battle ? battle.youChase + battle.youLead : result.points,
+      grade: battle ? (battle.outcome === 'win' ? 'W' : 'L') : result.grade,
       // No throttle assist any more: the car always drives itself. The field
       // stays in the API so the worker and database need no migration.
       assist: 1,
@@ -1423,13 +1739,17 @@ $('btn-intro-back').addEventListener('click', () => {
 });
 $('btn-time-attack').addEventListener('click', () => setBoardMode('timeAttack'));
 $('btn-drift-run').addEventListener('click', () => setBoardMode('driftRun'));
-$('btn-go').addEventListener('click', () => void startRun(boardMode));
+$('btn-tandem').addEventListener('click', () => setBoardMode('tandem'));
+$('btn-go').addEventListener('click', () => {
+  if (boardMode === 'tandem') startHouseBattle();
+  else void startRun(boardMode);
+});
 $('btn-ghost-clear').addEventListener('click', () => setGhostPick(null));
 $('btn-board-all').addEventListener('click', () => setBoardCar('all'));
 $('btn-board-car').addEventListener('click', () => setBoardCar('mine'));
 $('btn-level-easy').addEventListener('click', () => setTimeAttackLevel('easy'));
 $('btn-level-pro').addEventListener('click', () => setTimeAttackLevel('pro'));
-$('btn-retry').addEventListener('click', () => void startRun(currentMode));
+$('btn-retry').addEventListener('click', retry);
 $('btn-result-car-change').addEventListener('click', () => openGarage('rerun'));
 $('btn-result-all').addEventListener('click', () => setResultCar('all'));
 $('btn-result-car').addEventListener('click', () => setResultCar('mine'));
@@ -1503,7 +1823,8 @@ function restartRun(): void {
   session?.abandon();
   session = null;
   $('overlay-paused').hidden = true;
-  void startRun(currentMode, true);
+  if (battle) startBattleRun(true);
+  else void startRun(currentMode, true);
 }
 
 function isRunActive(): boolean {

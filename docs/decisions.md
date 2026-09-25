@@ -396,8 +396,6 @@ Four were caught by the headless harness and would have been miserable to find b
 
 ## Not built (v1 scope)
 
-- Drift Duels / tandem (§7.3) — deferred by the brief. The ghost-replay half is
-  already free from the determinism work; the pursuit controller is not started.
 - Server-side re-simulation — explicitly not required for v1. The state-hash stream is
   recorded anyway, so it is cheap to add later.
 - Supplied art. The loading, rotation and fallback paths all exist and are
@@ -423,3 +421,30 @@ car sideways (measured at 50-115g). Four limits in `throttleDrift.ts` fix it:
   still in a handbrake flick, which may run on until the car is into the corner).
 
 `tests/sim.test.mjs` checks the car's real sideways acceleration stays under 20g.
+
+## Tandem battles
+
+Built as full battles against a house driver per route, plus chasing any posted
+Drift Run. The brief expected the computer chaser to be the hardest feature in
+the game; Drift Run's controls made it tractable, because the game already
+steers, so a chaser only decides throttle and when to flick.
+
+- **One sim, two cars** (). Both step together each tick;
+  the opponent is a recorded run or a computer driver whose every decision is a
+  pure function of the two states. A tandem run replays from the player's inputs
+  alone (tested).
+- **The chaser is steered onto the leader's line**, a car's width inside.
+  What it controls is what a real chase driver controls: throttle, angle, gap.
+- **No brake in Drift Run**, so a chaser closing within ~0.7 car lengths is
+  helped to shed speed, and a chaser tucked in on a straight gets slipstream.
+  Without them the chaser -- player or computer -- rear-ended the leader in
+  every hairpin, and could never recover a gap opened in one.
+- **Judging, per run, out of 100**: lead on angle and speed; chase on the
+  bumper-to-bumper gap (full marks within one car length) and angle match on
+  the same side. Less 15 a spin, 10 a wall, 10 a contact (the chaser's), 15 a
+  pass in a zone. Battle: player chases then leads; totals within 2% go to one
+  more time.
+- **The house driver drives the player's car.** With a fixed car, picking a
+  faster one beat its chasing outright.
+- **Boards**: only battles against the house are ranked (mode , the
+  player's total out of 200, grade W/L). Chasing a posted run is not.

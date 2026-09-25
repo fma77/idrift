@@ -5,6 +5,7 @@ import { realKmh, WORLD_SCALE } from '../data/scale.ts';
 import { holdPhase, HOLD_OVER } from '../sim/model/throttleDrift.ts';
 import { SPIN_ANGLE } from '../sim/model/score.ts';
 import { ghostPointsGap, ghostTimeGap, type GhostTrack } from '../ghost.ts';
+import { tandemScore, type TandemState } from '../sim/tandem.ts';
 
 /** Seconds the hold meter spans: past HOLD_OVER, with room to see it overshoot. */
 const HOLD_SCALE = HOLD_OVER * 1.6;
@@ -47,6 +48,10 @@ export interface HudElements {
   ghostGap: HTMLElement;
   /** Where the ghost is, on the progress bar. */
   ghostMark: HTMLElement;
+  /** Tandem: the live scores, gap bar and angle match. */
+  tandem: HTMLElement;
+  /** Tandem: penalties popping up as they happen. */
+  tandemPop: HTMLElement;
 }
 
 /** Severity 1-6 to a chevron count. Six is a hairpin. */
@@ -76,6 +81,91 @@ export class Hud {
 
   constructor(el: HudElements) {
     this.el = el;
+  }
+
+  // --- Tandem ---------------------------------------------------------------
+
+  private tandemOn = false;
+  private tandemName = '';
+  private lastContacts = 0;
+  private lastPasses = 0;
+  private popTimer = 0;
+  private readonly t = (key: string): HTMLElement => this.el.tandem.querySelector(`[data-t="${key}"]`) as HTMLElement;
+
+  /**
+   * Show the tandem display for a run, or hide it. `run` is the caption in the
+   * middle ("Run 1/2", "Chase"), `name` the other driver's.
+   */
+  setTandem(setup: { playerRole: 'lead' | 'chase'; name: string; run: string } | null): void {
+    this.tandemOn = !!setup;
+    this.el.tandem.hidden = !setup;
+    this.el.root.dataset.tandem = String(!!setup);
+    this.lastContacts = 0;
+    this.lastPasses = 0;
+    this.el.tandemPop.textContent = '';
+    this.el.tandemPop.classList.remove('tandem-pop--show');
+    if (!setup) return;
+    this.tandemName = setup.name;
+    const theirs = setup.playerRole === 'lead' ? 'chase' : 'lead';
+    this.t('you-label').textContent = `You · ${setup.playerRole}`;
+    this.t('them-label').textContent = `${setup.name} · ${theirs}`;
+    this.t('run').textContent = setup.run;
+    this.t('you').textContent = '—';
+    this.t('them').textContent = '—';
+    // Leading, the gap is the chaser's problem: the bar shows how close it is.
+    this.t('gap-label').textContent = setup.playerRole === 'chase' ? 'Gap' : 'Chaser';
+    this.t('match-row').hidden = setup.playerRole !== 'chase';
+  }
+
+  /**
+   * The tandem readouts, every frame. The gap is bumper to bumper in car
+   * lengths: green within one, amber to three, red beyond -- the bar the
+   * chaser is judged on. The angle match is only shown to a chasing player,
+   * because matching the leader is the chaser's job.
+   */
+  updateTandem(t: TandemState): void {
+    if (!this.tandemOn) return;
+    const you = t.player;
+    const them = t.opponent;
+    this.t('you').textContent = you.zoneTicks > 0 ? String(tandemScore(you)) : '—';
+    this.t('them').textContent = them.zoneTicks > 0 ? String(tandemScore(them)) : '—';
+
+    const gap = t.gapLengths;
+    const zone = gap < -0.3 ? 'pass' : gap <= 1 ? 'good' : gap <= 3 ? 'ok' : 'far';
+    this.el.tandem.dataset.gap = zone;
+    this.t('gap').textContent = zone === 'pass' ? 'ALONGSIDE' : gap > 9.9 ? '10+' : Math.max(0, gap).toFixed(1);
+    this.t('mark').style.left = `${(Math.min(6, Math.max(0, gap)) / 6) * 100}%`;
+
+    if (t.playerRole === 'chase') {
+      const drifting = t.partner.driftDir !== 0;
+      const pct = Math.round(t.angleMatch * 100);
+      this.t('match').textContent = drifting ? `${pct}%` : '—';
+      this.el.tandem.dataset.match = !drifting ? 'none' : pct >= 80 ? 'good' : pct >= 50 ? 'ok' : 'bad';
+      this.t('side').textContent = !drifting ? '—' : t.sameSide ? 'Same side' : 'Wrong side';
+      this.t('side').dataset.ok = String(t.sameSide);
+    }
+
+    // Penalties: the chaser's contacts and passes, whoever is chasing.
+    const chaser = t.playerRole === 'chase' ? you : them;
+    const who = t.playerRole === 'chase' ? '' : ` · ${this.tandemName}`;
+    if (chaser.contacts > this.lastContacts) {
+      this.pop(`Contact${who} −10`);
+      this.flash();
+    } else if (chaser.passes > this.lastPasses) {
+      this.pop(`Passed${who} −15`);
+    }
+    this.lastContacts = chaser.contacts;
+    this.lastPasses = chaser.passes;
+  }
+
+  private pop(text: string): void {
+    const el = this.el.tandemPop;
+    el.textContent = text;
+    el.classList.remove('tandem-pop--show');
+    void el.offsetWidth;
+    el.classList.add('tandem-pop--show');
+    window.clearTimeout(this.popTimer);
+    this.popTimer = window.setTimeout(() => el.classList.remove('tandem-pop--show'), 1100);
   }
 
   /** The ghost this run races, or null. */

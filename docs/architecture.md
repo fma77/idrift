@@ -50,7 +50,7 @@ recordings behind them.
 `dist/`, then **Wrangler** (Cloudflare's command-line tool) uploads both the
 built files and the server code to Cloudflare in one step. Database schema
 changes are applied separately with `npm run db:remote`, which runs numbered SQL
-migration files (`migrations/0001…0003`).
+migration files (`migrations/0001…0004`).
 
 ## 5. Cloudflare (the only hosting, one project called `idrift`)
 
@@ -130,7 +130,7 @@ Four endpoints, all on the same origin, so no CORS:
 
 - `GET /api/health` — liveness check.
 - `GET /api/leaderboard/:routeId/:mode/:car` — a board's top 20. `:mode` is one
-  of `timeAttack`, `timeAttackPro`, `driftRun`; `:car` is a car's id or `all`.
+  of `timeAttack`, `timeAttackPro`, `driftRun`, `tandem`; `:car` is a car's id or `all`.
   The query string carries route version and simulation version.
 - `POST /api/score` — submit a run: name, car, mode, time, points, route and
   versions, plus the compressed input recording.

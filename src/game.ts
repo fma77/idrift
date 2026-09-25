@@ -20,6 +20,7 @@ import type { Renderer, RenderSettings } from './render/renderer.ts';
 import type { Hud } from './render/hud.ts';
 import type { EngineAudio } from './audio/engine.ts';
 import { ghostPose, type GhostTrack } from './ghost.ts';
+import { stepTandem, placeAhead, type TandemState } from './sim/tandem.ts';
 
 /**
  * The game loop.
@@ -35,6 +36,8 @@ export type RunPhase = 'countdown' | 'running' | 'finished' | 'aborted';
 
 export interface RunOutcome {
   result: RunResult;
+  /** The tandem run's judging, when this was one. */
+  tandem: TandemState | null;
   state: SimState;
   recorder: InputRecorder;
   hashes: number[];
@@ -49,6 +52,8 @@ export class GameSession {
 
   private state: SimState;
   private prevState: SimState;
+  /** The other car's state a tick ago, for drawing it smoothly. Tandem only. */
+  private prevPartner: SimState | null = null;
   private recorder = new InputRecorder();
   private hashes: number[] = [];
 
@@ -77,9 +82,14 @@ export class GameSession {
     private renderSettings: RenderSettings,
     /** A leaderboard run to race against, driven in full before the start. */
     readonly ghost: GhostTrack | null = null,
+    /** A tandem run: the other car, its driver, and the judging. */
+    readonly tandem: TandemState | null = null,
   ) {
     this.state = createSimState(route, car);
+    // Leading a tandem, the player starts a car length ahead of the chaser.
+    if (tandem?.playerRole === 'lead') placeAhead(this.state, route);
     this.prevState = cloneSimState(this.state);
+    if (tandem) this.prevPartner = cloneSimState(tandem.partner);
   }
 
   start(): void {
@@ -191,7 +201,12 @@ export class GameSession {
     }
 
     this.prevState = cloneSimState(this.state);
-    stepSim(this.state, this.simInput, this.car, this.route, this.config);
+    if (this.tandem) {
+      this.prevPartner = cloneSimState(this.tandem.partner);
+      stepTandem(this.tandem, this.state, this.simInput, this.car, this.route, this.config);
+    } else {
+      stepSim(this.state, this.simInput, this.car, this.route, this.config);
+    }
 
     if (this.state.finished) {
       this.phase = 'finished';
@@ -202,6 +217,7 @@ export class GameSession {
         state: this.state,
         recorder: this.recorder,
         hashes: this.hashes,
+        tandem: this.tandem,
       });
     }
   }
@@ -216,7 +232,11 @@ export class GameSession {
       this.renderSettings,
       deltaSeconds,
       this.ghost ? ghostPose(this.ghost, this.state.tick, alpha) : null,
+      this.tandem && this.prevPartner
+        ? { prev: this.prevPartner, next: this.tandem.partner, car: this.tandem.partnerCar }
+        : null,
     );
+    if (this.tandem) this.hud.updateTandem(this.tandem);
     this.hud.update(this.state, this.route, this.config);
     this.audio?.update(this.state, this.car);
   }
