@@ -10,7 +10,7 @@
  * their angle, how early and how hard they throw the car in, how tight they
  * chase, how fast they answer a change of side (see skillOf in sim/tandem.ts).
  *
- * Names, colours and art are provisional until the owner's arrive.
+ * Names, looks and colours are the owner's.
  */
 export type CharacterId = 'rookie' | 'street' | 'pro' | 'king';
 
@@ -24,15 +24,53 @@ export interface Character {
   level: number;
   /** Their car and suit: the main colour, and the stripes. */
   colours: { primary: string; secondary: string };
-  /** Head-and-shoulders art, square, transparent. A placeholder until supplied. */
+  /** Their name on the dark race display: the main colour, unless that is too dark to read there. */
+  accent: string;
+  /** Square portrait, on its own painted background. */
   bust?: string;
 }
 
 export const CHARACTERS: Character[] = [
-  { id: 'rookie', name: 'MIKA', tier: 'Rookie', skill: 0.6, level: 1, colours: { primary: '#3fa9f5', secondary: '#ffffff' } },
-  { id: 'street', name: 'KENJI', tier: 'Street Drifter', skill: 0.8, level: 2, colours: { primary: '#e8402a', secondary: '#141414' } },
-  { id: 'pro', name: 'LENA', tier: 'Pro Drifter', skill: 0.9, level: 3, colours: { primary: '#f2c230', secondary: '#141414' } },
-  { id: 'king', name: 'TAKA', tier: 'Drift King', skill: 1.0, level: 4, colours: { primary: '#6a3fd6', secondary: '#f2c230' } },
+  {
+    id: 'rookie',
+    name: 'KENJI',
+    tier: 'Rookie',
+    skill: 0.6,
+    level: 1,
+    colours: { primary: '#1f52e0', secondary: '#ffffff' },
+    accent: '#4f7dff',
+    bust: 'art/rivals/rookie.webp',
+  },
+  {
+    id: 'street',
+    name: 'NORICK',
+    tier: 'Street Drifter',
+    skill: 0.8,
+    level: 2,
+    colours: { primary: '#d8232a', secondary: '#ffffff' },
+    accent: '#ff4a4f',
+    bust: 'art/rivals/street.webp',
+  },
+  {
+    id: 'pro',
+    name: 'TAKA',
+    tier: 'Pro Drifter',
+    skill: 0.9,
+    level: 3,
+    colours: { primary: '#161616', secondary: '#d8232a' },
+    accent: '#ff4a4f',
+    bust: 'art/rivals/pro.webp',
+  },
+  {
+    id: 'king',
+    name: 'DK',
+    tier: 'Drift King',
+    skill: 1.0,
+    level: 4,
+    colours: { primary: '#139a45', secondary: '#141414' },
+    accent: '#2fcf6a',
+    bust: 'art/rivals/king.webp',
+  },
 ];
 
 export const DEFAULT_CHARACTER: CharacterId = 'street';

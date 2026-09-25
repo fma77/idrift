@@ -111,3 +111,19 @@ for (const [source, id] of CAR_HEROES) {
     .toFile(full);
   console.log(`cars/${id}-hero-full.webp  ${(statSync(full).size / 1024).toFixed(0)}KB`);
 }
+
+// Tandem characters: square portraits, painted on their own backgrounds.
+// Shipped at 384px, a little over what a phone shows the largest one at.
+const RIVALS = [
+  ['Kenji bust.png', 'rookie'],
+  ['Norick bust.png', 'street'],
+  ['Taka bust.png', 'pro'],
+  ['DK bust.png', 'king'],
+];
+const RIVAL_OUT = resolve(root, 'public/art/rivals');
+mkdirSync(RIVAL_OUT, { recursive: true });
+for (const [source, id] of RIVALS) {
+  const out = resolve(RIVAL_OUT, `${id}.webp`);
+  await sharp(resolve(root, 'art', source)).resize(384, 384, { kernel: 'lanczos3' }).webp({ quality: 82, effort: 6 }).toFile(out);
+  console.log(`rivals/${id}.webp  ${(statSync(out).size / 1024).toFixed(0)}KB`);
+}

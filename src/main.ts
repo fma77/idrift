@@ -704,6 +704,9 @@ function showBattleResults(yourSide: TandemSide): void {
             ? `${b.name} wins`
             : 'One more time';
   $('result-route').textContent = `${currentEntry.name} · ${car.name} · vs ${b.name}`;
+  const portrait = $<HTMLImageElement>('result-rival');
+  portrait.hidden = !b.rival?.bust;
+  if (b.rival?.bust) portrait.src = b.rival.bust;
 
   const rows: HTMLElement[] = [];
   if (b.kind === 'chase') {
@@ -1417,7 +1420,7 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
   hud.setGhost(ghostTrack);
   hud.setTandem(
     tandem && battle
-      ? { playerRole: tandem.playerRole, name: battle.name, run: battleRunLabel(battle), colour: battle.rival?.colours.primary }
+      ? { playerRole: tandem.playerRole, name: battle.name, run: battleRunLabel(battle), colour: battle.rival?.accent }
       : null,
   );
 
@@ -1460,6 +1463,10 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
         : keys
           ? `${key('left')} ${key('right')} to steer. The car drives itself.`
           : 'Touch anywhere and slide to steer. The car drives itself.';
+  // The opponent's face, for the moment before a battle run.
+  const rivalImg = $<HTMLImageElement>('countdown-rival');
+  rivalImg.hidden = !(tandem && battle?.rival?.bust);
+  if (tandem && battle?.rival?.bust) rivalImg.src = battle.rival.bust;
   if (tandem && battle) {
     const controls = keys
       ? `${key('throttle')} throttle, ${key('drift')} drift.`
@@ -1545,6 +1552,7 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
   if (!route) return;
 
   $('result-title').textContent = isBest ? 'Best yet' : 'Run over';
+  $('result-rival').hidden = true;
   $('btn-retry').textContent = 'Run again';
   $('btn-result-car-change').hidden = false;
   $('result-route').textContent = `${currentEntry.name} · ${currentEntry.location} · ${carById(settings.carId).name}`;

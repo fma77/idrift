@@ -1815,3 +1815,23 @@
 .tandem-hud__side--them .hud__label {
   color: var(--them, var(--ink-faint));
 }
+
+/* The opponent's portrait over the countdown before a battle run. */
+.countdown__rival {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  margin-bottom: var(--s-2);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+
+.countdown__rival[hidden] {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .countdown__rival {
+    width: 72px;
+    height: 72px;
+  }
+}

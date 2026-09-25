@@ -958,6 +958,14 @@ function repaint(sprite: HTMLImageElement, livery: Livery): HTMLCanvasElement {
     c.globalCompositeOperation = 'color';
     c.fillStyle = livery.primary;
     c.fillRect(0, 0, w, h);
+    // The blend alone left a white car pastel -- DK's deep green came out mint
+    // -- so deepen it by the colour itself: white panels take the full colour,
+    // shading stays shading. A near-black has no colour to deepen by (it made
+    // a grey car, then a featureless one), so it is darkened by a grey that
+    // leaves the shading readable.
+    c.globalCompositeOperation = 'multiply';
+    c.fillStyle = luminance(livery.primary) < 0.25 ? '#3c3c3c' : livery.primary;
+    c.fillRect(0, 0, w, h);
     // Back to the car's own outline: the blend filled the empty corners too.
     c.globalCompositeOperation = 'destination-in';
     c.drawImage(sprite, 0, 0);
@@ -969,4 +977,13 @@ function repaint(sprite: HTMLImageElement, livery: Livery): HTMLCanvasElement {
   }
   repaints.set(key, canvas);
   return canvas;
+}
+
+/** Relative brightness of a #rrggbb colour, 0..1. */
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }

@@ -1106,16 +1106,16 @@ body {
   padding: 7px 3px 9px;
 }
 
+/* The portraits are square paintings with their own backgrounds: shown whole,
+   underlined in the character's colour. */
 .rival__bust {
   width: 100%;
-  max-width: 72px;
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
   background: var(--rival);
-  box-shadow: inset 0 0 0 4px var(--rival-2);
+  border-bottom: 4px solid var(--rival);
   font-family: var(--display);
   font-size: 26px;
   color: var(--rival-2);
@@ -1166,4 +1166,15 @@ body {
   right: 6px;
   font-weight: 800;
   color: #3a9a2a;
+}
+
+.result-rival {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+}
+
+.result-rival[hidden] {
+  display: none;
 }
