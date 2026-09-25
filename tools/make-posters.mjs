@@ -70,6 +70,8 @@ const CAR_SPRITES = [
   ['Yellowbird.png', 'yellowbird', 0],
   ['Silvia.png', 'silvia', 0],
   ['Hellcat.png', 'hellcat', 0],
+  ["TOM's Supra.png", 'toms-gt500', 0],
+  ['Supra Drift.png', 'drift-supra', 0],
 ];
 const CAR_OUT = resolve(root, 'public/art/cars');
 mkdirSync(CAR_OUT, { recursive: true });
@@ -91,6 +93,8 @@ const CAR_HEROES = [
   ['Yellowbird hero.png', 'yellowbird'],
   ['Silvia hero.png', 'silvia'],
   ['Hellcat hero.png', 'hellcat'],
+  ["TOM's Supra hero.png", 'toms-gt500'],
+  ['Supra Drift hero.png', 'drift-supra'],
 ];
 for (const [source, id] of CAR_HEROES) {
   const out = resolve(CAR_OUT, `${id}-hero.webp`);

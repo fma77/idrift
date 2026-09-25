@@ -13,59 +13,59 @@ Every characteristic of every car, and what it actually affects.
 
 ## What the garage shows
 
-| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat |
-|---|---|---|---|---|---|---|---|---|
-| Top speed, km/h | All modes<sup>1</sup> | 210 | 235 | 290 | 205 | 342 | 250 | 320 |
-| 0-100, s | Display<sup>2</sup> | 6.5 | 5 | 3.5 | 4 | 4 | 4.5 | 3.9 |
-| ★ Acceleration | Display<sup>3</sup> | 2 | 3 | 5 | 5 | 5 | 4 | 5 |
-| ★ Top speed | Display<sup>3</sup> | 2 | 3 | 5 | 2 | 5 | 4 | 5 |
-| ★ Grip | Display<sup>3</sup> | 3 | 3 | 5 | 5 | 4 | 3 | 2 |
-| ★ Drift | Display<sup>3</sup> | 4 | 5 | 3 | 3 | 5 | 5 | 4 |
-| ★ Agility | Display<sup>3</sup> | 5 | 4 | 2 | 4 | 3 | 4 | 1 |
-| ★ Stability | Display<sup>3</sup> | 5 | 4 | 5 | 5 | 1 | 4 | 3 |
+| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat | Tom's | Drift supra |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Top speed, km/h | All modes<sup>1</sup> | 210 | 235 | 290 | 205 | 342 | 250 | 320 | 300 | 285 |
+| 0-100, s | Display<sup>2</sup> | 6.5 | 5 | 3.5 | 4 | 4 | 4.5 | 3.9 | 3.3 | 4.2 |
+| ★ Acceleration | Display<sup>3</sup> | 2 | 3 | 5 | 5 | 5 | 4 | 5 | 5 | 4 |
+| ★ Top speed | Display<sup>3</sup> | 2 | 3 | 5 | 2 | 5 | 4 | 5 | 5 | 5 |
+| ★ Grip | Display<sup>3</sup> | 3 | 3 | 5 | 5 | 4 | 3 | 2 | 5 | 3 |
+| ★ Drift | Display<sup>3</sup> | 4 | 5 | 3 | 3 | 5 | 5 | 4 | 2 | 5 |
+| ★ Agility | Display<sup>3</sup> | 5 | 4 | 2 | 4 | 3 | 4 | 1 | 4 | 3 |
+| ★ Stability | Display<sup>3</sup> | 5 | 4 | 5 | 5 | 1 | 4 | 3 | 5 | 4 |
 
 ## Speed and steering
 
-| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat |
-|---|---|---|---|---|---|---|---|---|
-| Top speed (game units) | All modes | 42 | 47 | 58 | 41 | 68.4 | 50 | 64 |
-| Acceleration | All modes | 4.18 | 5.21 | 7.01 | 6.85 | 5.92 | 5.68 | 6.15 |
-| Turn rate: how fast the nose can swing | All modes | 2.3 | 2.15 | 1.85 | 2.15 | 2 | 2.15 | 1.7 |
-| Turn-in speed: speed above which steering gets harder | All modes | 6.5 | 7.5 | 9.5 | 7.5 | 8.5 | 7.5 | 10.5 |
-| Steering lock (radians) | All modes | 0.6 | 0.56 | 0.52 | 0.56 | 0.55 | 0.62 | 0.62 |
-| Turn response: how quickly steering takes effect | Time Attack | 7.5 | 6.5 | 4.5 | 6.5 | 5.5 | 6.5 | 3.5 |
+| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat | Tom's | Drift supra |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Top speed (game units) | All modes | 42 | 47 | 58 | 41 | 68.4 | 50 | 64 | 60 | 57 |
+| Acceleration | All modes | 4.18 | 5.21 | 7.01 | 6.85 | 5.92 | 5.68 | 6.15 | 7.37 | 5.87 |
+| Turn rate: how fast the nose can swing | All modes | 2.3 | 2.15 | 1.85 | 2.15 | 2 | 2.15 | 1.7 | 2.15 | 2 |
+| Turn-in speed: speed above which steering gets harder | All modes | 6.5 | 7.5 | 9.5 | 7.5 | 8.5 | 7.5 | 10.5 | 7.5 | 8.5 |
+| Steering lock (radians) | All modes | 0.6 | 0.56 | 0.52 | 0.56 | 0.55 | 0.62 | 0.62 | 0.5 | 0.62 |
+| Turn response: how quickly steering takes effect | Time Attack | 7.5 | 6.5 | 4.5 | 6.5 | 5.5 | 6.5 | 3.5 | 6.5 | 5.5 |
 
 ## Grip and sliding
 
-| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat |
-|---|---|---|---|---|---|---|---|---|
-| Grip | Time Attack<sup>4</sup> | 1.08 | 1.08 | 1.24 | 1.24 | 1.16 | 1.08 | 1 |
-| Break angle: how far before the rear lets go | Time Attack | 0.12 | 0.11 | 0.14 | 0.14 | 0.11 | 0.11 | 0.12 |
-| Regrip angle: how straight before it grips again | Time Attack | 0.06 | 0.055 | 0.06 | 0.06 | 0.04 | 0.055 | 0.05 |
-| Slide friction, low speed | Time Attack | 0.5 | 0.45 | 0.6 | 0.6 | 0.45 | 0.45 | 0.5 |
-| Slide friction, high speed | Time Attack | 1.45 | 1.35 | 1.55 | 1.55 | 1.35 | 1.35 | 1.45 |
-| Self-align: how hard it straightens itself | Time Attack | 2.6 | 2.2 | 2.6 | 2.6 | 1.8 | 2.2 | 2 |
+| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat | Tom's | Drift supra |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Grip | Time Attack<sup>4</sup> | 1.08 | 1.08 | 1.24 | 1.24 | 1.16 | 1.08 | 1 | 1.32 | 1.08 |
+| Break angle: how far before the rear lets go | Time Attack | 0.12 | 0.11 | 0.14 | 0.14 | 0.11 | 0.11 | 0.12 | 0.15 | 0.11 |
+| Regrip angle: how straight before it grips again | Time Attack | 0.06 | 0.055 | 0.06 | 0.06 | 0.04 | 0.055 | 0.05 | 0.065 | 0.055 |
+| Slide friction, low speed | Time Attack | 0.5 | 0.45 | 0.6 | 0.6 | 0.45 | 0.45 | 0.5 | 0.65 | 0.45 |
+| Slide friction, high speed | Time Attack | 1.45 | 1.35 | 1.55 | 1.55 | 1.35 | 1.35 | 1.45 | 1.65 | 1.35 |
+| Self-align: how hard it straightens itself | Time Attack | 2.6 | 2.2 | 2.6 | 2.6 | 1.8 | 2.2 | 2 | 2.8 | 2.2 |
 
 ## Body
 
-| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat |
-|---|---|---|---|---|---|---|---|---|
-| Centre of mass to front axle (m) | All modes<sup>5</sup> | 1.1 | 1.22 | 1.34 | 1.2 | 1.35 | 1.2 | 1.3 |
-| Centre of mass to rear axle (m) | All modes<sup>5</sup> | 1.3 | 1.38 | 1.36 | 1.3 | 1.1 | 1.35 | 1.65 |
-| Width (m) | All modes<sup>5</sup> | 1.68 | 1.76 | 1.82 | 1.74 | 1.84 | 1.7 | 1.92 |
-| Length (m) | Drift Run<sup>6</sup> | 4.2 | 4.52 | 4.68 | 4.4 | 4.3 | 4.52 | 5.03 |
+| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat | Tom's | Drift supra |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Centre of mass to front axle (m) | All modes<sup>5</sup> | 1.1 | 1.22 | 1.34 | 1.2 | 1.35 | 1.2 | 1.3 | 1.3 | 1.2 |
+| Centre of mass to rear axle (m) | All modes<sup>5</sup> | 1.3 | 1.38 | 1.36 | 1.3 | 1.1 | 1.35 | 1.65 | 1.25 | 1.35 |
+| Width (m) | All modes<sup>5</sup> | 1.68 | 1.76 | 1.82 | 1.74 | 1.84 | 1.7 | 1.92 | 1.95 | 1.81 |
+| Length (m) | Drift Run<sup>6</sup> | 4.2 | 4.52 | 4.68 | 4.4 | 4.3 | 4.52 | 5.03 | 4.6 | 4.52 |
 
 ## Drift feel (1.00 is neutral, higher is more)
 
-| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat |
-|---|---|---|---|---|---|---|---|---|
-| Hold: how easily a slide holds its angle | Drift Run | 1 | 1.05 | 0.85 | 0.85 | 1.05 | 1.05 | 1 |
-| Runaway: too much throttle swings the tail round | Drift Run | 0.85 | 1 | 0.85 | 0.85 | 1.6 | 1 | 1.35 |
-| Rate: how fast the angle builds | Drift Run | 1 | 1.1 | 0.9 | 0.9 | 1.15 | 1.05 | 0.85 |
-| Swing: speed of a side-to-side change of direction | Drift Run | 1.1 | 1.15 | 0.7 | 0.9 | 1.2 | 1.1 | 0.75 |
-| Pivot: how far forward it turns (higher, wider tail) | Drift Run | 0.85 | 0.85 | 0.8 | 0.75 | 1 | 0.9 | 0.8 |
-| Momentum: how much it keeps its line while sliding | Drift Run | 1.3 | 1 | 1.2 | 0.9 | 1 | 1.1 | 1.35 |
-| Response: how quickly the tyres build and reverse sideways force | Drift Run | 1.3 | 1.15 | 0.8 | 1.05 | 1.1 | 1.15 | 0.75 |
+| Characteristic | Used in | Hachiroku | Rotary | Godzilla | Scooby | Yellowbird | Silvia | Hellcat | Tom's | Drift supra |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Hold: how easily a slide holds its angle | Drift Run | 1 | 1.05 | 0.85 | 0.85 | 1.05 | 1.05 | 1 | 0.8 | 1.05 |
+| Runaway: too much throttle swings the tail round | Drift Run | 0.85 | 1 | 0.85 | 0.85 | 1.6 | 1 | 1.35 | 0.8 | 1.15 |
+| Rate: how fast the angle builds | Drift Run | 1 | 1.1 | 0.9 | 0.9 | 1.15 | 1.05 | 0.85 | 0.9 | 1 |
+| Swing: speed of a side-to-side change of direction | Drift Run | 1.1 | 1.15 | 0.7 | 0.9 | 1.2 | 1.1 | 0.75 | 1.05 | 0.95 |
+| Pivot: how far forward it turns (higher, wider tail) | Drift Run | 0.85 | 0.85 | 0.8 | 0.75 | 1 | 0.9 | 0.8 | 0.8 | 0.85 |
+| Momentum: how much it keeps its line while sliding | Drift Run | 1.3 | 1 | 1.2 | 0.9 | 1 | 1.1 | 1.35 | 0.9 | 1.2 |
+| Response: how quickly the tyres build and reverse sideways force | Drift Run | 1.3 | 1.15 | 0.8 | 1.05 | 1.1 | 1.15 | 0.75 | 1.25 | 1 |
 
 ## Notes
 

@@ -357,9 +357,97 @@ export const PROFILES: Record<EngineKind, EngineProfile> = {
       gain: 1,
     },
   },
+  race4: {
+    kind: 'race4',
+    label: 'Race turbo four (anti-lag)',
+    // The 3S-GTE in the 1997 TOM'S GT500: a 2-litre turbo four built to race,
+    // about 490hp through an air restrictor. Light internals rev it hard and
+    // fast; anti-lag keeps the turbo lit off the throttle, so it spools almost
+    // at once and bangs and crackles on every lift.
+    spec: {
+      idleRpm: 1200,
+      redlineRpm: 8800,
+      limiterRpm: 9000,
+      gears: 6,
+      revRise: 18000,
+      revFall: 12000,
+      spool: 3.5,
+      boostThreshold: 0.25,
+    },
+    // Short, hard, rasping pulses through an open race exhaust, driven harder
+    // than any road car here; a high turbo whistle; and the anti-lag's bangs as
+    // the loudest overrun in the game. The flutter is light: a race car dumps
+    // its boost through a valve rather than back through the turbo.
+    voice: {
+      firesPerRev: 2,
+      pattern: [1, 1, 1, 1],
+      levels: [1, 0.93, 0.97, 0.9],
+      resonance: 460,
+      resonanceTrack: 0.85,
+      pulseDecay: 0.0032,
+      rasp: 0.62,
+      jitter: 0.14,
+      lope: 0,
+      lopeHz: 3,
+      intake: 0.35,
+      whistle: 0.6,
+      whistleHz: 6800,
+      flutter: 0.35,
+      flutterHz: 24,
+      pops: 1.3,
+      blower: 0,
+      blowerHz: 3000,
+      drive: 4.2,
+      gain: 1.05,
+    },
+  },
+  bigturbo6: {
+    kind: 'bigturbo6',
+    label: 'Big single-turbo straight six',
+    // A 2JZ-GTE converted from its two small turbos to one big one, as the
+    // film's orange Supra was said to be. Smooth and deep like any straight
+    // six, but the big turbo is lazy: nothing much below half revs, then it
+    // comes on hard. That lag and surge is the car's character.
+    spec: {
+      idleRpm: 850,
+      redlineRpm: 7200,
+      limiterRpm: 7500,
+      gears: 6,
+      revRise: 10000,
+      revFall: 7500,
+      spool: 1.3,
+      boostThreshold: 0.5,
+    },
+    // Three even firings a revolution, smooth and rounder than the RB26's; the
+    // whistle is a big turbo's, lower and louder than any other here, and the
+    // flutter on lift-off is the loudest and slowest -- the classic
+    // "stu-tu-tu" of a big single turbo.
+    voice: {
+      firesPerRev: 3,
+      pattern: [1, 1, 1, 1, 1, 1],
+      levels: [1, 0.96, 0.99, 0.95, 1, 0.96],
+      resonance: 280,
+      resonanceTrack: 0.65,
+      pulseDecay: 0.0065,
+      rasp: 0.28,
+      jitter: 0.07,
+      lope: 0,
+      lopeHz: 3,
+      intake: 0.3,
+      whistle: 1,
+      whistleHz: 4300,
+      flutter: 1.35,
+      flutterHz: 13,
+      pops: 0.5,
+      blower: 0,
+      blowerHz: 3000,
+      drive: 2.6,
+      gain: 1,
+    },
+  },
 };
 
-export const ENGINE_KINDS: EngineKind[] = ['na4', 'rotary', 'turbo6', 'boxer4', 'flat6tt', 'turbo4', 'scv8'];
+export const ENGINE_KINDS: EngineKind[] = ['na4', 'rotary', 'turbo6', 'boxer4', 'flat6tt', 'turbo4', 'scv8', 'race4', 'bigturbo6'];
 
 /** The voice numbers the sound lab exposes as sliders. */
 export interface VoiceSpec {
@@ -401,6 +489,8 @@ const SHIPPED: Record<EngineKind, VoiceParams> = {
   flat6tt: { ...PROFILES.flat6tt.voice },
   turbo4: { ...PROFILES.turbo4.voice },
   scv8: { ...PROFILES.scv8.voice },
+  race4: { ...PROFILES.race4.voice },
+  bigturbo6: { ...PROFILES.bigturbo6.voice },
 };
 
 type Overrides = Partial<Record<EngineKind, Partial<Record<keyof VoiceParams, number>>>>;

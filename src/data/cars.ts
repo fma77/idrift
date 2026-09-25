@@ -271,6 +271,84 @@ export const CARS: CarParams[] = [
     hero: 'art/cars/hellcat-hero.webp',
     heroFull: 'art/cars/hellcat-hero-full.webp',
   },
+  {
+    id: 'toms-gt500',
+    name: "TOM'S",
+    carClass: 'S',
+    // Castrol TOM'S Supra, #36, 1997 JGTC GT500 champion (Krumm and de la Rosa).
+    // A race car: slicks and downforce, about 490hp from a 2-litre turbo four
+    // moved back in the chassis for balance, about 1,100kg. Grip beyond any
+    // road car -- past the top of the scale the others were rated on -- and a
+    // car that fights every attempt to get it sideways.
+    handling: {
+      topSpeed: 60.00,
+      acceleration: 7.37,
+      turnRate: 2.15,
+      turnResponse: 6.5,
+      turnInSpeed: 7.5,
+      grip: 1.32,
+      slideFrictionLow: 0.65,
+      slideFrictionHigh: 1.65,
+      breakAngle: 0.15,
+      regripAngle: 0.065,
+      selfAlign: 2.8,
+    },
+    // Engine set back: slightly more weight over the rear than the front.
+    cgToFront: 1.3,
+    cgToRear: 1.25,
+    bodyLength: 4.6,
+    bodyWidth: 1.95,
+    // Race steering: precise, and not much lock.
+    maxWheelAngle: 0.5,
+    engine: 'race4',
+    driftFeel: { hold: 0.8, runaway: 0.8, rate: 0.9, swing: 1.05, pivot: 0.8, momentum: 0.9, response: 1.25 },
+    stats: { accel: 5, topSpeed: 5, grip: 5, drift: 2, agility: 4, stability: 5 },
+    zeroTo100: 3.3,
+    tagline:
+      "A 1997 championship-winning GT500 race car: slicks, downforce and a 490hp turbo four. Grips like nothing else and flies against the clock, but it hates going sideways.",
+    tint: '#f4f1ea',
+    sprite: { path: 'art/cars/toms-gt500.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/toms-gt500-hero.webp',
+    heroFull: 'art/cars/toms-gt500-hero-full.webp',
+  },
+  {
+    id: 'drift-supra',
+    name: 'DRIFT SUPRA',
+    carClass: 'A',
+    // Fictional: a Mk4 Supra built the way the film's orange car was said to
+    // be, a 2JZ straight six on one big turbo, then set up to drift -- about
+    // 600hp, an angle kit, around 1,500kg. Heavier than the Silvia, with turbo
+    // lag and then a surge that swings the tail.
+    handling: {
+      topSpeed: 57.00,
+      acceleration: 5.87,
+      turnRate: 2,
+      turnResponse: 5.5,
+      turnInSpeed: 8.5,
+      grip: 1.08,
+      slideFrictionLow: 0.45,
+      slideFrictionHigh: 1.35,
+      breakAngle: 0.11,
+      regripAngle: 0.055,
+      selfAlign: 2.2,
+    },
+    // The long straight six sits well forward.
+    cgToFront: 1.2,
+    cgToRear: 1.35,
+    bodyLength: 4.52,
+    bodyWidth: 1.81,
+    maxWheelAngle: 0.62,
+    engine: 'bigturbo6',
+    driftFeel: { hold: 1.05, runaway: 1.15, rate: 1, swing: 0.95, pivot: 0.85, momentum: 1.2, response: 1 },
+    stats: { accel: 4, topSpeed: 5, grip: 3, drift: 5, agility: 3, stability: 4 },
+    zeroTo100: 4.2,
+    tagline:
+      'Orange, loud and built for angle: a big single-turbo straight six in a Mk4. Heavier than the Silvia, with turbo lag and then a surge that swings the tail, and huge speed on the straights.',
+    tint: '#f28a1e',
+    sprite: { path: 'art/cars/drift-supra.webp', pixelsPerMetre: 70 },
+    hero: 'art/cars/drift-supra-hero.webp',
+    heroFull: 'art/cars/drift-supra-hero-full.webp',
+  },
 ];
 
 export function carById(id: string): CarParams {
