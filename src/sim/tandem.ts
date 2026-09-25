@@ -50,6 +50,18 @@ export interface TandemSide {
   walls: number;
   contacts: number;
   passes: number;
+  /**
+   * Where the points went, for the judges' words -- not part of the score.
+   * Quality lost per judged tick, summed, by cause: not sideways at all, short
+   * of full angle (a leader), too far back and not matching the leader's angle
+   * (a chaser). With qualitySum they add up to zoneTicks.
+   */
+  lostDrift: number;
+  lostAngle: number;
+  lostGap: number;
+  lostMatch: number;
+  /** A chaser's bumper gap summed over its judged ticks, car lengths (0..6 each). */
+  gapSum: number;
 }
 
 export interface TandemState {
@@ -146,7 +158,21 @@ export function placeAhead(state: SimState, route: RouteData): void {
 }
 
 function side(role: TandemRole): TandemSide {
-  return { role, zoneTicks: 0, qualitySum: 0, penalty: 0, spins: 0, walls: 0, contacts: 0, passes: 0 };
+  return {
+    role,
+    zoneTicks: 0,
+    qualitySum: 0,
+    penalty: 0,
+    spins: 0,
+    walls: 0,
+    contacts: 0,
+    passes: 0,
+    lostDrift: 0,
+    lostAngle: 0,
+    lostGap: 0,
+    lostMatch: 0,
+    gapSum: 0,
+  };
 }
 
 export function createTandem(
@@ -494,7 +520,10 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
   // perfect lead at about 75.
   if (!lead.finished && findZone(route, lead.sampleIndex) >= 0 && inBend(route, lead.sampleIndex)) {
     leadSide.zoneTicks++;
-    leadSide.qualitySum += leadQuality(lead, config);
+    const q = leadQuality(lead, config);
+    leadSide.qualitySum += q;
+    if (drifting(lead)) leadSide.lostAngle += 1 - q;
+    else leadSide.lostDrift += 1;
   }
   // Chaser: judged through its zones while the leader is drifting -- the chase
   // is judged against the lead, and nobody can be asked to be sideways when
@@ -502,7 +531,16 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
   const zone = findZone(route, chase.sampleIndex);
   if (!chase.finished && zone >= 0 && drifting(lead)) {
     chaseSide.zoneTicks++;
-    if (drifting(chase)) chaseSide.qualitySum += proximity(t.gapLengths) * (0.45 + 0.55 * t.angleMatch);
+    chaseSide.gapSum += clamp(t.gapLengths, 0, 6);
+    if (drifting(chase)) {
+      const near = proximity(t.gapLengths);
+      const match = 0.45 + 0.55 * t.angleMatch;
+      chaseSide.qualitySum += near * match;
+      chaseSide.lostGap += (1 - near) * match;
+      chaseSide.lostMatch += 1 - match;
+    } else {
+      chaseSide.lostDrift += 1;
+    }
   }
   if (!chase.finished && zone >= 0) {
     // Passing the leader in a zone.

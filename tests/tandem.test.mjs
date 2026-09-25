@@ -202,3 +202,17 @@ test('tandem: each difficulty level drives better than the one below, leading an
   assert.ok(chases[3] > chases[0] + 20, 'the Drift King chases no better than the Rookie');
   assert.ok(leads[3] >= 85, `the Drift King only led to ${leads[3].toFixed(0)}`);
 });
+
+test("tandem: the judges' breakdown adds up to the score, and names a reason", async () => {
+  const { runVerdict } = await import('../src/ui/judges.ts');
+  for (const route of ROUTES.slice(0, 3)) {
+    const { t } = leadRun(route, carById('silvia'));
+    for (const side of [t.player, t.opponent]) {
+      const lost = side.lostDrift + side.lostAngle + side.lostGap + side.lostMatch;
+      assert.ok(Math.abs(side.qualitySum + lost - side.zoneTicks) < 1e-6, `${side.role} on ${route.name}: the losses do not add up`);
+    }
+    const line = runVerdict('Run 2', 'NORICK', t.player, t.opponent);
+    assert.match(line, /^Run 2 (to (you|NORICK)|level)/);
+    console.log(`    ${route.name}: ${tandemScore(t.player)}-${tandemScore(t.opponent)} ${line}`);
+  }
+});

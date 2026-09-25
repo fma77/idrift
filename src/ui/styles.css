@@ -159,8 +159,12 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--paper);
-  padding: max(var(--gutter), env(safe-area-inset-top)) var(--gutter)
-    max(var(--gutter), env(safe-area-inset-bottom));
+  /* The status bar's height as a border, not padding: a scrolled screen is
+     clipped below it, so nothing slides under the clock -- where iOS blurs
+     whatever is behind it. The transparent border shows the screen's own
+     background. */
+  border-top: env(safe-area-inset-top, 0px) solid transparent;
+  padding: var(--gutter) var(--gutter) max(var(--gutter), env(safe-area-inset-bottom));
   overflow-y: auto;
   animation: fade 180ms ease-out;
 }
@@ -1320,4 +1324,33 @@ body {
  */
 [hidden] {
   display: none !important;
+}
+
+/* --- Tandem results: a word from the judges ------------------------------- */
+
+.judges {
+  margin-top: var(--s-4, 24px);
+  padding: 12px 14px;
+  border-left: 3px solid var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.judges__label {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.judges__line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.judges__line + .judges__line {
+  margin-top: 6px;
 }

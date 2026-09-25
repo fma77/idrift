@@ -32,6 +32,7 @@ import {
 } from './storage/bests.ts';
 import { buildGhost, type GhostTrack } from './ghost.ts';
 import { createTandem, tandemScore, type TandemSide, type TandemState } from './sim/tandem.ts';
+import { runVerdict } from './ui/judges.ts';
 import { InputRecorder } from './sim/replay.ts';
 import { CHARACTERS, characterById, type Character } from './data/characters.ts';
 import { loadDecoration } from './render/decoration.ts';
@@ -130,6 +131,8 @@ interface Battle {
   /** Both runs' time, for the board. */
   timeMs: number;
   outcome?: 'win' | 'loss' | 'omt';
+  /** Each run's judging, both drivers, for the judges' words: [run 1, run 2]. */
+  runs: { you: TandemSide; them: TandemSide }[];
   /** Chasing a posted run: its inputs and car. */
   leader?: { inputs: InputRecorder; car: CarParams };
 }
@@ -587,7 +590,7 @@ function buildRivals(): void {
 function newHouseBattle(): Battle | null {
   if (!currentRoute) return null;
   const rival = characterById(settings.tandemRival);
-  return { kind: 'house', rival, name: rival.name, skill: rival.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0 };
+  return { kind: 'house', rival, name: rival.name, skill: rival.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0, runs: [] };
 }
 
 /** The caption for the run under way: "Run 1/2", "One more time · Run 2/2", "Chase". */
@@ -633,6 +636,7 @@ async function startChase(row: LeaderboardRow): Promise<void> {
       skill: 0,
       run: 1,
       omt: 0,
+      runs: [],
       youChase: 0,
       theyLead: 0,
       youLead: 0,
@@ -655,6 +659,7 @@ function finishBattleRun(outcome: RunOutcome): void {
   const them = tandemScore(t.opponent);
   b.timeMs += Math.round(outcome.result.timeSeconds * 1000);
   b.outcome = undefined;
+  b.runs[b.kind === 'chase' ? 0 : b.run - 1] = { you: t.player, them: t.opponent };
   if (b.kind === 'chase' || b.run === 1) {
     b.youChase = you;
     b.theyLead = them;
@@ -668,7 +673,7 @@ function finishBattleRun(outcome: RunOutcome): void {
     b.outcome = close ? 'omt' : yours > theirs ? 'win' : 'loss';
     if (b.outcome === 'win' && b.rival && currentRoute) markBeaten(currentRoute.id, b.rival.id);
   }
-  showBattleResults(t.player);
+  showBattleResults();
 }
 
 /**
@@ -761,20 +766,24 @@ function battleTable(b: Battle, final: boolean): HTMLElement {
   return table;
 }
 
-/** "2 contacts · 1 spin", or "None". */
-function penaltiesText(s: TandemSide): string {
-  const parts: string[] = [];
-  const add = (n: number, one: string, many: string) => {
-    if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`);
-  };
-  add(s.contacts, 'contact', 'contacts');
-  add(s.passes, 'pass', 'passes');
-  add(s.spins, 'spin', 'spins');
-  add(s.walls, 'wall hit', 'wall hits');
-  return parts.length ? parts.join(' · ') : 'None';
+/** The judges' word on each run so far: who took it, and why. */
+function judgesWord(b: Battle): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'judges';
+  const label = document.createElement('p');
+  label.className = 'judges__label';
+  label.textContent = 'From the judges';
+  box.appendChild(label);
+  b.runs.forEach((r, i) => {
+    const p = document.createElement('p');
+    p.className = 'judges__line';
+    p.textContent = runVerdict(b.kind === 'chase' ? 'The chase' : `Run ${i + 1}`, b.name, r.you, r.them);
+    box.appendChild(p);
+  });
+  return box;
 }
 
-function showBattleResults(yourSide: TandemSide): void {
+function showBattleResults(): void {
   const b = battle;
   const route = currentRoute;
   if (!b || !route) return;
@@ -796,7 +805,7 @@ function showBattleResults(yourSide: TandemSide): void {
   portrait.hidden = !b.rival?.bust;
   if (b.rival?.bust) portrait.src = b.rival.bust;
 
-  $('result-stats').replaceChildren(battleTable(b, final), statRow('Your penalties', penaltiesText(yourSide)));
+  $('result-stats').replaceChildren(battleTable(b, final), judgesWord(b));
 
   // What next: the second run, one more time, or another battle.
   $('btn-retry').textContent =
