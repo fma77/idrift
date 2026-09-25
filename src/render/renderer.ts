@@ -77,6 +77,9 @@ export class Renderer {
   /** Rear-axle trail, world space. Purely cosmetic. */
   private skidLeft: SkidPoint[] = [];
   private skidRight: SkidPoint[] = [];
+  /** The tandem partner's marks: two cars' worth of rubber through a zone. */
+  private partnerSkidLeft: SkidPoint[] = [];
+  private partnerSkidRight: SkidPoint[] = [];
   private readonly smoke = new TyreSmoke();
   /** The tandem partner's own smoke: the two cars' clouds are half the spectacle. */
   private readonly partnerSmoke = new TyreSmoke();
@@ -188,6 +191,8 @@ export class Renderer {
   clearTrails(): void {
     this.skidLeft.length = 0;
     this.skidRight.length = 0;
+    this.partnerSkidLeft.length = 0;
+    this.partnerSkidRight.length = 0;
     this.smoke.clear();
     this.partnerSmoke.clear();
     this.dirt.clear();
@@ -258,7 +263,10 @@ export class Renderer {
     else this.drawRoad(ctx, road, state.sampleIndex, px);
     if (this.world) this.world.drawTrees(ctx, this.camera.x, this.camera.y, reach);
     this.drawScoringMarks(ctx, route, state, px);
-    if (settings.showSkidMarks) this.drawSkids(ctx, px);
+    if (settings.showSkidMarks) {
+      this.drawSkids(ctx, px, this.skidLeft, this.skidRight);
+      if (partner) this.drawSkids(ctx, px, this.partnerSkidLeft, this.partnerSkidRight);
+    }
     // Dirt off the verge, under the car and its smoke.
     this.dirt.update(view, car, dtSeconds);
     this.dirt.draw(ctx, theme ? theme.dirt : INK_DIRT);
@@ -284,7 +292,10 @@ export class Renderer {
 
     this.drawFog(ctx, theme);
 
-    if (settings.showSkidMarks) this.recordSkid(state, car);
+    if (settings.showSkidMarks) {
+      this.recordSkid(state, car, this.skidLeft, this.skidRight);
+      if (partner) this.recordSkid(partner.next, partner.car, this.partnerSkidLeft, this.partnerSkidRight);
+    }
   }
 
   // --- Road ---------------------------------------------------------------
@@ -574,7 +585,7 @@ export class Renderer {
    * player cannot otherwise see where the car has actually been sliding, which
    * makes the drift scoring feel arbitrary.
    */
-  private recordSkid(state: SimState, car: CarParams): void {
+  private recordSkid(state: SimState, car: CarParams, left: SkidPoint[], right: SkidPoint[]): void {
     const slip = Math.abs(state.slipAngle);
     const slipping = state.sliding && slip > 0.14 && state.speed > 4;
     if (!slipping) return;
@@ -585,24 +596,24 @@ export class Renderer {
     const rearY = state.y - sin(h) * car.cgToRear;
     const halfTrack = car.bodyWidth * 0.42;
 
-    this.skidLeft.push({
+    left.push({
       x: rearX - sin(h) * halfTrack,
       y: rearY + cos(h) * halfTrack,
       weight,
     });
-    this.skidRight.push({
+    right.push({
       x: rearX + sin(h) * halfTrack,
       y: rearY - cos(h) * halfTrack,
       weight,
     });
-    if (this.skidLeft.length > MAX_SKID) {
-      this.skidLeft.shift();
-      this.skidRight.shift();
+    if (left.length > MAX_SKID) {
+      left.shift();
+      right.shift();
     }
   }
 
-  private drawSkids(ctx: CanvasRenderingContext2D, px: number): void {
-    for (const trail of [this.skidLeft, this.skidRight]) {
+  private drawSkids(ctx: CanvasRenderingContext2D, px: number, left: SkidPoint[], right: SkidPoint[]): void {
+    for (const trail of [left, right]) {
       if (trail.length < 2) continue;
       ctx.lineCap = 'round';
       for (let i = 1; i < trail.length; i++) {

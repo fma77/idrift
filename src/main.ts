@@ -1185,6 +1185,18 @@ function buildSettings(): void {
   bindToggle('set-skids', () => settings.showSkidMarks, (v) => (settings.showSkidMarks = v));
   bindToggle('set-smoke', () => settings.showSmoke, (v) => (settings.showSmoke = v));
   bindToggle('set-sound', () => settings.soundOn, (v) => (settings.soundOn = v));
+  const opponent = $<HTMLInputElement>('set-opponent-volume');
+  const syncOpponent = () => {
+    opponent.value = String(Math.round(settings.opponentVolume * 100));
+    $('opponent-volume-value').textContent = `${opponent.value}%`;
+  };
+  syncOpponent();
+  opponent.addEventListener('input', () => {
+    settings.opponentVolume = Number(opponent.value) / 100;
+    saveSettings(settings);
+    syncOpponent();
+    partnerAudio?.setLevel(settings.opponentVolume);
+  });
   bindToggle(
     'set-drift-steer',
     () => settings.driftControls === 'steer',
@@ -1277,6 +1289,8 @@ function syncKeyHints(): void {
 // --- Running ----------------------------------------------------------------
 
 let audio: EngineAudio | null = null;
+/** The other tandem car's engine, sharing the player's audio. */
+let partnerAudio: EngineAudio | null = null;
 
 /**
  * Start a run. A restart keeps the engine sound of the run it replaces: it may
@@ -1315,6 +1329,15 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
   // requires before an AudioContext will run.
   void audio.start(car.engine);
 
+  // The other tandem car's engine: through the same, already unlocked, audio,
+  // at the player's chosen level and muffled, as heard from outside it.
+  partnerAudio?.stop();
+  partnerAudio = null;
+  if (tandem && settings.soundOn && settings.opponentVolume > 0 && audio.context) {
+    partnerAudio = new EngineAudio(true, { level: settings.opponentVolume, muffle: true });
+    void partnerAudio.start(tandem.partnerCar.engine, audio.context);
+  }
+
   // After the audio: that has to start inside the tap on Go, before any wait.
   const ghostTrack = tandem ? null : await loadGhostFor(currentRoute, boardFor(mode, currentControls), mode);
   runGhost = ghostTrack && ghostPick ? { row: ghostPick.row, track: ghostTrack } : null;
@@ -1335,6 +1358,7 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
     renderSettings,
     ghostTrack,
     tandem,
+    partnerAudio,
   );
 
   const countdownOverlay = $('overlay-countdown');

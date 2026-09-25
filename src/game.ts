@@ -84,6 +84,8 @@ export class GameSession {
     readonly ghost: GhostTrack | null = null,
     /** A tandem run: the other car, its driver, and the judging. */
     readonly tandem: TandemState | null = null,
+    /** The other car's engine, quieter and muffled. Tandem only. */
+    private partnerAudio: EngineAudio | null = null,
   ) {
     this.state = createSimState(route, car);
     // Leading a tandem, the player starts a car length ahead of the chaser.
@@ -97,6 +99,7 @@ export class GameSession {
     this.renderer.resetCamera(this.state);
     this.input.enable();
     this.audio?.resume();
+    this.partnerAudio?.resume();
     this.lastFrameMs = performance.now();
     document.addEventListener('visibilitychange', this.boundVisibility);
     this.rafId = requestAnimationFrame(this.boundFrame);
@@ -117,6 +120,7 @@ export class GameSession {
     this.phase = 'aborted';
     this.stop();
     this.audio?.stop();
+    this.partnerAudio?.stop();
   }
 
   /**
@@ -128,6 +132,7 @@ export class GameSession {
   abandon(): void {
     this.phase = 'aborted';
     this.stop();
+    this.partnerAudio?.stop();
   }
 
   /**
@@ -212,6 +217,7 @@ export class GameSession {
       this.phase = 'finished';
       this.stop();
       this.audio?.stop();
+      this.partnerAudio?.stop();
       this.onFinish?.({
         result: gradeRun(this.state, this.route, TICK_RATE),
         state: this.state,
@@ -236,7 +242,16 @@ export class GameSession {
         ? { prev: this.prevPartner, next: this.tandem.partner, car: this.tandem.partnerCar }
         : null,
     );
-    if (this.tandem) this.hud.updateTandem(this.tandem);
+    if (this.tandem) {
+      this.hud.updateTandem(this.tandem);
+      if (this.partnerAudio) {
+        // Louder alongside, fading to a quarter forty metres off.
+        const p = this.tandem.partner;
+        const d = Math.hypot(p.x - this.state.x, p.y - this.state.y);
+        this.partnerAudio.setNearness(Math.max(0.25, Math.min(1, 1 - (d - 5) / 45)));
+        this.partnerAudio.update(p, this.tandem.partnerCar);
+      }
+    }
     this.hud.update(this.state, this.route, this.config);
     this.audio?.update(this.state, this.car);
   }

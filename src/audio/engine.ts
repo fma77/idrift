@@ -27,12 +27,52 @@ export class EngineAudio {
   private lastTime = 0;
   private started = false;
   private readonly enabled: boolean;
+  /** Playing through another engine's AudioContext: that one owns it. */
+  private shared = false;
+  /** Overall level, 0..1, and how near the car is (1 alongside). */
+  private level: number;
+  private nearness = 1;
+  /** The exhaust filter's cutoff is scaled by this: below 1 is heard from outside. */
+  private readonly muffle: number;
 
   /** The latest reading, for the sound lab's display. */
   reading: EngineReading | null = null;
 
-  constructor(enabled: boolean) {
+  /**
+   * `level` scales the whole engine; `muffle` closes the exhaust filter down,
+   * so the car sounds as if heard from outside it -- the other car in a tandem.
+   */
+  constructor(enabled: boolean, options: { level?: number; muffle?: boolean } = {}) {
     this.enabled = enabled;
+    this.level = options.level ?? 1;
+    this.muffle = options.muffle ? 0.5 : 1;
+  }
+
+  /** The AudioContext, once started, for another engine to share. */
+  get context(): AudioContext | null {
+    return this.ctx;
+  }
+
+  private get gainTarget(): number {
+    return 0.55 * this.level * this.nearness;
+  }
+
+  /** Change the overall level, 0..1. */
+  setLevel(level: number): void {
+    this.level = level;
+    this.applyGain();
+  }
+
+  /** How near the car is, 0..1: the other car in a tandem is louder when close. */
+  setNearness(nearness: number): void {
+    if (Math.abs(nearness - this.nearness) < 0.02) return;
+    this.nearness = nearness;
+    this.applyGain();
+  }
+
+  private applyGain(): void {
+    if (!this.ctx || !this.master) return;
+    this.master.gain.setTargetAtTime(this.gainTarget, this.ctx.currentTime, 0.12);
   }
 
   /**
@@ -40,18 +80,26 @@ export class EngineAudio {
    * otherwise, and a silently-failing one is worse than none: the game would
    * appear to work and simply have no sound with no indication why.
    */
-  async start(kind: EngineKind): Promise<void> {
+  async start(kind: EngineKind, shared: AudioContext | null = null): Promise<void> {
     if (!this.enabled || this.started) return;
     let ctx: AudioContext;
-    try {
-      ctx = new AudioContext();
+    if (shared) {
+      // Another engine's context: already unlocked by the same tap, which is
+      // what a phone requires, and one context rather than two.
+      ctx = shared;
       this.ctx = ctx;
-      // Resume without waiting: on some phones the promise only settles once
-      // the page has been touched again, and the rest of setup must not wait.
-      if (ctx.state === 'suspended') void ctx.resume();
-    } catch {
-      this.ctx = null;
-      return;
+      this.shared = true;
+    } else {
+      try {
+        ctx = new AudioContext();
+        this.ctx = ctx;
+        // Resume without waiting: on some phones the promise only settles once
+        // the page has been touched again, and the rest of setup must not wait.
+        if (ctx.state === 'suspended') void ctx.resume();
+      } catch {
+        this.ctx = null;
+        return;
+      }
     }
     this.started = true;
     this.profile = PROFILES[kind];
@@ -103,7 +151,7 @@ export class EngineAudio {
     this.lockGain.connect(this.master);
     this.noise.start();
 
-    this.master.gain.setTargetAtTime(0.55, ctx.currentTime, 0.15);
+    this.master.gain.setTargetAtTime(this.gainTarget, ctx.currentTime, 0.15);
     this.lastTime = ctx.currentTime;
 
     try {
@@ -166,7 +214,11 @@ export class EngineAudio {
     if (r.flutter > 0) this.node?.port.postMessage({ type: 'flutter', strength: r.flutter });
 
     const smooth = 0.03;
-    this.exhaust?.frequency.setTargetAtTime(700 + 5200 * r.load * (0.4 + 0.6 * Math.min(1, r.rpmFraction)), now, smooth);
+    this.exhaust?.frequency.setTargetAtTime(
+      (700 + 5200 * r.load * (0.4 + 0.6 * Math.min(1, r.rpmFraction))) * this.muffle,
+      now,
+      smooth,
+    );
 
     // Squeal follows the slide, and needs some speed to be heard.
     const squeal = clamp01((slide - 0.12) / 0.5) * clamp01(inputs.speed / 12);
@@ -218,29 +270,35 @@ export class EngineAudio {
     this.node?.port.postMessage({ type: 'voice', voice });
   }
 
-  /** Pause: silence without tearing down, so resuming is instant. */
+  /** Pause: silence without tearing down, so resuming is instant. A shared context is its owner's to pause. */
   suspend(): void {
+    if (this.shared) return;
     void this.ctx?.suspend().catch(() => undefined);
   }
 
   resume(): void {
     if (!this.ctx) return;
-    void this.ctx.resume().catch(() => undefined);
+    if (!this.shared) void this.ctx.resume().catch(() => undefined);
     this.lastTime = this.ctx.currentTime;
   }
 
   stop(): void {
     const ctx = this.ctx;
-    if (!ctx || !this.master) return;
-    this.master.gain.setTargetAtTime(0, ctx.currentTime, 0.06);
+    const master = this.master;
+    if (!ctx || !master) return;
+    const shared = this.shared;
+    master.gain.setTargetAtTime(0, ctx.currentTime, 0.06);
     setTimeout(() => {
       try {
         this.noise?.stop();
       } catch {
         // Already stopped.
       }
-      void ctx.close().catch(() => undefined);
+      // A shared context carries on for its owner: only this engine goes.
+      if (shared) master.disconnect();
+      else void ctx.close().catch(() => undefined);
     }, 250);
+    this.shared = false;
     this.ctx = null;
     this.node = null;
     this.started = false;

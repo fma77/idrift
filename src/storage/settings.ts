@@ -41,6 +41,8 @@ export interface Settings {
   driftControls: Controls;
   /** Time Attack difficulty: easy (the car handles speed) or pro (pedals). */
   timeAttackLevel: 'easy' | 'pro';
+  /** The other car's engine in a tandem, 0..1 of the player's own. */
+  opponentVolume: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -55,6 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tuneMode: false,
   driftControls: 'throttle',
   timeAttackLevel: 'easy',
+  opponentVolume: 0.4,
 };
 
 export function loadSettings(): Settings {
@@ -92,6 +95,7 @@ export function loadSettings(): Settings {
       },
       driftControls: pick('driftControls', (v) => v === 'throttle' || v === 'steer'),
       timeAttackLevel: pick('timeAttackLevel', (v) => v === 'easy' || v === 'pro'),
+      opponentVolume: pick('opponentVolume', (v) => typeof v === 'number' && v >= 0 && v <= 1),
     };
   } catch {
     return defaults();

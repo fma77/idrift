@@ -239,6 +239,17 @@
 
             <div class="row">
               <div>
+                <div>Opponent's engine</div>
+                <div class="caption">How loud the other car is in a tandem, against your own. It is louder the closer it gets.</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px">
+                <input type="range" id="set-opponent-volume" min="0" max="100" step="5" />
+                <span class="row__value" id="opponent-volume-value" style="min-width: 4ch">40%</span>
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
                 <div>Steer in Drift Run</div>
                 <div class="caption">Off: the game steers, you hold the throttle and tap to drift. On: steer with your thumb, as in Time Attack. Runs steered this way are not saved or posted.</div>
               </div>
