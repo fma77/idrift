@@ -23,6 +23,12 @@ export interface SimInput {
   initiate: boolean;
   /** True while the brake is held. Pedals only. */
   brake?: boolean;
+  /**
+   * Metres left of the centreline for the game to steer for, in place of its
+   * own line. Tandem only: the chasing car follows the leader. Worked out from
+   * the sim each tick, so it is never recorded.
+   */
+  line?: number;
 }
 
 /** Quantised input as stored in a replay: steer int16, throttle uint8, flags uint8. */

@@ -212,7 +212,7 @@ function breakCombo(d: SimState['drift']): void {
 }
 
 /** Index of the drift zone containing this sample, or -1. Linear over a short array. */
-function findZone(route: RouteData, sampleIndex: number): number {
+export function findZone(route: RouteData, sampleIndex: number): number {
   const zones = route.driftZones;
   for (let i = 0; i < zones.length; i++) {
     if (sampleIndex >= zones[i].entryIndex && sampleIndex <= zones[i].exitIndex) return i;

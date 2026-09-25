@@ -217,7 +217,12 @@ export function stepThrottleControls(
     // ordinary line.
     const coming = upcomingCornerSign(state, route, SETUP_REACH);
     const inCorner = Math.abs(route.samples.curvature[state.sampleIndex]) >= CORNER_CURVATURE;
-    const setup = coming !== 0 && !inCorner ? -coming * route.samples.halfWidth[state.sampleIndex] * config.drift.setupLine : 0;
+    const setup =
+      input.line !== undefined
+        ? input.line
+        : coming !== 0 && !inCorner
+          ? -coming * route.samples.halfWidth[state.sampleIndex] * config.drift.setupLine
+          : 0;
     const yaw = autoSteerYaw(state, route, setup);
     const turnScale = clamp(state.speed / h.turnInSpeed, 0.2, 1);
     const steer = clamp(-yaw / (h.turnRate * turnScale), -1, 1);
@@ -225,7 +230,7 @@ export function stepThrottleControls(
     return;
   }
 
-  stepDrift(state, car, throttle, config, route, surfaceGrip, dt);
+  stepDrift(state, car, throttle, config, route, surfaceGrip, dt, input.line);
 }
 
 function stepDrift(
@@ -236,6 +241,8 @@ function stepDrift(
   route: RouteData,
   surfaceGrip: number,
   dt: number,
+  /** A line to follow instead of the drift line: a tandem chaser's. */
+  line: number | undefined,
 ): void {
   const d = config.drift;
   const h = car.handling;
@@ -328,7 +335,8 @@ function stepDrift(
   const centre = Math.max(0, half * d.tailLine - tailSwing);
   // The line glides to its target rather than jumping: in a transition the
   // outside changes sides, and the car arcs across the road to it.
-  state.lineOffset += (-dir * centre - state.lineOffset) * (dt / (LINE_GLIDE + dt));
+  const target = line !== undefined ? line : -dir * centre;
+  state.lineOffset += (target - state.lineOffset) * (dt / (LINE_GLIDE + dt));
   // A car with more momentum is lazier to pull back to the line.
   const momentum = car.driftFeel?.momentum ?? 1;
   const want = autoSteerYaw(state, route, state.lineOffset, DRIFT_LINE_GAIN / Math.sqrt(momentum));
