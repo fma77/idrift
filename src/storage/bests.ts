@@ -186,3 +186,34 @@ export async function loadReplay(key: string): Promise<Uint8Array | null> {
   db.close();
   return result;
 }
+
+// --- Tandem: which house characters the player has beaten, per route ---------
+
+const BEATEN_KEY = 'idrift.beaten.v1';
+
+function readBeaten(): Record<string, string[]> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BEATEN_KEY) ?? '{}') as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Whether the player has beaten this character on this route, on this device. */
+export function hasBeaten(routeId: string, characterId: string): boolean {
+  const list = readBeaten()[routeId];
+  return Array.isArray(list) && list.includes(characterId);
+}
+
+export function markBeaten(routeId: string, characterId: string): void {
+  const all = readBeaten();
+  const list = Array.isArray(all[routeId]) ? all[routeId] : [];
+  if (!list.includes(characterId)) list.push(characterId);
+  all[routeId] = list;
+  try {
+    localStorage.setItem(BEATEN_KEY, JSON.stringify(all));
+  } catch {
+    // Not remembered; the win still stands.
+  }
+}

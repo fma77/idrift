@@ -27,18 +27,20 @@ import {
   compress,
   decompress,
   bestKey,
+  hasBeaten,
+  markBeaten,
 } from './storage/bests.ts';
 import { buildGhost, type GhostTrack } from './ghost.ts';
 import { createTandem, tandemScore, type TandemSide, type TandemState } from './sim/tandem.ts';
 import { InputRecorder } from './sim/replay.ts';
-import { houseDriver } from './data/house.ts';
+import { CHARACTERS, characterById, type Character } from './data/characters.ts';
 import { loadDecoration } from './render/decoration.ts';
 import { getSprite, preload } from './render/sprites.ts';
 import { drawPosterOverlay } from './ui/poster.ts';
 import { flagElement } from './ui/flags.ts';
 import { submitScore, fetchBoard, fetchReplay, bytesToBase64, LeaderboardError } from './net/leaderboard.ts';
 import { checkName } from '../shared/moderation.ts';
-import type { ApiMode, LeaderboardRow } from '../shared/api.ts';
+import { isTandemBoard, type ApiMode, type LeaderboardRow } from '../shared/api.ts';
 import { SIM_VERSION, TICK_RATE } from './sim/version.ts';
 import type { CarParams, Controls, RouteData, SimMode } from './sim/types.ts';
 
@@ -113,6 +115,8 @@ let lastPageMode: PageMode = 'driftRun';
  */
 interface Battle {
   kind: 'house' | 'chase';
+  /** Against the house: which character. */
+  rival?: Character;
   /** The other driver's name. */
   name: string;
   skill: number;
@@ -333,8 +337,10 @@ function setBoardMode(mode: PageMode): void {
   $('btn-tandem').setAttribute('aria-pressed', String(mode === 'tandem'));
   $('tandem-row').hidden = mode !== 'tandem';
   $('chase-board').hidden = mode !== 'tandem';
-  if (currentRoute) $('tandem-vs').textContent = `vs ${houseDriver(currentRoute.id).name}`;
-  if (mode === 'tandem') void refreshChaseBoard();
+  if (mode === 'tandem') {
+    buildRivals();
+    void refreshChaseBoard();
+  }
   $('btn-board-car').textContent = carById(settings.carId).name;
   $('btn-board-all').setAttribute('aria-pressed', String(boardCar === 'all'));
   $('btn-board-car').setAttribute('aria-pressed', String(boardCar === 'mine'));
@@ -364,12 +370,15 @@ function boardFor(mode: SimMode, controls: Controls): ApiMode {
 
 /** The board the route page is showing: its mode, and for Time Attack the level. */
 function pageBoard(): ApiMode {
-  if (boardMode === 'tandem') return 'tandem';
+  if (boardMode === 'tandem') return rivalBoard(characterById(settings.tandemRival));
   return boardFor(boardMode, settings.timeAttackLevel === 'pro' ? 'pedals' : 'steer');
 }
 
 function boardTitle(board: ApiMode): string {
-  if (board === 'tandem') return 'Tandem · vs the house';
+  if (isTandemBoard(board)) {
+    const rival = CHARACTERS.find((c) => rivalBoard(c) === board);
+    return rival ? `Tandem · vs ${rival.name}` : 'Tandem';
+  }
   return board === 'driftRun' ? 'Drift Run' : board === 'timeAttackPro' ? 'Time Attack · Pro' : 'Time Attack · Easy';
 }
 
@@ -440,12 +449,12 @@ function boardRow(row: LeaderboardRow, mode: PageMode, board: ApiMode, action: '
   // Time Attack shows only a time; Drift Run shows points, with the time as
   // the secondary value, exactly as the brief specifies.
   value.textContent =
-    board === 'tandem'
+    isTandemBoard(board)
       ? String(row.points)
       : mode === 'timeAttack'
         ? formatTime(row.timeMs / 1000)
         : row.points.toLocaleString('en-GB');
-  if (board === 'tandem') {
+  if (isTandemBoard(board)) {
     // A battle total out of 200, and whether it beat the house.
     const result = document.createElement('span');
     result.className = 'board__car';
@@ -513,10 +522,72 @@ async function refreshChaseBoard(): Promise<void> {
   }
 }
 
+/** A character's own tandem board. */
+function rivalBoard(c: Character): ApiMode {
+  return `tandem-${c.id}` as ApiMode;
+}
+
+/** The four house characters, to pick from on the route page. */
+function buildRivals(): void {
+  const route = currentRoute;
+  const box = $('rivals');
+  box.replaceChildren(
+    ...CHARACTERS.map((c) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'rival';
+      card.setAttribute('role', 'radio');
+      card.setAttribute('aria-checked', String(c.id === settings.tandemRival));
+      card.style.setProperty('--rival', c.colours.primary);
+      card.style.setProperty('--rival-2', c.colours.secondary);
+
+      const bust = document.createElement('div');
+      bust.className = 'rival__bust';
+      if (c.bust) {
+        const img = document.createElement('img');
+        img.src = c.bust;
+        img.alt = '';
+        bust.appendChild(img);
+      } else {
+        // No art yet: their initial, in their colours.
+        bust.textContent = c.name.charAt(0);
+      }
+      const name = document.createElement('div');
+      name.className = 'rival__name';
+      name.textContent = c.name;
+      const tier = document.createElement('div');
+      tier.className = 'rival__tier';
+      tier.textContent = c.tier;
+      const pips = document.createElement('div');
+      pips.className = 'rival__pips';
+      pips.setAttribute('aria-label', `Difficulty ${c.level} of 4`);
+      for (let i = 1; i <= 4; i++) {
+        const pip = document.createElement('span');
+        pip.className = i <= c.level ? 'rival__pip rival__pip--on' : 'rival__pip';
+        pips.appendChild(pip);
+      }
+      card.append(bust, name, tier, pips);
+      if (route && hasBeaten(route.id, c.id)) {
+        const done = document.createElement('span');
+        done.className = 'rival__beaten';
+        done.textContent = '✓';
+        done.title = 'Beaten on this route';
+        card.appendChild(done);
+      }
+      card.addEventListener('click', () => {
+        settings.tandemRival = c.id;
+        saveSettings(settings);
+        setBoardMode('tandem');
+      });
+      return card;
+    }),
+  );
+}
+
 function newHouseBattle(): Battle | null {
   if (!currentRoute) return null;
-  const d = houseDriver(currentRoute.id);
-  return { kind: 'house', name: d.name, skill: d.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0 };
+  const rival = characterById(settings.tandemRival);
+  return { kind: 'house', rival, name: rival.name, skill: rival.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0 };
 }
 
 /** The caption for the run under way: "Run 1/2", "One more time · Run 2/2", "Chase". */
@@ -595,6 +666,7 @@ function finishBattleRun(outcome: RunOutcome): void {
     // Within 2% is too close to call, as the judges would say: one more time.
     const close = Math.abs(yours - theirs) <= 0.02 * Math.max(yours, theirs, 1);
     b.outcome = close ? 'omt' : yours > theirs ? 'win' : 'loss';
+    if (b.outcome === 'win' && b.rival && currentRoute) markBeaten(currentRoute.id, b.rival.id);
   }
   showBattleResults(t.player);
 }
@@ -702,7 +774,7 @@ function retry(): void {
 
 /** The board the results show: a house battle's, or the run's own. */
 function resultBoardKey(): ApiMode {
-  return battle?.kind === 'house' ? 'tandem' : boardFor(currentMode, currentControls);
+  return battle?.kind === 'house' && battle.rival ? rivalBoard(battle.rival) : boardFor(currentMode, currentControls);
 }
 
 // --- Ghosts -----------------------------------------------------------------
@@ -1344,7 +1416,9 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
   if (ghostPick && !ghostTrack) showGhostNote(`${ghostPick.row.playerName}'s ghost could not be replayed.`);
   hud.setGhost(ghostTrack);
   hud.setTandem(
-    tandem && battle ? { playerRole: tandem.playerRole, name: battle.name, run: battleRunLabel(battle) } : null,
+    tandem && battle
+      ? { playerRole: tandem.playerRole, name: battle.name, run: battleRunLabel(battle), colour: battle.rival?.colours.primary }
+      : null,
   );
 
   session = new GameSession(
@@ -1359,6 +1433,7 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
     ghostTrack,
     tandem,
     partnerAudio,
+    battle?.rival ? battle.rival.colours : null,
   );
 
   const countdownOverlay = $('overlay-countdown');

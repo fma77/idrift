@@ -444,7 +444,23 @@ steers, so a chaser only decides throttle and when to flick.
   the same side. Less 15 a spin, 10 a wall, 10 a contact (the chaser's), 15 a
   pass in a zone. Battle: player chases then leads; totals within 2% go to one
   more time.
-- **The house driver drives the player's car.** With a fixed car, picking a
-  faster one beat its chasing outright.
+- **The house driver drives the player's car**, repainted in their colours. With a
+  fixed car, picking a faster one beat its chasing outright; with the same car and
+  no repaint, the two could not be told apart.
 - **Boards**: only battles against the house are ranked (mode `tandem`, the
   player's total out of 200, grade W/L). Chasing a posted run is not.
+
+## Tandem characters, crashes
+
+- **Four characters** (`src/data/characters.ts`): Rookie 0.6, Street Drifter 0.8,
+  Pro Drifter 0.9, Drift King 1.0, each with its own board (`tandem-<id>`). Skill
+  now sets angle, flick timing and force, chase gap, reactions and commitment.
+  Measured: leads 57/74/84/95, chases about 30/60/70/72. The skill knob first
+  changed almost nothing, because leading earned full marks from 40 degrees;
+  it now pays angle to the limit, over the bends of a zone.
+- **The chaser copies the leader's angle**, and on grip uses power to close a gap.
+  Mid-drift, lifting right on the bumper killed its angle and speed, so it trims
+  instead.
+- **Crashes are physical**: pushed apart, momentum exchanged, twisted by an
+  off-centre hit. A leader spun by the chaser is not charged for the spin.
+- **The database no longer lists the modes**; the worker does (migration 0005).

@@ -43,6 +43,8 @@ export interface Settings {
   timeAttackLevel: 'easy' | 'pro';
   /** The other car's engine in a tandem, 0..1 of the player's own. */
   opponentVolume: number;
+  /** The house character a tandem battle is fought against. */
+  tandemRival: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -58,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   driftControls: 'throttle',
   timeAttackLevel: 'easy',
   opponentVolume: 0.4,
+  tandemRival: 'street',
 };
 
 export function loadSettings(): Settings {
@@ -96,6 +99,7 @@ export function loadSettings(): Settings {
       driftControls: pick('driftControls', (v) => v === 'throttle' || v === 'steer'),
       timeAttackLevel: pick('timeAttackLevel', (v) => v === 'easy' || v === 'pro'),
       opponentVolume: pick('opponentVolume', (v) => typeof v === 'number' && v >= 0 && v <= 1),
+      tandemRival: pick('tandemRival', (v) => typeof v === 'string'),
     };
   } catch {
     return defaults();

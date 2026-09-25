@@ -16,7 +16,7 @@ import {
 } from './sim/index.ts';
 import type { CarParams, RouteData, SimConfig, SimInput, SimState } from './sim/types.ts';
 import type { InputController } from './input/input.ts';
-import type { Renderer, RenderSettings } from './render/renderer.ts';
+import type { Livery, Renderer, RenderSettings } from './render/renderer.ts';
 import type { Hud } from './render/hud.ts';
 import type { EngineAudio } from './audio/engine.ts';
 import { ghostPose, type GhostTrack } from './ghost.ts';
@@ -88,6 +88,8 @@ export class GameSession {
     readonly tandem: TandemState | null = null,
     /** The other car's engine, quieter and muffled. Tandem only. */
     private partnerAudio: EngineAudio | null = null,
+    /** A house character's colours for the other car. */
+    private partnerLivery: Livery | null = null,
   ) {
     this.state = createSimState(route, car);
     // Leading a tandem, the player starts a car length ahead of the chaser.
@@ -242,7 +244,7 @@ export class GameSession {
       deltaSeconds,
       this.ghost ? ghostPose(this.ghost, this.state.tick, alpha) : null,
       this.tandem && this.prevPartner
-        ? { prev: this.prevPartner, next: this.tandem.partner, car: this.tandem.partnerCar }
+        ? { prev: this.prevPartner, next: this.tandem.partner, car: this.tandem.partnerCar, livery: this.partnerLivery ?? undefined }
         : null,
     );
     if (this.tandem) {

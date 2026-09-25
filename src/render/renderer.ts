@@ -9,11 +9,19 @@ import { WorldArt } from './world.ts';
 import { themeFor, type WorldTheme } from './themes.ts';
 import type { GhostPose } from '../ghost.ts';
 
+/** A car repainted in a character's colours: the body, and two stripes. */
+export interface Livery {
+  primary: string;
+  secondary: string;
+}
+
 /** The other car in a tandem, a tick ago and now, for drawing it between them. */
 export interface PartnerView {
   prev: SimState;
   next: SimState;
   car: CarParams;
+  /** A house character's colours; a posted run's car keeps its own. */
+  livery?: Livery;
 }
 
 /**
@@ -285,7 +293,7 @@ export class Renderer {
     if (ghost) this.drawGhost(ctx, ghost, px);
     // The other tandem car is a real car, solid and shadowed, drawn under the
     // player's so the player's own car is always the one on top.
-    if (partner && partnerView) this.drawCar(ctx, partnerView, partner.car, px, theme);
+    if (partner && partnerView) this.drawCar(ctx, partnerView, partner.car, px, theme, partner.livery);
     this.drawCar(ctx, view, car, px, theme);
 
     ctx.restore();
@@ -645,11 +653,14 @@ export class Renderer {
     car: CarParams,
     px: number,
     theme: WorldTheme | null,
+    livery?: Livery,
   ): void {
     const len = car.bodyLength;
     const wid = car.bodyWidth;
 
     const sprite = getSprite(car.sprite?.path);
+    // The drawing to put on the road: the car's own, or repainted.
+    const art: HTMLImageElement | HTMLCanvasElement | null = sprite && livery ? repaint(sprite, livery) : sprite;
 
     // A soft shadow on the painted ground, so the car sits on the road rather
     // than floating over it. The sun is fixed in the world, like the trees'.
@@ -693,7 +704,7 @@ export class Renderer {
       // includes the mirrors is wider than the body, and stretching it to
       // bodyWidth would squash the car.
       const drawnWidth = (len * sprite.naturalWidth) / sprite.naturalHeight;
-      ctx.drawImage(sprite, -drawnWidth / 2, -len / 2, drawnWidth, len);
+      ctx.drawImage(art ?? sprite, -drawnWidth / 2, -len / 2, drawnWidth, len);
     } else {
       // Placeholder: an oriented body with a windshield marker so the front is
       // unambiguous at a glance.
@@ -916,5 +927,46 @@ function boxShadow(colour: string): HTMLCanvasElement {
     c.fill();
   }
   shadows.set(key, canvas);
+  return canvas;
+}
+
+// --- Team colours -----------------------------------------------------------
+
+const repaints = new Map<string, HTMLCanvasElement>();
+
+/**
+ * A car drawing repainted in a character's colours, made once and reused.
+ *
+ * The body takes the main colour but keeps the drawing's own light and shade
+ * -- a 'color' blend keeps each pixel's brightness and takes the new hue -- so
+ * the panels, glass and wheels still read. Then two stripes down the car in
+ * the second colour, on the car only. Two identical cars in a tandem are hard
+ * to tell apart; these are not.
+ */
+function repaint(sprite: HTMLImageElement, livery: Livery): HTMLCanvasElement {
+  const key = `${sprite.src}|${livery.primary}|${livery.secondary}`;
+  const cached = repaints.get(key);
+  if (cached) return cached;
+  const w = sprite.naturalWidth;
+  const h = sprite.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const c = canvas.getContext('2d');
+  if (c) {
+    c.drawImage(sprite, 0, 0);
+    c.globalCompositeOperation = 'color';
+    c.fillStyle = livery.primary;
+    c.fillRect(0, 0, w, h);
+    // Back to the car's own outline: the blend filled the empty corners too.
+    c.globalCompositeOperation = 'destination-in';
+    c.drawImage(sprite, 0, 0);
+    c.globalCompositeOperation = 'source-atop';
+    c.globalAlpha = 0.85;
+    c.fillStyle = livery.secondary;
+    c.fillRect(w * 0.39, 0, w * 0.07, h);
+    c.fillRect(w * 0.54, 0, w * 0.07, h);
+  }
+  repaints.set(key, canvas);
   return canvas;
 }

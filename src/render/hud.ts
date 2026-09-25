@@ -96,7 +96,7 @@ export class Hud {
    * Show the tandem display for a run, or hide it. `run` is the caption in the
    * middle ("Run 1/2", "Chase"), `name` the other driver's.
    */
-  setTandem(setup: { playerRole: 'lead' | 'chase'; name: string; run: string } | null): void {
+  setTandem(setup: { playerRole: 'lead' | 'chase'; name: string; run: string; colour?: string } | null): void {
     this.tandemOn = !!setup;
     this.el.tandem.hidden = !setup;
     this.el.root.dataset.tandem = String(!!setup);
@@ -106,6 +106,8 @@ export class Hud {
     this.el.tandemPop.classList.remove('tandem-pop--show');
     if (!setup) return;
     this.tandemName = setup.name;
+    // Their name in their colour, like their car.
+    this.el.tandem.style.setProperty('--them', setup.colour ?? '');
     const theirs = setup.playerRole === 'lead' ? 'chase' : 'lead';
     this.t('you-label').textContent = `You · ${setup.playerRole}`;
     this.t('them-label').textContent = `${setup.name} · ${theirs}`;

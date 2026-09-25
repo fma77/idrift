@@ -1810,3 +1810,8 @@
     font-size: 18px;
   }
 }
+
+/* The house character's name in their colour, like their car. */
+.tandem-hud__side--them .hud__label {
+  color: var(--them, var(--ink-faint));
+}

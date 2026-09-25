@@ -6,13 +6,34 @@
  */
 
 /**
- * Leaderboards: Time Attack on pedals ('timeAttackPro') has its own, and so do
- * tandem battles against the house ('tandem'), ranked on the player's battle
- * total out of 200.
+ * Leaderboards: Time Attack on pedals ('timeAttackPro') has its own, and each
+ * tandem opponent has its own ('tandem-rookie' .. 'tandem-king'), ranked on
+ * the player's battle total out of 200 -- beating the Drift King is not the
+ * same achievement as beating the Rookie.
  */
-export type ApiMode = 'timeAttack' | 'timeAttackPro' | 'driftRun' | 'tandem';
+export type ApiMode =
+  | 'timeAttack'
+  | 'timeAttackPro'
+  | 'driftRun'
+  | 'tandem-rookie'
+  | 'tandem-street'
+  | 'tandem-pro'
+  | 'tandem-king';
 
-export const API_MODES: readonly ApiMode[] = ['timeAttack', 'timeAttackPro', 'driftRun', 'tandem'];
+export const API_MODES: readonly ApiMode[] = [
+  'timeAttack',
+  'timeAttackPro',
+  'driftRun',
+  'tandem-rookie',
+  'tandem-street',
+  'tandem-pro',
+  'tandem-king',
+];
+
+/** A tandem battle's board, against one of the house characters. */
+export function isTandemBoard(mode: string): boolean {
+  return mode.startsWith('tandem-');
+}
 
 /** Leaderboard partition key, per the brief. */
 export interface BoardKey {

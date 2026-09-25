@@ -1075,3 +1075,95 @@ body {
 #chase-board > .caption {
   margin: 4px 0 var(--s-2);
 }
+
+/* --- Tandem: the four house characters ------------------------------------- */
+
+.rivals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-2);
+}
+
+.rival {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px 10px;
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--rule);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.rival[aria-checked='true'] {
+  background: #fff;
+  border: 3px solid var(--red);
+  padding: 7px 3px 9px;
+}
+
+.rival__bust {
+  width: 100%;
+  max-width: 72px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--rival);
+  box-shadow: inset 0 0 0 4px var(--rival-2);
+  font-family: var(--display);
+  font-size: 26px;
+  color: var(--rival-2);
+  overflow: hidden;
+}
+
+.rival__bust img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rival__name {
+  margin-top: 4px;
+  font-family: var(--display);
+  font-size: 13px;
+}
+
+.rival__tier {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-align: center;
+  line-height: 1.2;
+  min-height: 2.4em;
+}
+
+.rival__pips {
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.rival__pip {
+  width: 8px;
+  height: 4px;
+  background: var(--rule);
+}
+
+.rival__pip--on {
+  background: var(--red);
+}
+
+.rival__beaten {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-weight: 800;
+  color: #3a9a2a;
+}

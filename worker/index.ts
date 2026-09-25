@@ -2,6 +2,7 @@ import { checkName, MAX_NAME_LENGTH } from '../shared/moderation.ts';
 import {
   API_MODES,
   BOARD_SIZE,
+  isTandemBoard,
   isLowerBetter,
   rankValue,
   type ApiMode,
@@ -371,7 +372,7 @@ function validateShape(b: ScoreSubmission): string | null {
   if (!Number.isInteger(b.routeVersion) || b.routeVersion < 1) return 'Bad route version.';
   if (!API_MODES.includes(b.mode)) return 'Bad mode.';
   // A tandem battle is two runs judged out of 100 each.
-  if (b.mode === 'tandem' && b.points > 200) return 'Bad points.';
+  if (isTandemBoard(b.mode) && b.points > 200) return 'Bad points.';
   if (typeof b.carClass !== 'string' || !/^[A-Z]{1,2}$/.test(b.carClass)) return 'Bad car class.';
   if (!Number.isInteger(b.simVersion) || b.simVersion < 1) return 'Bad sim version.';
   if (typeof b.playerName !== 'string' || b.playerName.length > MAX_NAME_LENGTH * 2) return 'Bad name.';
