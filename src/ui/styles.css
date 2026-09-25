@@ -1189,10 +1189,14 @@ body {
 
 .battle th,
 .battle td {
-  padding: 10px 0;
+  padding: 10px 0 10px 12px;
   border-bottom: 1px solid var(--rule);
   text-align: right;
-  vertical-align: baseline;
+  vertical-align: middle;
+}
+
+.battle th:first-child {
+  padding-left: 0;
 }
 
 .battle thead th {
@@ -1202,7 +1206,7 @@ body {
   font-weight: 400;
   font-size: 15px;
   color: var(--ink-muted);
-  width: 5.5em;
+  width: 6.2em;
 }
 
 .battle thead th:first-child,
@@ -1218,16 +1222,6 @@ body {
   box-shadow: inset 0 -3px 0 var(--red);
 }
 
-.battle td {
-  font-size: 20px;
-  color: var(--ink-muted);
-}
-
-.battle td.battle__you {
-  font-weight: 800;
-  color: var(--ink);
-}
-
 .battle__run {
   display: block;
   font-weight: 700;
@@ -1239,10 +1233,40 @@ body {
   color: var(--ink-muted);
 }
 
+/* Each score in its own box: neighbouring totals keep their distance. */
+.battle__score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 3ch;
+  padding: 2px 8px;
+  font-size: 20px;
+  color: var(--ink-muted);
+}
+
+.battle__you .battle__score {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Took this run: a green tick before the score. */
+.battle__score--won::before {
+  content: '✓';
+  font-size: 14px;
+  font-weight: 800;
+  color: #3a9a2a;
+}
+
+.battle__score--won {
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 #6fd14f;
+}
+
 .battle tfoot th,
 .battle tfoot td {
   border-bottom: none;
-  padding-top: 12px;
+  padding-top: 14px;
 }
 
 .battle tfoot th {
@@ -1253,34 +1277,40 @@ body {
   text-transform: uppercase;
 }
 
-.battle__total {
+.battle tfoot .battle__score {
   font-family: var(--display);
-  font-size: 28px;
+  font-weight: 400;
+  font-size: 24px;
   padding: 6px 10px;
 }
 
-/* The winner's total, filled in the game's green for "good" -- not red, which
-   marks the player's own column, so a house win cannot read as yours; the
-   loser's, quiet; a tie, outlined both. */
-.battle td.battle__win {
+/* The battle: the winner's total filled in the game's green for "good" -- not
+   red, which marks the player's own column, so a house win cannot read as
+   yours; the loser's quiet; a tie outlined both. */
+.battle__score--win {
   background: #6fd14f;
-  color: var(--ink);
+  color: var(--ink) !important;
 }
 
-.battle td.battle__lose {
-  color: var(--ink-faint);
+.battle__score--lose {
+  color: var(--ink-faint) !important;
 }
 
-.battle td.battle__tie {
+.battle__score--tie {
   box-shadow: inset 0 0 0 2px var(--ink);
-  color: var(--ink);
+  color: var(--ink) !important;
 }
 
 .battle__note {
+  padding: 12px 0 0 !important;
   text-align: left !important;
-  font-size: 13px !important;
-  color: var(--ink) !important;
-  padding-top: 8px !important;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.battle__note strong {
+  font-weight: 800;
 }
 
 /*

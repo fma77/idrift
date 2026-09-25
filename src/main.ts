@@ -680,16 +680,27 @@ function finishBattleRun(outcome: RunOutcome): void {
 function battleTable(b: Battle, final: boolean): HTMLElement {
   const table = document.createElement('table');
   table.className = 'battle';
-  const cell = (tag: 'th' | 'td', text: string, className = '') => {
-    const el = document.createElement(tag);
-    el.textContent = text;
-    if (className) el.className = className;
-    return el;
-  };
   const row = (...cells: HTMLElement[]) => {
     const tr = document.createElement('tr');
     tr.append(...cells);
     return tr;
+  };
+  const head = (text: string, className = '') => {
+    const th = document.createElement('th');
+    th.textContent = text;
+    if (className) th.className = className;
+    return th;
+  };
+  /** A score in its own box, so neighbouring totals never touch; ticked when it took the round. */
+  const score = (value: number | null, mine: boolean, mark: '' | 'won' | 'win' | 'lose' | 'tie' = '') => {
+    const td = document.createElement('td');
+    if (mine) td.className = 'battle__you';
+    const box = document.createElement('span');
+    box.className = `battle__score${mark ? ` battle__score--${mark}` : ''}`;
+    box.textContent = value === null ? '—' : String(value);
+    if (mark === 'won') box.setAttribute('aria-label', `${value}, took this run`);
+    td.appendChild(box);
+    return td;
   };
   const runLabel = (title: string, detail: string) => {
     const th = document.createElement('th');
@@ -703,42 +714,49 @@ function battleTable(b: Battle, final: boolean): HTMLElement {
     th.append(t, d);
     return th;
   };
+  // Who took a run: the higher score. A dead heat in a run ticks neither.
+  const runRow = (title: string, detail: string, yours: number | null, theirs: number | null) =>
+    row(
+      runLabel(title, detail),
+      score(yours, true, yours !== null && theirs !== null && yours > theirs ? 'won' : ''),
+      score(theirs, false, yours !== null && theirs !== null && theirs > yours ? 'won' : ''),
+    );
 
-  const head = document.createElement('thead');
-  head.append(row(cell('th', ''), cell('th', 'You', 'battle__you'), cell('th', b.name, 'battle__them')));
-  const body = document.createElement('tbody');
+  const thead = document.createElement('thead');
+  thead.append(row(head(''), head('You', 'battle__you'), head(b.name, 'battle__them')));
+  const tbody = document.createElement('tbody');
   if (b.kind === 'chase') {
-    body.append(row(runLabel('Chase', `you chase · ${b.name} leads`), cell('td', String(b.youChase), 'battle__you'), cell('td', String(b.theyLead))));
-    table.append(head, body);
+    tbody.append(runRow('Chase', `you chase · ${b.name} leads`, b.youChase, b.theyLead));
+    table.append(thead, tbody);
     return table;
   }
-  body.append(
-    row(runLabel('Run 1', `you chase · ${b.name} leads`), cell('td', String(b.youChase), 'battle__you'), cell('td', String(b.theyLead))),
-    row(
-      runLabel('Run 2', `you lead · ${b.name} chases`),
-      cell('td', final ? String(b.youLead) : '—', 'battle__you'),
-      cell('td', final ? String(b.theyChase) : '—'),
-    ),
+  tbody.append(
+    runRow('Run 1', `you chase · ${b.name} leads`, b.youChase, b.theyLead),
+    runRow('Run 2', `you lead · ${b.name} chases`, final ? b.youLead : null, final ? b.theyChase : null),
   );
-  table.append(head, body);
+  table.append(thead, tbody);
   if (final) {
     const yours = b.youChase + b.youLead;
     const theirs = b.theyLead + b.theyChase;
-    const foot = document.createElement('tfoot');
-    const mark = (won: boolean) => (b.outcome === 'omt' ? ' battle__tie' : won ? ' battle__win' : ' battle__lose');
-    foot.append(
-      row(
-        cell('th', 'Total'),
-        cell('td', String(yours), `battle__you battle__total${mark(b.outcome === 'win')}`),
-        cell('td', String(theirs), `battle__total${mark(b.outcome === 'loss')}`),
-      ),
-    );
+    const mark = (won: boolean) => (b.outcome === 'omt' ? 'tie' : won ? 'win' : 'lose');
+    const tfoot = document.createElement('tfoot');
+    const total = head('Total');
+    total.scope = 'row';
+    tfoot.append(row(total, score(yours, true, mark(b.outcome === 'win')), score(theirs, false, mark(b.outcome === 'loss'))));
     if (b.outcome === 'omt') {
-      const note = cell('td', 'Within 2%: one more time.', 'battle__note');
+      // In the judges' words: too close to call, so they call One More Time.
+      const note = document.createElement('td');
       note.colSpan = 3;
-      foot.append(row(note));
+      note.className = 'battle__note';
+      const lead = document.createElement('strong');
+      lead.textContent = 'Too close to call: within 2% of each other.';
+      note.append(
+        lead,
+        ` The judges call One More Time (OMT): both runs again, you chasing first, and the rerun settles it.`,
+      );
+      tfoot.append(row(note));
     }
-    table.append(foot);
+    table.append(tfoot);
   }
   return table;
 }
