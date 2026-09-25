@@ -429,7 +429,7 @@ Drift Run. The brief expected the computer chaser to be the hardest feature in
 the game; Drift Run's controls made it tractable, because the game already
 steers, so a chaser only decides throttle and when to flick.
 
-- **One sim, two cars** (). Both step together each tick;
+- **One sim, two cars** (`src/sim/tandem.ts`). Both step together each tick;
   the opponent is a recorded run or a computer driver whose every decision is a
   pure function of the two states. A tandem run replays from the player's inputs
   alone (tested).
@@ -446,5 +446,5 @@ steers, so a chaser only decides throttle and when to flick.
   more time.
 - **The house driver drives the player's car.** With a fixed car, picking a
   faster one beat its chasing outright.
-- **Boards**: only battles against the house are ranked (mode , the
+- **Boards**: only battles against the house are ranked (mode `tandem`, the
   player's total out of 200, grade W/L). Chasing a posted run is not.
