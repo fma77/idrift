@@ -1178,3 +1178,116 @@ body {
 .result-rival[hidden] {
   display: none;
 }
+
+/* --- Tandem results: you and them, run by run ----------------------------- */
+
+.battle {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.battle th,
+.battle td {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: right;
+  vertical-align: baseline;
+}
+
+.battle thead th {
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--ink);
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--ink-muted);
+  width: 5.5em;
+}
+
+.battle thead th:first-child,
+.battle tbody th,
+.battle tfoot th {
+  width: auto;
+  text-align: left;
+}
+
+/* The player's column: their name in red, their scores in bold. */
+.battle thead .battle__you {
+  color: var(--red);
+  box-shadow: inset 0 -3px 0 var(--red);
+}
+
+.battle td {
+  font-size: 20px;
+  color: var(--ink-muted);
+}
+
+.battle td.battle__you {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.battle__run {
+  display: block;
+  font-weight: 700;
+}
+
+.battle__role {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.battle tfoot th,
+.battle tfoot td {
+  border-bottom: none;
+  padding-top: 12px;
+}
+
+.battle tfoot th {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.battle__total {
+  font-family: var(--display);
+  font-size: 28px;
+  padding: 6px 10px;
+}
+
+/* The winner's total, filled in the game's green for "good" -- not red, which
+   marks the player's own column, so a house win cannot read as yours; the
+   loser's, quiet; a tie, outlined both. */
+.battle td.battle__win {
+  background: #6fd14f;
+  color: var(--ink);
+}
+
+.battle td.battle__lose {
+  color: var(--ink-faint);
+}
+
+.battle td.battle__tie {
+  box-shadow: inset 0 0 0 2px var(--ink);
+  color: var(--ink);
+}
+
+.battle__note {
+  text-align: left !important;
+  font-size: 13px !important;
+  color: var(--ink) !important;
+  padding-top: 8px !important;
+}
+
+/*
+ * Hidden means hidden. A class that sets its own display (every .btn is flex)
+ * otherwise beats the browser's rule for [hidden]: "Run again in another car"
+ * stayed on screen mid-battle although the code had hidden it.
+ */
+[hidden] {
+  display: none !important;
+}

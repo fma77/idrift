@@ -145,12 +145,14 @@ async function submitScore(
   // they are the right amount of effort: they make a fabricated score obvious
   // without making an honest one fragile.
 
-  const id = crypto.randomUUID();
+  // The game's own id for this result when it sent one, so a post retried
+  // after its answer was lost is stored once, not twice.
+  const id = body.submissionId ?? crypto.randomUUID();
   const value = rankValue(body.mode, body.timeMs, body.points);
   const replay = body.replay ? base64ToBytes(body.replay) : null;
 
   await env.DB.prepare(
-    `INSERT INTO scores (
+    `INSERT OR IGNORE INTO scores (
        id, route_id, route_version, mode, car_class, sim_version,
        player_name, car_id, rank_value, time_ms, points, grade,
        assist, tick_count, replay, created_at
@@ -380,6 +382,9 @@ function validateShape(b: ScoreSubmission): string | null {
   if (!Number.isFinite(b.timeMs) || b.timeMs <= 0 || b.timeMs > 3_600_000) return 'Bad time.';
   if (!Number.isFinite(b.points) || b.points < 0 || b.points > 1e12) return 'Bad points.';
   if (typeof b.assist !== 'number' || b.assist < 0 || b.assist > 1) return 'Bad assist value.';
+  if (b.submissionId !== undefined && (typeof b.submissionId !== 'string' || !/^[0-9a-f-]{36}$/.test(b.submissionId))) {
+    return 'Bad submission.';
+  }
   // A replay is a few KB; anything far larger is not a replay.
   if (b.replay !== undefined && (typeof b.replay !== 'string' || b.replay.length > 400_000)) {
     return 'Bad replay.';

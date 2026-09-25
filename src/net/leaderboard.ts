@@ -27,7 +27,23 @@ export class LeaderboardError extends Error {
   }
 }
 
+/**
+ * One quiet retry: a phone dropping signal for a second is the commonest
+ * failure, and a second attempt usually just works. Only for not reaching the
+ * server at all -- an answer from it, even an error, is final. Safe for posting
+ * too: a post carries its own id, and the server stores it once.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  try {
+    return await attempt<T>(path, init);
+  } catch (err) {
+    if (!(err instanceof LeaderboardError) || err.status !== 0) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return attempt<T>(path, init);
+  }
+}
+
+async function attempt<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

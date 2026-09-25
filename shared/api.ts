@@ -59,6 +59,11 @@ export interface ScoreSubmission extends Omit<BoardKey, 'car'> {
   tickCount: number;
   /** Gzipped, delta-encoded input stream, base64. Optional. */
   replay?: string;
+  /**
+   * Made once per result by the game. A post retried after a lost answer
+   * carries the same one, and the server stores it only once.
+   */
+  submissionId?: string;
 }
 
 export interface LeaderboardRow {

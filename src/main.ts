@@ -377,7 +377,7 @@ function pageBoard(): ApiMode {
 function boardTitle(board: ApiMode): string {
   if (isTandemBoard(board)) {
     const rival = CHARACTERS.find((c) => rivalBoard(c) === board);
-    return rival ? `Tandem · vs ${rival.name}` : 'Tandem';
+    return rival ? `Drift Tandem · vs ${rival.name}` : 'Drift Tandem';
   }
   return board === 'driftRun' ? 'Drift Run' : board === 'timeAttackPro' ? 'Time Attack · Pro' : 'Time Attack · Easy';
 }
@@ -671,6 +671,78 @@ function finishBattleRun(outcome: RunOutcome): void {
   showBattleResults(t.player);
 }
 
+/**
+ * The battle as a table: a column each for the player and the opponent, a row
+ * per run, and the totals under them -- so the sums add up down the page and
+ * the winner is plain. After the deciding run the winner's total is filled in
+ * red; a tie-breaker outlines both, and says why.
+ */
+function battleTable(b: Battle, final: boolean): HTMLElement {
+  const table = document.createElement('table');
+  table.className = 'battle';
+  const cell = (tag: 'th' | 'td', text: string, className = '') => {
+    const el = document.createElement(tag);
+    el.textContent = text;
+    if (className) el.className = className;
+    return el;
+  };
+  const row = (...cells: HTMLElement[]) => {
+    const tr = document.createElement('tr');
+    tr.append(...cells);
+    return tr;
+  };
+  const runLabel = (title: string, detail: string) => {
+    const th = document.createElement('th');
+    th.scope = 'row';
+    const t = document.createElement('span');
+    t.className = 'battle__run';
+    t.textContent = title;
+    const d = document.createElement('span');
+    d.className = 'battle__role';
+    d.textContent = detail;
+    th.append(t, d);
+    return th;
+  };
+
+  const head = document.createElement('thead');
+  head.append(row(cell('th', ''), cell('th', 'You', 'battle__you'), cell('th', b.name, 'battle__them')));
+  const body = document.createElement('tbody');
+  if (b.kind === 'chase') {
+    body.append(row(runLabel('Chase', `you chase · ${b.name} leads`), cell('td', String(b.youChase), 'battle__you'), cell('td', String(b.theyLead))));
+    table.append(head, body);
+    return table;
+  }
+  body.append(
+    row(runLabel('Run 1', `you chase · ${b.name} leads`), cell('td', String(b.youChase), 'battle__you'), cell('td', String(b.theyLead))),
+    row(
+      runLabel('Run 2', `you lead · ${b.name} chases`),
+      cell('td', final ? String(b.youLead) : '—', 'battle__you'),
+      cell('td', final ? String(b.theyChase) : '—'),
+    ),
+  );
+  table.append(head, body);
+  if (final) {
+    const yours = b.youChase + b.youLead;
+    const theirs = b.theyLead + b.theyChase;
+    const foot = document.createElement('tfoot');
+    const mark = (won: boolean) => (b.outcome === 'omt' ? ' battle__tie' : won ? ' battle__win' : ' battle__lose');
+    foot.append(
+      row(
+        cell('th', 'Total'),
+        cell('td', String(yours), `battle__you battle__total${mark(b.outcome === 'win')}`),
+        cell('td', String(theirs), `battle__total${mark(b.outcome === 'loss')}`),
+      ),
+    );
+    if (b.outcome === 'omt') {
+      const note = cell('td', 'Within 2%: one more time.', 'battle__note');
+      note.colSpan = 3;
+      foot.append(row(note));
+    }
+    table.append(foot);
+  }
+  return table;
+}
+
 /** "2 contacts · 1 spin", or "None". */
 function penaltiesText(s: TandemSide): string {
   const parts: string[] = [];
@@ -690,8 +762,6 @@ function showBattleResults(yourSide: TandemSide): void {
   if (!b || !route) return;
   const car = carById(settings.carId);
   const final = b.kind === 'house' && b.run === 2;
-  const yours = b.youChase + b.youLead;
-  const theirs = b.theyLead + b.theyChase;
 
   $('result-title').textContent =
     b.kind === 'chase'
@@ -708,18 +778,7 @@ function showBattleResults(yourSide: TandemSide): void {
   portrait.hidden = !b.rival?.bust;
   if (b.rival?.bust) portrait.src = b.rival.bust;
 
-  const rows: HTMLElement[] = [];
-  if (b.kind === 'chase') {
-    rows.push(scoreRow('Your chase', `of ${b.name}'s run`, b.youChase, false));
-  } else {
-    rows.push(scoreRow('Run 1 · you chase', `${b.name} leads: ${b.theyLead}`, b.youChase, false));
-    if (final) {
-      rows.push(scoreRow('Run 2 · you lead', `${b.name} chases: ${b.theyChase}`, b.youLead, false));
-      rows.push(totalRow(`You · ${b.name}`, `${yours} – ${theirs}`));
-    }
-  }
-  rows.push(statRow('Your penalties', penaltiesText(yourSide)));
-  $('result-stats').replaceChildren(...rows);
+  $('result-stats').replaceChildren(battleTable(b, final), statRow('Your penalties', penaltiesText(yourSide)));
 
   // What next: the second run, one more time, or another battle.
   $('btn-retry').textContent =
@@ -1443,7 +1502,7 @@ async function startRun(mode: SimMode, restart = false, tandem: TandemState | nu
   const countdownEl = $('countdown');
   $('countdown-mode').textContent =
     tandem && battle
-      ? `TANDEM · ${battleRunLabel(battle).toUpperCase()}`
+      ? `DRIFT TANDEM · ${battleRunLabel(battle).toUpperCase()}`
       : mode === 'driftRun'
         ? 'DRIFT RUN'
         : currentControls === 'pedals'
@@ -1705,7 +1764,11 @@ function quitRun(): void {
 
 // --- Posting a score --------------------------------------------------------
 
+/** This result's id for the server: kept across retries, so it is stored once. */
+let submissionId = '';
+
 function resetSubmitPanel(): void {
+  submissionId = crypto.randomUUID();
   const input = $<HTMLInputElement>('player-name');
   input.value = settings.playerName;
   input.removeAttribute('aria-invalid');
@@ -1788,6 +1851,7 @@ async function postScore(): Promise<void> {
       assist: 1,
       tickCount: result.totalTicks,
       replay,
+      submissionId,
     });
 
     myLastRowId = response.id;
