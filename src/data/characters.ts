@@ -6,7 +6,7 @@
  * With the cars matched, a battle is decided by driving -- and the colours are
  * how the player tells the two cars apart.
  *
- * Skill (0.6..1.0) is what sets them apart: how close to the limit they run
+ * Skill (0.5..0.9) is what sets them apart: how close to the limit they run
  * their angle, how early and how hard they throw the car in, how tight they
  * chase, how fast they answer a change of side (see skillOf in sim/tandem.ts).
  *
@@ -35,7 +35,7 @@ export const CHARACTERS: Character[] = [
     id: 'rookie',
     name: 'KENJI',
     tier: 'Rookie',
-    skill: 0.6,
+    skill: 0.5,
     level: 1,
     colours: { primary: '#1f52e0', secondary: '#ffffff' },
     accent: '#4f7dff',
@@ -45,7 +45,7 @@ export const CHARACTERS: Character[] = [
     id: 'street',
     name: 'NORICK',
     tier: 'Street Drifter',
-    skill: 0.8,
+    skill: 0.6,
     level: 2,
     colours: { primary: '#d8232a', secondary: '#ffffff' },
     accent: '#ff4a4f',
@@ -55,7 +55,7 @@ export const CHARACTERS: Character[] = [
     id: 'pro',
     name: 'TAKA',
     tier: 'Pro Drifter',
-    skill: 0.9,
+    skill: 0.8,
     level: 3,
     colours: { primary: '#161616', secondary: '#d8232a' },
     accent: '#ff4a4f',
@@ -65,7 +65,7 @@ export const CHARACTERS: Character[] = [
     id: 'king',
     name: 'DK',
     tier: 'Drift King',
-    skill: 1.0,
+    skill: 0.9,
     level: 4,
     colours: { primary: '#139a45', secondary: '#141414' },
     accent: '#2fcf6a',

@@ -158,13 +158,14 @@ test('tandem: cars that hit bounce apart and trade speed, and the chaser is char
   const gap = Math.hypot(player.x - t.partner.x, player.y - t.partner.y);
   assert.ok(gap > 3.5, `the cars are still inside each other: ${gap.toFixed(2)} m apart`);
   assert.equal(t.player.contacts, 1, 'one hit, one contact');
+  assert.equal(t.player.knocks, 0, 'a crash, not a spin');
   assert.equal(t.opponent.contacts, 0, 'the leader is not charged');
 });
 
 test('tandem: each difficulty level drives better than the one below, leading and chasing', () => {
   // The four characters' skills. Scores averaged over three routes, against
   // the same stand-in driver, so only the house driver changes.
-  const skills = [0.6, 0.8, 0.9, 1.0];
+  const skills = [0.5, 0.6, 0.8, 0.9];
   const sample = [ROUTES[0], ROUTES[2], ROUTES[4]];
   const car = carById('silvia');
   const leads = [];
@@ -196,11 +197,10 @@ test('tandem: each difficulty level drives better than the one below, leading an
   }
   for (let i = 1; i < skills.length; i++) {
     assert.ok(leads[i] > leads[i - 1] + 3, `leading: skill ${skills[i]} scored ${leads[i].toFixed(0)}, below ${skills[i - 1]}'s ${leads[i - 1].toFixed(0)}`);
-    // The Pro and the King chase about equally well; the King leads better.
     assert.ok(chases[i] > chases[i - 1] - 3, `chasing: skill ${skills[i]} scored ${chases[i].toFixed(0)}, below ${skills[i - 1]}'s ${chases[i - 1].toFixed(0)}`);
   }
   assert.ok(chases[3] > chases[0] + 20, 'the Drift King chases no better than the Rookie');
-  assert.ok(leads[3] >= 85, `the Drift King only led to ${leads[3].toFixed(0)}`);
+  assert.ok(leads[3] >= 82, `the Drift King only led to ${leads[3].toFixed(0)}`);
 });
 
 test("tandem: the judges' breakdown adds up to the score, and names a reason", async () => {
@@ -215,4 +215,24 @@ test("tandem: the judges' breakdown adds up to the score, and names a reason", a
     assert.match(line, /^Run 2 (to (you|NORICK)|level)/);
     console.log(`    ${route.name}: ${tandemScore(t.player)}-${tandemScore(t.opponent)} ${line}`);
   }
+});
+
+test("tandem: the judges name every incident, and follow One More Time", async () => {
+  const { battleVerdict } = await import('../src/ui/judges.ts');
+  const side = (role, o) => ({ role, zoneTicks: 1000, qualitySum: 0, penalty: 0, spins: 0, walls: 0, contacts: 0, knocks: 0, passes: 0,
+    lostDrift: 0, lostAngle: 0, lostGap: 0, lostMatch: 0, gapSum: 1000, ...o });
+  // Run 1: you chase too far back, and knock the leader into a spin. Run 2: DK crashes into you and hits a wall.
+  const r1 = { you: side('chase', { qualitySum: 800, lostGap: 200, gapSum: 2500, contacts: 1, knocks: 1, penalty: 10 }), them: side('lead', { qualitySum: 950, lostAngle: 50 }) };
+  const r2 = { you: side('lead', { qualitySum: 900, lostAngle: 100 }), them: side('chase', { qualitySum: 950, lostGap: 50, contacts: 1, walls: 1, penalty: 20 }) };
+  const omt = battleVerdict({ kind: 'house', name: 'DK', omt: 0, runs: [r1, r2], outcome: 'omt', rounds: [[160, 170]] });
+  assert.match(omt[0], /^Run 1 to DK: you sat about 2\.5 car lengths back \(−20\), against DK's near-perfect lead\. Also: you knocked DK into a spin \(−10\)\.$/);
+  assert.match(omt[1], /^Run 2 to you: DK/);
+  assert.match(omt[1], /crashed into you \(−10\)/);
+  assert.match(omt[1], /hit the wall \(−10\)/);
+  assert.match(omt[2], /What you gave away chasing \(25\), you won back leading \(15\): too close to split\./);
+  const rerun = battleVerdict({ kind: 'house', name: 'DK', omt: 1, runs: [r1], rounds: [[160, 170]] });
+  assert.match(rerun[0], /^One More Time: the last round finished 160–170/);
+  assert.match(rerun[1], /^OMT run 1 to DK/);
+  const settled = battleVerdict({ kind: 'house', name: 'DK', omt: 1, runs: [r1, r2], outcome: 'win', rounds: [[160, 170]] });
+  assert.match(settled.at(-1), /^Settled at the first One More Time, after 160–170/);
 });

@@ -28,7 +28,8 @@ import type { CarParams, RouteData, SimConfig, SimInput, SimState } from './type
  *          angle matches the leader's, and on the same side.
  *
  * Each is the average over the ticks the car spends in drift zones, less
- * penalties: a spin, a wall, contact (the chaser's), or passing in a zone.
+ * penalties: a spin, a wall, a real hit (the chaser's: a crash, or knocking the
+ * leader into a spin -- not a touch), or passing in a zone.
  */
 
 export type TandemRole = 'lead' | 'chase';
@@ -48,7 +49,10 @@ export interface TandemSide {
   penalty: number;
   spins: number;
   walls: number;
+  /** Hits charged: crashes, and knocking the leader into a spin. */
   contacts: number;
+  /** Of those, the times the chaser spun the leader. */
+  knocks: number;
   passes: number;
   /**
    * Where the points went, for the judges' words -- not part of the score.
@@ -89,9 +93,10 @@ export interface TandemState {
   angleMatch: number;
   /** Both cars sideways the same way. */
   sameSide: boolean;
-  /** The two cars touched this tick (counted once per contact). */
+  /** The chaser was charged for a hit this tick. */
   contactThisTick: boolean;
-  contactCooldown: number;
+  /** The chaser has been charged for the contact going on now: one charge per contact. */
+  contactCharged: boolean;
   /** How hard the cars hit each other this tick, m/s of closing speed; 0 if they did not. */
   impact: number;
   /** Ticks since the cars last touched: a leader spun by the chaser is not blamed for it. */
@@ -133,10 +138,15 @@ const SPIN_PENALTY = 15;
 const WALL_PENALTY = 10;
 const CONTACT_PENALTY = 10;
 const PASS_PENALTY = 15;
-/** Seconds after a contact before another counts. */
+/** Seconds apart two touches must be to count as two contacts, not one. */
 const CONTACT_COOLDOWN = 0.6;
-/** m/s of closing speed below which cars merely brush, without a penalty. */
-const CONTACT_MIN = 0.3;
+/**
+ * m/s of closing speed from which a hit is a crash, and charged. Below it the
+ * cars touch, bump and lean on each other for free: in tests, a close chase
+ * touches at 0.5 to 4 m/s without upsetting either car; running into the back
+ * of a slower leader is 5 and up.
+ */
+const CRASH_SPEED = 4.5;
 /** Seconds after contact in which a leader's spin is the chaser's doing. */
 const SPIN_FORGIVENESS = 1.5;
 
@@ -166,6 +176,7 @@ function side(role: TandemRole): TandemSide {
     spins: 0,
     walls: 0,
     contacts: 0,
+    knocks: 0,
     passes: 0,
     lostDrift: 0,
     lostAngle: 0,
@@ -196,7 +207,7 @@ export function createTandem(
     angleMatch: 0,
     sameSide: false,
     contactThisTick: false,
-    contactCooldown: 0,
+    contactCharged: false,
     impact: 0,
     sinceContact: 1e9,
     passedZone: -1,
@@ -321,8 +332,10 @@ function chaseLine(lead: SimState, chase: SimState, route: RouteData): number | 
 // --- The other driver --------------------------------------------------------
 
 /**
- * What a driver's skill (0.6 Rookie .. 1.0 Drift King) means in practice. Each
- * is drawn straight between the Rookie's and the Drift King's value.
+ * What a driver's skill (0.4 .. 1.0) means in practice. Each is drawn straight
+ * between the values at 0.6 and 1.0, and carried on below 0.6. The house
+ * drivers run from 0.5 (Kenji) to 0.9 (DK), see data/characters.ts; the
+ * "Rookie" and "King" named below are the two ends of the scale.
  */
 interface Skill {
   /** Radians under the limit angle it holds a drift at: the Rookie's 38 degrees to the King's 53. */
@@ -344,17 +357,19 @@ interface Skill {
 }
 
 function skillOf(skill: number): Skill {
-  const k = clamp((skill - 0.6) / 0.4, 0, 1);
-  const between = (rookie: number, king: number) => rookie + (king - rookie) * k;
+  // Below 0.6 the line carries on past its first end, down to 0.4 -- a
+  // beginner is a clumsier version of the same driver.
+  const k = clamp((skill - 0.6) / 0.4, -0.5, 1);
+  const between = (low: number, high: number) => low + (high - low) * k;
   return {
     margin: between(0.3, 0.035),
     flickAhead: between(13, 27),
     flickHold: between(0.13, 0.24),
     gap: between(2.4, 0.5),
     react: between(0.45, 0.08),
-    mirror: between(0.3, 1.0),
+    mirror: Math.max(0, between(0.3, 1.0)),
     commit: between(0.82, 1),
-    read: between(0, 1),
+    read: Math.max(0, between(0, 1)),
   };
 }
 
@@ -551,25 +566,39 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
     }
   }
 
-  // Contact: the chaser's to avoid.
+  // Contact: the chaser's to avoid -- but only a real hit. Doors touching while
+  // both are sideways, a nudge, a bump that upsets nobody: that is tandem, and
+  // costs nothing. A hit counts when it is hard, or when the leader spins from
+  // it (below). Once per contact either way.
   t.contactThisTick = false;
-  if (t.impact > 0) t.sinceContact = 0;
-  else t.sinceContact++;
-  if (t.contactCooldown > 0) t.contactCooldown--;
-  else if (t.impact > CONTACT_MIN) {
+  if (t.impact > 0) {
+    // A fresh contact, not the same one still grinding on.
+    if (t.sinceContact > CONTACT_COOLDOWN / DT) t.contactCharged = false;
+    t.sinceContact = 0;
+  } else {
+    t.sinceContact++;
+  }
+  const charge = () => {
     t.contactThisTick = true;
-    t.contactCooldown = Math.round(CONTACT_COOLDOWN / DT);
+    t.contactCharged = true;
     chaseSide.contacts++;
     chaseSide.penalty += CONTACT_PENALTY;
-  }
+  };
+  if (!t.contactCharged && t.impact > CRASH_SPEED) charge();
 
   // Spins and walls, each driver's own -- except a leader spun by the chaser
   // hitting it, which the judges put down to the chaser.
   const playerSide = t.player;
   const other = t.opponent;
   const knocked = t.sinceContact < SPIN_FORGIVENESS / DT;
+  const knockedLeader = () => {
+    chaseSide.knocks++;
+    if (!t.contactCharged) charge();
+  };
   if (player.drift.spins > t.playerSpinsSeen) {
-    if (!(knocked && t.playerRole === 'lead')) {
+    if (knocked && t.playerRole === 'lead') {
+      knockedLeader();
+    } else {
       playerSide.spins += player.drift.spins - t.playerSpinsSeen;
       playerSide.penalty += SPIN_PENALTY * (player.drift.spins - t.playerSpinsSeen);
     }
@@ -582,7 +611,9 @@ function judge(t: TandemState, player: SimState, lead: SimState, chase: SimState
   }
   const p = t.partner;
   if (p.drift.spins > t.partnerSpinsSeen) {
-    if (!(knocked && t.playerRole === 'chase')) {
+    if (knocked && t.playerRole === 'chase') {
+      knockedLeader();
+    } else {
       other.spins += p.drift.spins - t.partnerSpinsSeen;
       other.penalty += SPIN_PENALTY * (p.drift.spins - t.partnerSpinsSeen);
     }

@@ -32,7 +32,7 @@ import {
 } from './storage/bests.ts';
 import { buildGhost, type GhostTrack } from './ghost.ts';
 import { createTandem, tandemScore, type TandemSide, type TandemState } from './sim/tandem.ts';
-import { runVerdict } from './ui/judges.ts';
+import { battleVerdict } from './ui/judges.ts';
 import { InputRecorder } from './sim/replay.ts';
 import { CHARACTERS, characterById, type Character } from './data/characters.ts';
 import { loadDecoration } from './render/decoration.ts';
@@ -133,6 +133,8 @@ interface Battle {
   outcome?: 'win' | 'loss' | 'omt';
   /** Each run's judging, both drivers, for the judges' words: [run 1, run 2]. */
   runs: { you: TandemSide; them: TandemSide }[];
+  /** Each earlier round's totals that went to One More Time, [yours, theirs]. */
+  rounds: [number, number][];
   /** Chasing a posted run: its inputs and car. */
   leader?: { inputs: InputRecorder; car: CarParams };
 }
@@ -590,7 +592,7 @@ function buildRivals(): void {
 function newHouseBattle(): Battle | null {
   if (!currentRoute) return null;
   const rival = characterById(settings.tandemRival);
-  return { kind: 'house', rival, name: rival.name, skill: rival.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0, runs: [] };
+  return { kind: 'house', rival, name: rival.name, skill: rival.skill, run: 1, omt: 0, youChase: 0, theyLead: 0, youLead: 0, theyChase: 0, timeMs: 0, runs: [], rounds: [] };
 }
 
 /** The caption for the run under way: "Run 1/2", "One more time · Run 2/2", "Chase". */
@@ -637,6 +639,7 @@ async function startChase(row: LeaderboardRow): Promise<void> {
       run: 1,
       omt: 0,
       runs: [],
+      rounds: [],
       youChase: 0,
       theyLead: 0,
       youLead: 0,
@@ -671,6 +674,7 @@ function finishBattleRun(outcome: RunOutcome): void {
     // Within 2% is too close to call, as the judges would say: one more time.
     const close = Math.abs(yours - theirs) <= 0.02 * Math.max(yours, theirs, 1);
     b.outcome = close ? 'omt' : yours > theirs ? 'win' : 'loss';
+    if (close) b.rounds.push([yours, theirs]);
     if (b.outcome === 'win' && b.rival && currentRoute) markBeaten(currentRoute.id, b.rival.id);
   }
   showBattleResults();
@@ -766,7 +770,7 @@ function battleTable(b: Battle, final: boolean): HTMLElement {
   return table;
 }
 
-/** The judges' word on each run so far: who took it, and why. */
+/** The judges' word on the battle so far: each run, who took it and why, and where One More Time stands. */
 function judgesWord(b: Battle): HTMLElement {
   const box = document.createElement('div');
   box.className = 'judges';
@@ -774,12 +778,12 @@ function judgesWord(b: Battle): HTMLElement {
   label.className = 'judges__label';
   label.textContent = 'From the judges';
   box.appendChild(label);
-  b.runs.forEach((r, i) => {
+  for (const line of battleVerdict(b)) {
     const p = document.createElement('p');
     p.className = 'judges__line';
-    p.textContent = runVerdict(b.kind === 'chase' ? 'The chase' : `Run ${i + 1}`, b.name, r.you, r.them);
+    p.textContent = line;
     box.appendChild(p);
-  });
+  }
   return box;
 }
 
@@ -853,6 +857,7 @@ function retry(): void {
   if (b.outcome === 'omt') {
     b.omt++;
     b.run = 1;
+    b.runs = [];
     b.timeMs = 0;
     b.outcome = undefined;
     startBattleRun();
