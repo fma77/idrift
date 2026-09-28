@@ -1,4 +1,5 @@
 import { createRng, nextUint32 } from './math/prng.ts';
+import { cos, sin } from './math/trig.ts';
 import { HASH_SEED, hashFloat, hashInt } from './math/hash.ts';
 import { stepVehicle, resetToRoad } from './model/vehicle.ts';
 import { stepThrottleControls, endDrift, isTailAgainstWall } from './model/throttleDrift.ts';
@@ -68,6 +69,8 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
     penaltyTicks: 0,
     wallHits: 0,
     hitThisTick: false,
+    bellsRung: 0,
+    bellThisTick: -1,
     drift: {
       banked: 0,
       pending: 0,
@@ -87,6 +90,8 @@ export function createSimState(route: RouteData, _car: CarParams): SimState {
       entryFactor: 1,
       lastDriftSign: 0,
       sideTicks: 0,
+      bellPoints: 0,
+      bellsScored: 0,
     },
     rngS0: rng.s0,
     rngS1: rng.s1,
@@ -162,6 +167,8 @@ export function stepSim(
     updateProgress(state, route);
   }
 
+  ringBells(state, car, route, config);
+
   if (config.mode === 'driftRun') {
     stepDriftScore(state, route, config, DT);
   }
@@ -174,6 +181,54 @@ export function stepSim(
     // Bank anything still pending in a zone that runs to the finish line.
     state.drift.banked += state.drift.pending;
     state.drift.pending = 0;
+  }
+}
+
+/**
+ * Drift angle, radians, from which the tail swings far enough out to ring a
+ * bell: within ten degrees of the Drift Run limit.
+ */
+const BELL_ANGLE = 0.78;
+
+/**
+ * Ring any bell the back of the car passes close enough to -- either rear
+ * corner, or the middle of the bumper, within the bell's radius -- at a big
+ * angle. The angle is the test that counts: with throttle controls the game
+ * puts the tail round the outside whatever the angle, so being there proves
+ * nothing, and in measured runs a lazy 30 degrees ran the tail out further
+ * than 55. Each bell rings once a run. A route without bells costs one check.
+ */
+function ringBells(state: SimState, car: CarParams, route: RouteData, config: SimConfig): void {
+  state.bellThisTick = -1;
+  const bells = route.bells;
+  if (!bells) return;
+  const angle = config.controls === 'throttle' ? (state.driftDir !== 0 ? state.driftAngle : 0) : Math.abs(state.slipAngle);
+  if (angle < BELL_ANGLE || state.spinTicks > 0) return;
+  const s = route.samples;
+  const c = cos(state.heading);
+  const n = sin(state.heading);
+  const back = car.bodyLength / 2;
+  const half = car.bodyWidth / 2;
+  const rearX = state.x - c * back;
+  const rearY = state.y - n * back;
+  for (let i = 0; i < bells.length; i++) {
+    const bell = bells[i];
+    if (state.bellsRung & (1 << i)) continue;
+    // Only near its corner: a bell is not rung from another leg of the road.
+    const along = state.sampleIndex - bell.index;
+    if (along < -30 || along > 30) continue;
+    const h = s.heading[bell.index];
+    const bx = s.x[bell.index] - sin(h) * bell.offset;
+    const by = s.y[bell.index] + cos(h) * bell.offset;
+    for (let side = -1; side <= 1; side++) {
+      const dx = rearX - n * half * side - bx;
+      const dy = rearY + c * half * side - by;
+      if (dx * dx + dy * dy <= bell.radius * bell.radius) {
+        state.bellsRung |= 1 << i;
+        state.bellThisTick = i;
+        return;
+      }
+    }
   }
 }
 

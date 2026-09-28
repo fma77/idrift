@@ -1,5 +1,6 @@
 import { sin, cos } from '../sim/math/trig.ts';
 import { getSprite } from './sprites.ts';
+import type { SceneryFeature } from './scenery.ts';
 
 /**
  * Route decoration.
@@ -34,6 +35,9 @@ export interface DecorationData {
   decorationVersion: number;
   palette: Record<string, string>;
   objects: DecoObject[];
+  /** A built world: which kind, and the places its spec marks. See scenery.ts. */
+  style?: 'street' | 'park';
+  features?: SceneryFeature[];
 }
 
 const cache = new Map<string, DecorationData | null>();

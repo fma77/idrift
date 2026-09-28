@@ -47,15 +47,38 @@ export class WorldArt {
     this.theme = theme;
     const rand = mulberry32(route.seed ^ 0x5eed);
 
-    this.grass = ctx.createPattern(paintGrass(theme, rand), 'repeat');
+    this.grass = ctx.createPattern(theme.style === 'street' ? paintPaving(theme, rand) : paintGrass(theme, rand), 'repeat');
     this.grass?.setTransform(new DOMMatrix().scale(GRASS_M / GRASS_PX));
     this.patches = ctx.createPattern(paintPatches(theme, rand), 'repeat');
     this.patches?.setTransform(new DOMMatrix().scale(PATCH_M / PATCH_PX));
 
     for (let i = 0; i < 4; i++) this.stamps.push(paintLeafTree(theme, rand, 2.2 + i * 0.45));
     for (let i = 0; i < 4; i++) this.stamps.push(paintConifer(theme, rand, 1.7 + i * 0.35));
+    // Street trees, smaller than the forest's, and cherry blossom where the theme has it.
+    for (let i = 0; i < 2; i++) this.stamps.push(paintLeafTree(theme, rand, 1.4 + i * 0.35));
+    const blossom = theme.blossom;
+    if (blossom) {
+      const pink = { ...theme, leaf: blossom };
+      for (let i = 0; i < 3; i++) this.stamps.push(paintLeafTree(pink, rand, 1.8 + i * 0.4));
+    }
 
-    this.plantTrees(route, rand);
+    // A street or a drift park places its own trees (see scenery.ts); only the
+    // countryside grows a forest along the road.
+    if (theme.style === 'country' || theme.forest > 0) this.plantTrees(route, rand);
+  }
+
+  /**
+   * Plant one tree: 'leaf' and 'conifer' in four sizes (0..3), 'street' in two
+   * (0..1), 'blossom' in three (0..2), where the theme has blossom.
+   */
+  plant(x: number, y: number, kind: 'leaf' | 'conifer' | 'street' | 'blossom', size: number): void {
+    const base = kind === 'leaf' ? 0 : kind === 'conifer' ? 4 : kind === 'street' ? 8 : this.stamps.length > 10 ? 10 : 8;
+    const count = kind === 'street' ? 2 : kind === 'blossom' ? (this.stamps.length > 10 ? 3 : 2) : 4;
+    const variant = base + Math.max(0, Math.min(count - 1, Math.floor(size)));
+    const key = cellKey(Math.floor(x / CELL), Math.floor(y / CELL));
+    let list = this.cells.get(key);
+    if (!list) this.cells.set(key, (list = []));
+    list.push(x, y, variant);
   }
 
   /** Grass and meadows over the whole view. `radius` is metres from (x, y) to a screen corner. */
@@ -158,7 +181,7 @@ function cellKey(cx: number, cy: number): number {
   return (cx + 4096) * 8192 + (cy + 4096);
 }
 
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -170,7 +193,7 @@ function mulberry32(seed: number): () => number {
 }
 
 /** Smooth 0..1 noise over the world, one random value per `cell` metres. */
-function valueNoise(rand: () => number, cell: number): (x: number, y: number) => number {
+export function valueNoise(rand: () => number, cell: number): (x: number, y: number) => number {
   const size = 64;
   const grid = new Float32Array(size * size);
   for (let i = 0; i < grid.length; i++) grid[i] = rand();
@@ -246,6 +269,57 @@ function paintGrass(theme: WorldTheme, rand: () => number): HTMLCanvasElement {
       ctx.fillStyle = theme.leaf[1];
       disc(ctx, px - r * 0.2, py - r * 0.25, r * 0.7);
     });
+  }
+  ctx.globalAlpha = 1;
+  return c;
+}
+
+/**
+ * Town ground: paving slabs, two metres square, each a shade off its
+ * neighbours, with the odd crack and stain. Most of it ends up under
+ * buildings; what shows is courtyards, alleys and forecourts.
+ */
+function paintPaving(theme: WorldTheme, rand: () => number): HTMLCanvasElement {
+  const [c, ctx] = canvas(GRASS_PX, GRASS_PX);
+  ctx.fillStyle = theme.ground;
+  ctx.fillRect(0, 0, GRASS_PX, GRASS_PX);
+  const slab = (GRASS_PX / GRASS_M) * 2;
+  for (let y = 0; y < GRASS_PX; y += slab) {
+    for (let x = 0; x < GRASS_PX; x += slab) {
+      ctx.globalAlpha = 0.18 + rand() * 0.22;
+      ctx.fillStyle = theme.grassStrokes[Math.floor(rand() * theme.grassStrokes.length)];
+      ctx.fillRect(x + 1, y + 1, slab - 2, slab - 2);
+    }
+  }
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = theme.shade;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= GRASS_PX; i += slab) {
+    ctx.beginPath();
+    ctx.moveTo(i + 0.5, 0);
+    ctx.lineTo(i + 0.5, GRASS_PX);
+    ctx.moveTo(0, i + 0.5);
+    ctx.lineTo(GRASS_PX, i + 0.5);
+    ctx.stroke();
+  }
+  // Cracks and stains.
+  for (let i = 0; i < 14; i++) {
+    const x = rand() * GRASS_PX;
+    const y = rand() * GRASS_PX;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    let px = x;
+    let py = y;
+    for (let k = 0; k < 4; k++) {
+      px += (rand() - 0.5) * 18;
+      py += (rand() - 0.5) * 18;
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = theme.shade;
+    disc(ctx, rand() * GRASS_PX, rand() * GRASS_PX, 6 + rand() * 14);
   }
   ctx.globalAlpha = 1;
   return c;

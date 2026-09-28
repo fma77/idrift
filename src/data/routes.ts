@@ -51,6 +51,22 @@ export const ROUTES: RouteEntry[] = [
     blurb: 'Fast opener, three hairpins, esses in the middle. 2.5km down.',
   },
   {
+    id: 'akari-town',
+    country: 'jp',
+    name: 'AKARI TOWN',
+    location: 'Akari Town, below the pass',
+    file: 'routes/akari-town.json',
+    blurb: 'Closed-off streets: block corners, a roundabout, the canal and two level crossings. 2.7km.',
+  },
+  {
+    id: 'akari-park',
+    country: 'jp',
+    name: 'AKARI DRIFT PARK',
+    location: 'Akari Drift Park, the old quarry',
+    file: 'routes/akari-park.json',
+    blurb: 'Built for it: a flat-out entry, the carousel, the esses, a hairpin, and two bells to ring. 2.4km.',
+  },
+  {
     id: 'estoril',
     country: 'pt',
     name: 'ESTORIL',

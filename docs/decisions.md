@@ -464,3 +464,43 @@ steers, so a chaser only decides throttle and when to flick.
 - **Crashes are physical**: pushed apart, momentum exchanged, twisted by an
   off-centre hit. A leader spun by the chaser is not charged for the spin.
 - **The database no longer lists the modes**; the worker does (migration 0005).
+
+## Tandem judging, second pass
+
+- **Touching is free.** Doors leaning on each other mid-drift, a nudge, a bump that
+  upsets nobody: all part of tandem. The chaser is charged (10) only for a crash,
+  at 4.5 m/s of closing speed or more, or for knocking the leader into a spin,
+  once per contact. In test runs a close chase touched at 0.5 to 4 m/s without
+  upsetting either car.
+- **Easier house drivers**: every character a step down. Kenji 0.5 (below the old
+  scale's end: the skill line now carries on down to 0.4), Norick 0.6, Taka 0.8,
+  DK 0.9.
+- **The judges' word** (`src/ui/judges.ts`) comes from the judging itself: the
+  sim records where each driver's points went (not sideways, short of angle, too
+  far back, angle not matched), and every penalty. A line per run: who took it,
+  the biggest thing the loser lost, every other incident by either driver, and
+  around One More Time why it was too close to split and what the last round
+  finished at.
+
+## Akari Town and Akari Drift Park
+
+- **Two courses built like Akari Downhill**: a corner list in `tools/specs`,
+  checked not to cross itself, with the flow and widths the tandem liked there.
+  The town is 8 m of street between pavements; the park 11 m of track between
+  walls.
+- **Built worlds** (`src/render/scenery.ts`). A spec marks where things go --
+  a junction, a level crossing, the canal, a car park, the pits, a grandstand --
+  and the scenery fills the rest from the route's seed: rows of buildings along
+  every street, houses with gardens in the quiet parts, poles and wires, lamps,
+  parked cars; round the park, walls, tyres, painted outer zones and clipping
+  boxes, crowds at the fences, and paddock aprons in whatever ground the legs of
+  the track leave. Placed once, bucketed, drawn from the buckets in view.
+  Decoration still never reaches the sim.
+- **Bells are the exception, and so they are route data**: ringing one scores
+  (10,000 in Drift Run, once per bell), so where they hang is in the route file,
+  and moving one needs a new route version. A bell rings when the back of the
+  car passes within its radius at 45 degrees or more: with throttle controls the
+  game puts the tail round the outside whatever the angle -- measured, a lazy 30
+  degrees ran it out further than 55 -- so the angle is the real test.
+- **Unlocks**: the two new routes sit after Akari Downhill. A route already
+  finished stays open even if a new one now stands in front of it.

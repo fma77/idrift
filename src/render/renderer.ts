@@ -7,6 +7,7 @@ import { TyreSmoke } from './smoke.ts';
 import { DirtSpray } from './dirt.ts';
 import { WorldArt } from './world.ts';
 import { themeFor, type WorldTheme } from './themes.ts';
+import { Scenery } from './scenery.ts';
 import type { GhostPose } from '../ghost.ts';
 
 /** A car repainted in a character's colours: the body, and two stripes. */
@@ -104,6 +105,13 @@ export class Renderer {
   private world: WorldArt | null = null;
   private worldRoute = '';
   private road: DisplayRoad | null = null;
+  /** A street's or a drift park's built scenery, made once the decoration file says what goes where. */
+  private scenery: Scenery | null = null;
+  /** Seconds of drawing so far: the clock a bell swings by. */
+  private clock = 0;
+  /** Bells rung, as the sim's bits, for the player's car and the other one: a new bit starts a swing. */
+  private bellsSeen = 0;
+  private partnerBellsSeen = 0;
 
   // Declared as a plain field rather than a constructor parameter property:
   // Node's type-stripping loader rejects parameter properties outright, and
@@ -194,6 +202,16 @@ export class Renderer {
     this.theme = themeFor(route.id);
     this.road = extendRoad(route);
     this.world = this.theme ? new WorldArt(this.road.route, this.theme, this.ctx) : null;
+    this.scenery = null;
+  }
+
+  /** Build the scenery when both the world and the decoration that places it are in. */
+  private prepareScenery(route: RouteData): void {
+    const theme = this.theme;
+    const deco = this.decoration;
+    if (!theme || theme.style === 'country' || !deco?.features || deco.routeId !== route.id) return;
+    if (this.scenery?.routeId === route.id || !this.road) return;
+    this.scenery = new Scenery(this.road, deco.features, theme, this.world);
   }
 
   clearTrails(): void {
@@ -233,7 +251,20 @@ export class Renderer {
     const view = interpolate(prev, state, alpha);
     const partnerView = partner ? interpolate(partner.prev, partner.next, alpha) : null;
     this.prepareWorld(route);
+    this.prepareScenery(route);
     const theme = this.theme;
+    const scenery = this.scenery;
+    this.clock += dtSeconds;
+    // Bells: a newly rung one starts swinging; a new run starts them all still.
+    if (scenery) {
+      if (state.bellsRung < this.bellsSeen) scenery.resetBells();
+      for (const [mask, seen] of [[state.bellsRung, this.bellsSeen], [partner?.next.bellsRung ?? 0, this.partnerBellsSeen]]) {
+        const fresh = mask & ~seen;
+        for (let b = 0; fresh >> b; b++) if (fresh & (1 << b)) scenery.ring(b, this.clock);
+      }
+    }
+    this.bellsSeen = state.bellsRung;
+    this.partnerBellsSeen = partner?.next.bellsRung ?? 0;
 
     this.camera.follow(view, settings, dtSeconds, this.width, this.height);
 
@@ -251,10 +282,16 @@ export class Renderer {
     const reach = Math.hypot(this.width / 2, carScreenY(this.width, this.height)) * px + 2;
 
     if (this.world) this.world.drawGround(ctx, this.camera.x, this.camera.y, reach);
+    const road = this.road ?? extendRoad(route);
+    // The stretch of drawn road in view, as the road itself is drawn.
+    const here = state.sampleIndex + road.before;
+    const drawFrom = Math.max(0, here - Math.round(REVEAL_BEHIND / route.sampleSpacing));
+    const drawTo = Math.min(road.route.samples.x.length - 1, here + Math.round(REVEAL_AHEAD / route.sampleSpacing));
+    if (scenery) scenery.drawGround(ctx, this.camera.x, this.camera.y, reach);
 
     // Scenery first: it sits under the road surface and the racing line. A
     // painted world grows its own trees, so the route's ink discs are skipped.
-    if (this.decoration) {
+    if (this.decoration && !scenery) {
       const spacing = route.sampleSpacing;
       drawDecoration(
         ctx,
@@ -266,10 +303,11 @@ export class Renderer {
       );
     }
 
-    const road = this.road ?? extendRoad(route);
     if (theme) this.drawPaintedRoad(ctx, road, state.sampleIndex, theme);
     else this.drawRoad(ctx, road, state.sampleIndex, px);
+    if (scenery) scenery.drawRoadPaint(ctx, drawFrom, drawTo);
     if (this.world) this.world.drawTrees(ctx, this.camera.x, this.camera.y, reach);
+    if (scenery) scenery.drawProps(ctx, this.camera.x, this.camera.y, reach, drawFrom, drawTo);
     this.drawScoringMarks(ctx, route, state, px);
     if (settings.showSkidMarks) {
       this.drawSkids(ctx, px, this.skidLeft, this.skidRight);
@@ -295,6 +333,8 @@ export class Renderer {
     // player's so the player's own car is always the one on top.
     if (partner && partnerView) this.drawCar(ctx, partnerView, partner.car, px, theme, partner.livery);
     this.drawCar(ctx, view, car, px, theme);
+    // Wires, gantries and bells hang over the cars.
+    if (scenery) scenery.drawOverhead(ctx, drawFrom, drawTo, this.clock, this.camera.x, this.camera.y, reach);
 
     ctx.restore();
 

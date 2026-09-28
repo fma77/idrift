@@ -1658,6 +1658,7 @@ function showResults(result: RunOutcome['result'], isBest: boolean): void {
       scoreRow('Transitions', String(result.reversals), result.transitionBonus, true),
       scoreRow('Spins', String(result.spins), -result.spinPenalty, true),
       scoreRow('Wall hits', String(result.wallHits), -result.wallPenalty, true),
+      ...(route.bells?.length ? [scoreRow('Bells rung', `${result.bells} / ${route.bells.length}`, result.bellBonus, true)] : []),
       totalRow('Final score', result.points.toLocaleString('en-GB')),
     );
   } else {

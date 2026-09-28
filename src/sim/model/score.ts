@@ -34,6 +34,13 @@ const STRAIGHTEN_GRACE = 36;
 /** Time Attack penalty for hitting a wall, in sim ticks (2 seconds at 120Hz). */
 export const WALL_PENALTY_TICKS = 240;
 
+/**
+ * Points for ringing a bell while drifting. Flat, not a share of the run: a
+ * bell is a target, hit or missed. Mirrored in tools/bake-route.mjs, which
+ * counts it into a route's points bound.
+ */
+export const BELL_POINTS = 10000;
+
 /** Ceiling on the combo multiplier so a single long zone cannot run away. */
 const MAX_MULTIPLIER = 8;
 
@@ -134,6 +141,12 @@ export function stepDriftScore(state: SimState, route: RouteData, config: SimCon
     !state.hitThisTick &&
     state.spinTicks === 0 &&
     (!throttleControls || state.driftDir !== 0);
+
+  // A bell rung by a car drifting -- the tail out at the wall, as intended.
+  if (state.bellThisTick >= 0 && drifting) {
+    d.bellPoints += BELL_POINTS;
+    d.bellsScored++;
+  }
 
   if (drifting) {
     // Count a steering reversal: the slide swapped sides while still committed.
@@ -266,6 +279,9 @@ export interface RunResult {
   earned: number;
   zoneBonus: number;
   transitionBonus: number;
+  /** Points for bells rung, and how many. */
+  bellBonus: number;
+  bells: number;
   spinPenalty: number;
   wallPenalty: number;
   wallHits: number;
@@ -307,7 +323,8 @@ export function gradeRun(state: SimState, route: RouteData, tickRate: number): R
   const transitionBonus = Math.round(earned * Math.min(TRANSITION_CAP, TRANSITION_BONUS * d.reversals));
   const spinPenalty = Math.round(earned * Math.min(SPIN_CAP, SPIN_PENALTY * d.spins));
   const wallPenalty = Math.round(earned * Math.min(WALL_CAP, WALL_PENALTY * state.wallHits));
-  const points = Math.max(0, earned + zoneBonus + transitionBonus - spinPenalty - wallPenalty);
+  const bellBonus = Math.round(d.bellPoints);
+  const points = Math.max(0, earned + zoneBonus + transitionBonus + bellBonus - spinPenalty - wallPenalty);
 
   const ratio = earned === 0 ? 0 : points / earned;
   const grade: StyleGrade =
@@ -320,6 +337,8 @@ export function gradeRun(state: SimState, route: RouteData, tickRate: number): R
     earned,
     zoneBonus,
     transitionBonus,
+    bellBonus,
+    bells: d.bellsScored,
     spinPenalty,
     wallPenalty,
     wallHits: state.wallHits,

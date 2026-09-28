@@ -235,6 +235,20 @@ export interface ClipPoint {
   radius: number;
 }
 
+/**
+ * A bell hung over the outside of a corner, at a drift park. The tail of a car
+ * passing close enough rings it; in Drift Run, a car drifting when it does
+ * scores for it, once per bell per run.
+ */
+export interface Bell {
+  /** Centreline sample index. */
+  index: number;
+  /** Lateral offset from the centreline in metres; positive = left. */
+  offset: number;
+  /** Metres. The back of the car within this of the bell rings it. */
+  radius: number;
+}
+
 export interface DriftZone {
   entryIndex: number;
   exitIndex: number;
@@ -259,6 +273,8 @@ export interface RouteData {
   corners: RouteCorner[];
   clipPoints: ClipPoint[];
   driftZones: DriftZone[];
+  /** Bells to ring, on the routes that have them. */
+  bells?: Bell[];
   /** Sanity bounds for server-side score rejection. */
   theoreticalMinTime: number;
   theoreticalMaxPoints: number;
@@ -358,6 +374,9 @@ export interface DriftScoreState {
   sideTicks: number;
   /** 0.5..1. How well timed the last drift entry was. Throttle controls only. */
   entryFactor: number;
+  /** Points from bells rung while drifting, and how many. Kept apart from the drifting points. */
+  bellPoints: number;
+  bellsScored: number;
 }
 
 export interface SimState {
@@ -451,6 +470,10 @@ export interface SimState {
   wallHits: number;
   /** Set for one tick on wall contact, for renderer/audio feedback. */
   hitThisTick: boolean;
+  /** Bells rung so far, as bits by index into route.bells: each rings once a run. */
+  bellsRung: number;
+  /** The bell rung this tick, -1 if none. For the renderer, the audio and the score. */
+  bellThisTick: number;
   drift: DriftScoreState;
 
   // --- Determinism bookkeeping ---

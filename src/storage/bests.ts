@@ -123,7 +123,9 @@ export function isCompleted(routeId: string): boolean {
  */
 export function isUnlocked(routeIds: string[], index: number): boolean {
   if (index <= 0) return true;
-  return isCompleted(routeIds[index - 1]);
+  // A route already finished stays open, even if a new route has since been
+  // put in front of it.
+  return isCompleted(routeIds[index - 1]) || isCompleted(routeIds[index]);
 }
 
 // --- Replays ----------------------------------------------------------------

@@ -3,7 +3,7 @@ import type { RouteData, SimConfig, SimState } from '../sim/types.ts';
 import type { DriftGauge } from './driftGauge.ts';
 import { realKmh, WORLD_SCALE } from '../data/scale.ts';
 import { holdPhase, HOLD_OVER } from '../sim/model/throttleDrift.ts';
-import { SPIN_ANGLE } from '../sim/model/score.ts';
+import { SPIN_ANGLE, BELL_POINTS } from '../sim/model/score.ts';
 import { ghostPointsGap, ghostTimeGap, type GhostTrack } from '../ghost.ts';
 import { tandemScore, type TandemState } from '../sim/tandem.ts';
 
@@ -60,6 +60,7 @@ const SEVERITY_GLYPH = ['', '>', '>>', '>>>', '>>>>', '>>>>>', '>>>>>>'];
 export class Hud {
   private lastScore = 0;
   private lastBanked = 0;
+  private lastBells = 0;
   private lastPaceKey = '';
 
   /** The touch drift pad, filled while the button is held. */
@@ -293,7 +294,7 @@ export class Hud {
     el.angleValue.textContent = String(Math.round(Math.min(Math.abs(state.slipAngle), Math.PI / 2) * 57.29578));
 
     if (mode === 'driftRun') {
-      const total = Math.round(state.drift.banked + state.drift.pending);
+      const total = Math.round(state.drift.banked + state.drift.pending + state.drift.bellPoints);
       el.comboLabel.textContent = 'Combo';
       el.comboValue.textContent = `x${state.drift.multiplier.toFixed(1)}`;
       el.scoreLabel.textContent = 'Score';
@@ -331,6 +332,14 @@ export class Hud {
         el.bankPop.classList.add('bank-pop--show');
       }
       this.lastBanked = banked;
+      // A bell rung: its own pop, over whatever the drift banks.
+      if (state.drift.bellsScored > this.lastBells) {
+        el.bankPop.textContent = `BELL +${BELL_POINTS.toLocaleString('en-GB')}`;
+        el.bankPop.classList.remove('bank-pop--show');
+        void el.bankPop.offsetWidth;
+        el.bankPop.classList.add('bank-pop--show');
+      }
+      this.lastBells = state.drift.bellsScored;
       this.updateZone(state, route);
     } else {
       const seconds = (state.raceTicks + state.penaltyTicks) / TICK_RATE;

@@ -48,8 +48,11 @@ function curvatureProfile(segments, ds) {
   const k = [];
   const widths = [];
   const grips = [];
+  /** Each segment's first and last sample, for placing bells and scenery on it. */
+  const ranges = [];
 
   for (const seg of segments) {
+    const first = k.length;
     const width = seg.width ?? null;
     const grip = seg.grip ?? null;
 
@@ -60,6 +63,7 @@ function curvatureProfile(segments, ds) {
         widths.push(width);
         grips.push(grip);
       }
+      ranges.push([first, k.length - 1]);
       continue;
     }
 
@@ -88,9 +92,10 @@ function curvatureProfile(segments, ds) {
       widths.push(width);
       grips.push(grip);
     }
+    ranges.push([first, k.length - 1]);
   }
 
-  return { k, widths, grips };
+  return { k, widths, grips, ranges };
 }
 
 /** Integrate a curvature profile into positions and headings. */
@@ -737,10 +742,23 @@ function lcg(seed) {
  * can cull it with the same window it uses for the road instead of doing a
  * spatial query every frame.
  */
-function bakeDecoration(route) {
+function bakeDecoration(route, style) {
   const rand = lcg(route.seed ^ 0x5eed);
   const s = route.samples;
   const objects = [];
+  // A street or a drift park paints its whole world in the renderer, from the
+  // features the spec marks; the ink scatter below is for the plain look.
+  if (style) {
+    return {
+      routeId: route.id,
+      routeVersion: route.version,
+      decorationVersion: 1,
+      style,
+      palette: {},
+      objects,
+      features: route.features ?? [],
+    };
+  }
 
   for (let i = 0; i < s.x.length; i++) {
     const h = s.heading[i];
@@ -815,7 +833,7 @@ function bakeDecoration(route) {
 
 function bakeFromSpec(spec) {
   const ds = spec.sampleSpacing ?? 2;
-  const { k, widths, grips } = curvatureProfile(spec.segments, ds);
+  const { k, widths, grips, ranges } = curvatureProfile(spec.segments, ds);
   const { x, y, heading } = integrate(k, ds, (spec.startHeading ?? 0) * DEG);
 
   const defaultWidth = spec.width ?? 7;
@@ -826,8 +844,8 @@ function bakeFromSpec(spec) {
   const corners = deriveCorners(k, ds);
   const clipPoints = deriveClipPoints(corners, halfWidth);
   const driftZones = deriveDriftZones(corners, ds);
-
-  return {
+  const bells = placeBells(spec.segments, ranges, halfWidth);
+  const route = {
     id: spec.id,
     version: spec.version ?? 1,
     name: spec.name,
@@ -846,11 +864,81 @@ function bakeFromSpec(spec) {
     corners,
     clipPoints: clipPoints.map((c) => ({ ...c, offset: round3(c.offset) })),
     driftZones,
+    ...(bells.length > 0 ? { bells } : {}),
     theoreticalMinTime: theoreticalMinTime(k, ds, defaultGrip),
-    theoreticalMaxPoints: theoreticalMaxPoints(driftZones, ds),
+    theoreticalMaxPoints: theoreticalMaxPoints(driftZones, ds) + bells.length * BELL_POINTS,
     decoration: spec.decoration ?? `${spec.id}.deco.json`,
     poster: spec.poster ?? `art/routes/${spec.id}-poster.png`,
   };
+  // Where the scenery goes: not part of the route, handed to the decoration.
+  Object.defineProperty(route, 'features', { value: sceneryFeatures(spec, ranges, route), enumerable: false });
+  return route;
+}
+
+/**
+ * Must match BELL_POINTS in src/sim/model/score.ts: what ringing a bell scores,
+ * counted into the route's points bound.
+ */
+const BELL_POINTS = 10000;
+/** Metres in from the outside edge a bell hangs, and how near the tail must pass. */
+const BELL_INSET = 1.3;
+const BELL_RADIUS = 1.1;
+/** How far through its corner a bell hangs: past the apex, where the tail swings widest. */
+const BELL_AT = 0.6;
+
+/**
+ * Bells: one on the outside of each corner marked `bell` in the spec, hung
+ * just in from the edge, where a tail at full angle passes. The sim rings
+ * them, so they are part of the route.
+ */
+function placeBells(segments, ranges, halfWidth) {
+  const bells = [];
+  segments.forEach((seg, i) => {
+    if (!seg.bell || seg.type !== 'corner') return;
+    const [a, b] = ranges[i];
+    const index = Math.round(a + (b - a) * BELL_AT);
+    const inside = seg.direction === 'left' ? 1 : -1;
+    bells.push({ index, offset: round3(-inside * (halfWidth[index] - BELL_INSET)), radius: BELL_RADIUS });
+  });
+  return bells;
+}
+
+/**
+ * The spec's scenery marks -- a junction here, a level crossing there, the
+ * pits along this straight -- as features for the decoration file. Where to put
+ * things is authored; what they look like is the renderer's.
+ */
+function sceneryFeatures(spec, ranges, route) {
+  const s = route.samples;
+  const features = [];
+  const sides = (v) => (v === 'both' ? [1, -1] : v === 'left' ? [1] : v === 'right' ? [-1] : []);
+  spec.segments.forEach((seg, i) => {
+    const [from, to] = ranges[i];
+    const mid = Math.round((from + to) / 2);
+    for (const side of sides(seg.junction)) features.push({ kind: 'junction', index: mid, from, to, side });
+    for (const side of sides(seg.lot)) features.push({ kind: 'lot', index: mid, from, to, side });
+    for (const side of sides(seg.pits)) features.push({ kind: 'pits', index: mid, from, to, side });
+    for (const side of sides(seg.grandstand)) features.push({ kind: 'grandstand', index: mid, from, to, side });
+    for (const side of sides(seg.paddock)) features.push({ kind: 'paddock', index: mid, from, to, side });
+    if (seg.shops) features.push({ kind: 'shops', index: mid, from, to, side: 0 });
+    if (seg.crossing) features.push({ kind: seg.crossing, index: mid, from, to, side: 0 });
+    if (seg.roundabout) {
+      // The island at the corner's centre of turn.
+      const inside = seg.direction === 'left' ? 1 : -1;
+      const h = s.heading[mid];
+      features.push({
+        kind: 'roundabout',
+        index: mid,
+        from,
+        to,
+        side: inside,
+        x: round3(s.x[mid] - Math.sin(h) * seg.radius * inside),
+        y: round3(s.y[mid] + Math.cos(h) * seg.radius * inside),
+        radius: seg.radius,
+      });
+    }
+  });
+  return features;
 }
 
 async function bakeFromOsm(wayId, spec) {
@@ -1055,7 +1143,7 @@ async function main() {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(route));
 
-  const deco = bakeDecoration(route);
+  const deco = bakeDecoration(route, spec.style);
   const decoOut = resolve(dirname(out), `${route.id}.deco.json`);
   writeFileSync(decoOut, JSON.stringify(deco));
 
@@ -1068,7 +1156,8 @@ async function main() {
   console.log(`  min time       ${route.theoreticalMinTime}s (theoretical bound)`);
   console.log(`  max points     ${route.theoreticalMaxPoints} (theoretical bound)`);
   console.log(`  file size      ${(bytes / 1024).toFixed(1)} KB`);
-  console.log(`  decoration     ${deco.objects.length} objects -> ${basename(decoOut)}`);
+  console.log(`  decoration     ${deco.objects.length} objects, ${deco.features?.length ?? 0} features -> ${basename(decoOut)}`);
+  if (route.bells) console.log(`  bells          ${route.bells.length}`);
 }
 
 main().catch((err) => {

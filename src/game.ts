@@ -56,6 +56,9 @@ export class GameSession {
   private prevPartner: SimState | null = null;
   /** The hardest hit between the cars since the last frame, m/s. Tandem only. */
   private pendingImpact = 0;
+  /** Bells already heard ring, as the sim's bits, so each one sounds once. */
+  private bellsHeard = 0;
+  private partnerBellsHeard = 0;
   private recorder = new InputRecorder();
   private hashes: number[] = [];
 
@@ -262,6 +265,17 @@ export class GameSession {
     }
     this.hud.update(this.state, this.route, this.config);
     this.audio?.update(this.state, this.car);
+    // Bells: the player's own, full; the other car's, by how near it is.
+    const mine = this.state.bellsRung & ~this.bellsHeard;
+    const theirs = (this.tandem?.partner.bellsRung ?? 0) & ~this.partnerBellsHeard;
+    if (mine) this.audio?.triggerBell(1);
+    if (theirs && this.tandem) {
+      const p = this.tandem.partner;
+      const d = Math.hypot(p.x - this.state.x, p.y - this.state.y);
+      this.audio?.triggerBell(Math.max(0.3, Math.min(1, 1 - (d - 5) / 60)));
+    }
+    this.bellsHeard = this.state.bellsRung;
+    this.partnerBellsHeard = this.tandem?.partner.bellsRung ?? 0;
   }
 
   resize(): void {

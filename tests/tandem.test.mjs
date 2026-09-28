@@ -4,14 +4,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { createSimState, quantiseInput, dequantiseInput, InputRecorder, TICK_RATE, TICKS_PER_INPUT } from '../src/sim/index.ts';
+import { createSimState, stepSim, quantiseInput, dequantiseInput, InputRecorder, TICK_RATE, TICKS_PER_INPUT } from '../src/sim/index.ts';
 import { createTandem, stepTandem, tandemScore, placeAhead, proximity, bumperGap } from '../src/sim/tandem.ts';
 import { carById } from '../src/data/cars.ts';
 import { configFor, DRIFT_CONTROL } from '../src/data/assist.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const load = (name) => JSON.parse(readFileSync(resolve(here, '../public/routes', `${name}.json`), 'utf8'));
-const ROUTES = ['akari-downhill', 'estoril', 'nurburg', 'haruna-upper', 'haruna-middle', 'haruna-lower'].map(load);
+const ROUTES = ['akari-downhill', 'estoril', 'nurburg', 'haruna-upper', 'haruna-middle', 'haruna-lower', 'akari-town', 'akari-park'].map(load);
 const config = configFor('driftRun', 'throttle');
 
 /** A stand-in player: throws it in before corners and balances the angle, like the sim tests' driver. */
@@ -235,4 +235,42 @@ test("tandem: the judges name every incident, and follow One More Time", async (
   assert.match(rerun[1], /^OMT run 1 to DK/);
   const settled = battleVerdict({ kind: 'house', name: 'DK', omt: 1, runs: [r1, r2], outcome: 'win', rounds: [[160, 170]] });
   assert.match(settled.at(-1), /^Settled at the first One More Time, after 160–170/);
+});
+
+test('bells: a drift at the limit rings them and scores; a timid one rings none', async () => {
+  const { gradeRun } = await import('../src/sim/index.ts');
+  const { BELL_POINTS } = await import('../src/sim/model/score.ts');
+  const route = load('akari-park');
+  const car = carById('silvia');
+  assert.equal(route.bells.length, 2);
+  // The stand-in driver, holding its angle this far under the limit.
+  const run = (margin) => {
+    const state = createSimState(route, car);
+    let throttle = 0;
+    let hold = 0;
+    const sign = (st, m) => {
+      const last = route.samples.x.length - 1;
+      for (let j = 0; j <= Math.round(m / route.sampleSpacing); j++) {
+        const k = route.samples.curvature[Math.min(last, st.sampleIndex + j)];
+        if (Math.abs(k) > 1 / 60) return Math.sign(k);
+      }
+      return 0;
+    };
+    while (!state.finished && state.tick < TICK_RATE * 300) {
+      const next = sign(state, 24);
+      let tap = (state.driftDir === 0 && state.spinTicks === 0 && next !== 0) || (state.driftDir !== 0 && next === -state.driftDir);
+      if (tap && hold === 0) hold = 13;
+      const keep = state.driftDir === 0 || (sign(state, 40) !== 0 && state.driftAngle < DRIFT_CONTROL.limitAngle - margin);
+      throttle = Math.min(1, Math.max(0, throttle + (keep ? 1 / 0.45 : -1 / 0.3) / 60));
+      stepSim(state, { steer: 0, throttle, initiate: hold > 0 }, car, route, config);
+      if (hold > 0) hold--;
+    }
+    return gradeRun(state, route, TICK_RATE);
+  };
+  const bold = run(0.05);
+  assert.equal(bold.bells, 2, 'near the limit, both bells ring');
+  assert.equal(bold.bellBonus, 2 * BELL_POINTS);
+  const timid = run(0.3);
+  assert.equal(timid.bells, 0, 'at a timid angle, neither rings');
+  assert.equal(timid.bellBonus, 0);
 });

@@ -321,6 +321,57 @@ export class EngineAudio {
     ring.stop(now + 0.18);
   }
 
+  /**
+   * A bell struck: a bright strike, then a long ring of a few inharmonic
+   * partials, the way a cast bell sounds, dying away over a couple of seconds.
+   * `level` 0..1: the other car's bell further off is quieter.
+   */
+  triggerBell(level = 1): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const now = ctx.currentTime;
+    const base = 740;
+    // Hum, prime, tierce, quint, nominal: a bell's partials, roughly.
+    const partials: [number, number, number][] = [
+      [0.5, 0.35, 2.6],
+      [1, 0.5, 2.2],
+      [1.19, 0.3, 1.6],
+      [1.5, 0.22, 1.3],
+      [2, 0.28, 1.1],
+      [2.74, 0.12, 0.6],
+      [3.6, 0.08, 0.35],
+    ];
+    const out = ctx.createGain();
+    out.gain.value = 0.55 * Math.max(0, Math.min(1, level));
+    out.connect(this.master);
+    for (const [ratio, amp, decay] of partials) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = base * ratio;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(amp, now + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0008, now + decay);
+      osc.connect(env).connect(out);
+      osc.start(now);
+      osc.stop(now + decay + 0.05);
+    }
+    // The strike itself: a click of noise, bright.
+    if (this.noiseBuffer) {
+      const click = ctx.createBufferSource();
+      click.buffer = this.noiseBuffer;
+      const high = ctx.createBiquadFilter();
+      high.type = 'highpass';
+      high.frequency.value = 3000;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.5, now);
+      env.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      click.connect(high).connect(env).connect(out);
+      click.start(now, Math.random() * 0.5);
+      click.stop(now + 0.06);
+    }
+  }
+
   /** Swap the voice live, for the sound lab. */
   setVoice(voice: VoiceParams): void {
     this.node?.port.postMessage({ type: 'voice', voice });
