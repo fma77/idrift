@@ -39,6 +39,8 @@ export interface RouteEntry {
   blurb: string;
   /** Credit line for routes built from third-party data. Shown on the route screen. */
   attribution?: string;
+  /** Still being worked on: listed only in preview (see previewEnabled). */
+  hidden?: boolean;
 }
 
 export const ROUTES: RouteEntry[] = [
@@ -56,6 +58,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'AKARI TOWN',
     location: 'Akari Town, below the pass',
     file: 'routes/akari-town.json',
+    hidden: true,
     blurb: 'Closed-off streets: block corners, a roundabout, the canal and two level crossings. 2.7km.',
   },
   {
@@ -64,6 +67,7 @@ export const ROUTES: RouteEntry[] = [
     name: 'AKARI DRIFT PARK',
     location: 'Akari Drift Park, the old quarry',
     file: 'routes/akari-park.json',
+    hidden: true,
     blurb: 'Built for it: a flat-out entry, the carousel, the esses, a hairpin, and two bells to ring. 2.4km.',
   },
   {
@@ -129,6 +133,33 @@ export const ROUTES: RouteEntry[] = [
 ];
 
 export const ROUTE_IDS = ROUTES.map((r) => r.id);
+
+const PREVIEW_KEY = 'idrift-preview';
+
+/**
+ * Preview: routes still being worked on show in the list only on a device that
+ * has opened the game with ?preview in the address. It is remembered there
+ * (?preview=off forgets it), so the game can then be opened normally. Hidden,
+ * not secret: the route files are served to anyone who asks for them.
+ */
+export function previewEnabled(): boolean {
+  try {
+    const param = new URLSearchParams(window.location.search).get('preview');
+    if (param !== null) {
+      if (param === 'off' || param === '0') localStorage.removeItem(PREVIEW_KEY);
+      else localStorage.setItem(PREVIEW_KEY, '1');
+    }
+    return localStorage.getItem(PREVIEW_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** The routes to list: all of them in preview, otherwise those that are ready. */
+export function listedRoutes(): RouteEntry[] {
+  const preview = previewEnabled();
+  return ROUTES.filter((r) => preview || !r.hidden);
+}
 
 const cache = new Map<string, RouteData>();
 

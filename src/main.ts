@@ -17,7 +17,7 @@ import { SoundLab } from './ui/soundLab.ts';
 import { CARS, carById } from './data/cars.ts';
 import { realKmh } from './data/scale.ts';
 import { configFor } from './data/assist.ts';
-import { ROUTES, loadRoute, type RouteEntry } from './data/routes.ts';
+import { ROUTES, listedRoutes, loadRoute, type RouteEntry } from './data/routes.ts';
 import { loadSettings, saveSettings, type Settings } from './storage/settings.ts';
 import {
   getBest,
@@ -262,7 +262,7 @@ function showGame(): void {
 function buildRouteList(): void {
   const list = $('route-list');
   list.replaceChildren(
-    ...ROUTES.map((entry) => {
+    ...listedRoutes().map((entry) => {
       const button = document.createElement('button');
       button.className = 'card';
 
